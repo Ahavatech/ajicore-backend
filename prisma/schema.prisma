@@ -45,41 +45,62 @@ enum StaffRole {
   Admin
 }
 
+enum AuthProvider {
+  Email
+  Google
+}
+
 // ============================================
 // Models
 // ============================================
 
 model User {
-  id            String     @id @default(uuid())
-  email         String     @unique
-  password_hash String
-  name          String?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id              String       @id @default(uuid())
+  email           String       @unique
+  password_hash   String?
+  first_name      String?
+  last_name       String?
+  auth_provider   AuthProvider  @default(Email)
+  google_id       String?      @unique
+  onboarding_step Int          @default(1)
+  onboarding_completed Boolean @default(false)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
   // Relations
-  businesses    Business[]
+  businesses      Business[]
 
   @@map("users")
 }
 
 model Business {
-  id                    String     @id @default(uuid())
-  name                  String
-  industry              String
+  id                     String     @id @default(uuid())
+  name                   String
+  industry               String
   dedicated_phone_number String?
-  owner_id              String?
-  createdAt             DateTime   @default(now())
-  updatedAt             DateTime   @updatedAt
+  owner_id               String?
+  company_email          String?
+  company_type           String?
+  company_phone          String?
+  street                 String?
+  city                   String?
+  postal_code            String?
+  country                String?
+  logo_url               String?
+  ai_phone_number        String?
+  ai_phone_country       String?
+  ai_phone_area_code     String?
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
 
   // Relations
-  owner                 User?      @relation(fields: [owner_id], references: [id], onDelete: SetNull)
-  staff                 Staff[]
-  customers             Customer[]
-  jobs                  Job[]
-  expenses              Expense[]
-  materials             Material[]
-  vehicles              Vehicle[]
+  owner                  User?      @relation(fields: [owner_id], references: [id], onDelete: SetNull)
+  staff                  Staff[]
+  customers              Customer[]
+  jobs                   Job[]
+  expenses               Expense[]
+  materials              Material[]
+  vehicles               Vehicle[]
 
   @@map("businesses")
 }
