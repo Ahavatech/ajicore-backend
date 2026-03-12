@@ -1,0 +1,247 @@
+// Ajicore Prisma Schema
+// Service Business Management Platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================
+// Enums
+// ============================================
+
+enum JobStatus {
+  Pending
+  Scheduled
+  InProgress
+  Completed
+  Cancelled
+}
+
+enum DocumentType {
+  Quote
+  Invoice
+}
+
+enum InvoiceStatus {
+  Draft
+  Sent
+  PartiallyPaid
+  Paid
+  Overdue
+  Cancelled
+}
+
+enum StaffRole {
+  Owner
+  Manager
+  Technician
+  Apprentice
+  Admin
+}
+
+// ============================================
+// Models
+// ============================================
+
+model User {
+  id            String     @id @default(uuid())
+  email         String     @unique
+  password_hash String
+  name          String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  // Relations
+  businesses    Business[]
+
+  @@map("users")
+}
+
+model Business {
+  id                    String     @id @default(uuid())
+  name                  String
+  industry              String
+  dedicated_phone_number String?
+  owner_id              String?
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  // Relations
+  owner                 User?      @relation(fields: [owner_id], references: [id], onDelete: SetNull)
+  staff                 Staff[]
+  customers             Customer[]
+  jobs                  Job[]
+  expenses              Expense[]
+  materials             Material[]
+  vehicles              Vehicle[]
+
+  @@map("businesses")
+}
+
+model Staff {
+  id           String    @id @default(uuid())
+  business_id  String
+  name         String
+  role         StaffRole @default(Technician)
+  hourly_rate  Float
+  email        String?
+  phone        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  business     Business    @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  assigned_jobs Job[]      @relation("AssignedStaff")
+  timesheets   Timesheet[]
+
+  @@map("staff")
+}
+
+model Timesheet {
+  id          String    @id @default(uuid())
+  staff_id    String
+  clock_in    DateTime
+  clock_out   DateTime?
+  total_hours Float?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  staff       Staff     @relation(fields: [staff_id], references: [id], onDelete: Cascade)
+
+  @@map("timesheets")
+}
+
+model Customer {
+  id           String   @id @default(uuid())
+  business_id  String
+  first_name   String
+  last_name    String
+  phone_number String?
+  email        String?
+  address      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  business     Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  jobs         Job[]
+
+  @@map("customers")
+}
+
+model Job {
+  id                  String    @id @default(uuid())
+  business_id         String
+  customer_id         String
+  assigned_staff_id   String?
+  status              JobStatus @default(Pending)
+  scheduled_start_time DateTime?
+  scheduled_end_time   DateTime?
+  job_details         String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  // Relations
+  business            Business        @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  customer            Customer        @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  assigned_staff      Staff?          @relation("AssignedStaff", fields: [assigned_staff_id], references: [id], onDelete: SetNull)
+  quote_invoices      Quote_Invoice[]
+  job_materials       Job_Material[]
+  expenses            Expense[]
+
+  @@map("jobs")
+}
+
+model Quote_Invoice {
+  id           String        @id @default(uuid())
+  job_id       String
+  type         DocumentType
+  status       InvoiceStatus @default(Draft)
+  total_amount Float
+  amount_paid  Float         @default(0)
+  due_date     DateTime?
+  notes        String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  // Relations
+  job          Job           @relation(fields: [job_id], references: [id], onDelete: Cascade)
+
+  @@map("quote_invoices")
+}
+
+model Expense {
+  id          String   @id @default(uuid())
+  business_id String
+  job_id      String?
+  category    String
+  amount      Float
+  description String?
+  date        DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  business    Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  job         Job?     @relation(fields: [job_id], references: [id], onDelete: SetNull)
+
+  @@map("expenses")
+}
+
+model Material {
+  id                String         @id @default(uuid())
+  business_id       String
+  name              String
+  quantity_on_hand  Int            @default(0)
+  restock_threshold Int            @default(5)
+  unit_cost         Float?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  // Relations
+  business          Business       @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  job_materials     Job_Material[]
+
+  @@map("materials")
+}
+
+model Job_Material {
+  id            String   @id @default(uuid())
+  job_id        String
+  material_id   String
+  quantity_used Int
+  createdAt     DateTime @default(now())
+
+  // Relations
+  job           Job      @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  material      Material @relation(fields: [material_id], references: [id], onDelete: Cascade)
+
+  @@map("job_materials")
+}
+
+model Vehicle {
+  id                      String   @id @default(uuid())
+  business_id             String
+  make_model              String
+  license_plate           String?
+  mileage                 Int      @default(0)
+  insurance_expiry        DateTime?
+  registration_renewal    DateTime?
+  maintenance_cycle_miles Int      @default(5000)
+  last_maintenance_mileage Int     @default(0)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  // Relations
+  business                Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
+
+  @@map("vehicles")
+}
