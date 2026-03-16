@@ -5,7 +5,6 @@
 const env = require('../../config/env');
 const logger = require('../../utils/logger');
 
-// Lazy-load Stripe to avoid crashes if the package isn't installed yet
 let stripe = null;
 
 function getStripe() {
@@ -14,7 +13,7 @@ function getStripe() {
       const Stripe = require('stripe');
       stripe = new Stripe(env.STRIPE_SECRET_KEY);
     } catch (err) {
-      logger.warn('Stripe SDK not installed. Payment features will be unavailable.');
+      logger.warn('Stripe SDK not installed or STRIPE_SECRET_KEY not set. Payment processing will be manual.');
       return null;
     }
   }
@@ -22,13 +21,22 @@ function getStripe() {
 }
 
 /**
- * Create a Stripe PaymentIntent.
- * @param {Object} params - { amount (cents), currency, payment_method, confirm }
+ * Check if Stripe is available and configured.
  */
+function isConfigured() {
+  if (!env.STRIPE_SECRET_KEY) return false;
+  try {
+    const client = getStripe();
+    return !!client;
+  } catch {
+    return false;
+  }
+}
+
 async function createPaymentIntent(params) {
   const client = getStripe();
   if (!client) {
-    throw new Error('Stripe is not configured. Install stripe package and set STRIPE_SECRET_KEY.');
+    throw new Error('Stripe is not configured. Set STRIPE_SECRET_KEY environment variable.');
   }
 
   const paymentIntent = await client.paymentIntents.create({
@@ -46,18 +54,12 @@ async function createPaymentIntent(params) {
   return paymentIntent;
 }
 
-/**
- * Handle Stripe webhook events.
- * @param {string} payload - Raw request body.
- * @param {string} signature - Stripe-Signature header.
- */
 async function handleWebhook(payload, signature) {
   const client = getStripe();
   if (!client) throw new Error('Stripe is not configured.');
-
   const event = client.webhooks.constructEvent(payload, signature, env.STRIPE_WEBHOOK_SECRET);
   logger.info(`Stripe webhook received: ${event.type}`);
   return event;
 }
 
-module.exports = { createPaymentIntent, handleWebhook };
+module.exports = { isConfigured, createPaymentIntent, handleWebhook };

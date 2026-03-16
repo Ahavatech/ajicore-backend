@@ -1,47 +1,195 @@
 /**
  * Invoice Service
- * Business logic for quote/invoice lifecycle management.
+ * Invoice lifecycle: Draft → Sent → Paid/PartiallyPaid/Overdue/Refunded/Voided
+ * Supports line items, edit audit log, and refunds.
+ *
+ * Edit rules:
+ *   Draft: Full edit
+ *   Sent: Full edit (link updated in-place)
+ *   Paid: Notes/photos only
+ *   Refunded/Voided: Locked
  */
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const logger = require('../../utils/logger');
+
+async function getInvoices({ business_id, job_id, status, page = 1, limit = 20 }) {
+  const where = {};
+  if (job_id) where.job_id = job_id;
+  if (status) where.status = status;
+  if (business_id) where.job = { business_id };
+
+  const skip = (page - 1) * limit;
+  const [data, total] = await Promise.all([
+    prisma.invoice.findMany({
+      where, skip, take: limit,
+      include: { line_items: true, payments: true, job: { include: { customer: true } } },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.invoice.count({ where }),
+  ]);
+  return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+}
+
+async function getById(id) {
+  return prisma.invoice.findUnique({
+    where: { id },
+    include: {
+      line_items: true,
+      payments: true,
+      edit_logs: { include: { user: { select: { id: true, email: true, first_name: true, last_name: true } } }, orderBy: { edited_at: 'desc' } },
+      job: { include: { customer: true, business: true } },
+    },
+  });
+}
 
 async function getByJobId(jobId) {
-  return prisma.quote_Invoice.findMany({
+  return prisma.invoice.findMany({
     where: { job_id: jobId },
+    include: { line_items: true, payments: true },
     orderBy: { createdAt: 'desc' },
   });
 }
 
 async function create(data) {
-  return prisma.quote_Invoice.create({
+  const invoice = await prisma.invoice.create({
     data: {
       job_id: data.job_id,
-      type: data.type,
+      business_id: data.business_id,
       status: data.status || 'Draft',
-      total_amount: data.total_amount,
-      amount_paid: data.amount_paid || 0,
-      due_date: data.due_date ? new Date(data.due_date) : null,
       notes: data.notes || null,
+      due_date: data.due_date ? new Date(data.due_date) : null,
     },
+    include: { line_items: true },
   });
+
+  // Add line items if provided
+  if (data.line_items && data.line_items.length > 0) {
+    await prisma.invoiceLine.createMany({
+      data: data.line_items.map((li) => ({
+        invoice_id: invoice.id,
+        description: li.description,
+        quantity: li.quantity ?? 1,
+        unit_price: li.unit_price,
+        total: (li.quantity ?? 1) * li.unit_price,
+        is_credit: li.is_credit ?? false,
+      })),
+    });
+  }
+
+  return getById(invoice.id);
 }
 
-async function update(id, data) {
+/**
+ * Edit an invoice. Enforces status-based edit rules:
+ * - Draft/Sent: full edit allowed
+ * - Paid: only internal_notes allowed
+ * - Refunded/Voided: locked entirely
+ */
+async function update(id, data, userId) {
+  const invoice = await prisma.invoice.findUnique({ where: { id } });
+  if (!invoice) throw Object.assign(new Error('Invoice not found'), { statusCode: 404 });
+
+  if (['Refunded', 'Voided'].includes(invoice.status)) {
+    throw Object.assign(new Error(`Invoice is ${invoice.status} and cannot be edited`), { statusCode: 400 });
+  }
+
+  const isPaid = invoice.status === 'Paid';
   const updateData = {};
-  if (data.status) updateData.status = data.status;
-  if (data.total_amount !== undefined) updateData.total_amount = data.total_amount;
-  if (data.amount_paid !== undefined) updateData.amount_paid = data.amount_paid;
-  if (data.due_date) updateData.due_date = new Date(data.due_date);
-  if (data.notes !== undefined) updateData.notes = data.notes;
+  const changes = {};
 
-  return prisma.quote_Invoice.update({ where: { id }, data: updateData });
+  if (!isPaid) {
+    if (data.notes !== undefined) { changes.notes = { from: invoice.notes, to: data.notes }; updateData.notes = data.notes; }
+    if (data.due_date !== undefined) { changes.due_date = { from: invoice.due_date, to: data.due_date }; updateData.due_date = data.due_date ? new Date(data.due_date) : null; }
+    if (data.status !== undefined) { changes.status = { from: invoice.status, to: data.status }; updateData.status = data.status; }
+    if (data.status === 'Sent') updateData.sent_at = invoice.sent_at || new Date();
+  }
+
+  if (data.internal_notes !== undefined) {
+    changes.internal_notes = { from: invoice.internal_notes, to: data.internal_notes };
+    updateData.internal_notes = data.internal_notes;
+  }
+
+  // Update line items (only allowed on non-paid invoices)
+  if (!isPaid && data.line_items !== undefined) {
+    await prisma.invoiceLine.deleteMany({ where: { invoice_id: id } });
+    if (data.line_items.length > 0) {
+      await prisma.invoiceLine.createMany({
+        data: data.line_items.map((li) => ({
+          invoice_id: id,
+          description: li.description,
+          quantity: li.quantity ?? 1,
+          unit_price: li.unit_price,
+          total: (li.quantity ?? 1) * li.unit_price,
+          is_credit: li.is_credit ?? false,
+        })),
+      });
+    }
+    changes.line_items = 'updated';
+  }
+
+  const updated = await prisma.invoice.update({ where: { id }, data: updateData });
+
+  // Audit log if anything changed
+  if (Object.keys(changes).length > 0) {
+    await prisma.invoiceEditLog.create({
+      data: { invoice_id: id, edited_by: userId || null, changes },
+    });
+    logger.info(`Invoice ${id} edited`, { userId, changes });
+  }
+
+  return getById(id);
 }
 
-async function getById(id) {
-  return prisma.quote_Invoice.findUnique({
+async function send(id) {
+  const invoice = await prisma.invoice.findUnique({ where: { id } });
+  if (!invoice) throw Object.assign(new Error('Invoice not found'), { statusCode: 404 });
+  return prisma.invoice.update({ where: { id }, data: { status: 'Sent', sent_at: new Date() } });
+}
+
+async function voidInvoice(id, userId) {
+  const invoice = await prisma.invoice.findUnique({ where: { id } });
+  if (!invoice) throw Object.assign(new Error('Invoice not found'), { statusCode: 404 });
+  if (invoice.status === 'Paid') throw Object.assign(new Error('Cannot void a paid invoice. Issue a refund instead.'), { statusCode: 400 });
+
+  const updated = await prisma.invoice.update({ where: { id }, data: { status: 'Voided', voided_at: new Date() } });
+  await prisma.invoiceEditLog.create({ data: { invoice_id: id, edited_by: userId || null, changes: { action: 'voided' } } });
+  return updated;
+}
+
+async function refundInvoice(id, { amount, reason, userId }) {
+  const invoice = await prisma.invoice.findUnique({ where: { id }, include: { payments: true } });
+  if (!invoice) throw Object.assign(new Error('Invoice not found'), { statusCode: 404 });
+  if (!['Paid', 'PartiallyPaid'].includes(invoice.status)) {
+    throw Object.assign(new Error('Invoice must be paid to issue a refund'), { statusCode: 400 });
+  }
+
+  const totalPaid = invoice.payments.reduce((sum, p) => sum + p.amount, 0);
+  const refundAmt = amount || totalPaid;
+
+  if (refundAmt > totalPaid) {
+    throw Object.assign(new Error('Refund amount cannot exceed amount paid'), { statusCode: 400 });
+  }
+
+  const updated = await prisma.invoice.update({
     where: { id },
-    include: { job: true },
+    data: { status: 'Refunded', refunded_at: new Date(), refund_amount: refundAmt, refund_reason: reason || null },
   });
+
+  await prisma.invoiceEditLog.create({
+    data: { invoice_id: id, edited_by: userId || null, changes: { action: 'refunded', amount: refundAmt, reason } },
+  });
+
+  logger.info(`Invoice ${id} refunded: $${refundAmt}`);
+  return updated;
 }
 
-module.exports = { getByJobId, create, update, getById };
+async function getInvoiceTotal(id) {
+  const lines = await prisma.invoiceLine.findMany({ where: { invoice_id: id } });
+  const subtotal = lines.reduce((sum, l) => sum + (l.is_credit ? -l.total : l.total), 0);
+  const payments = await prisma.payment.findMany({ where: { invoice_id: id } });
+  const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+  return { subtotal, total_paid: totalPaid, balance_due: subtotal - totalPaid };
+}
+
+module.exports = { getInvoices, getById, getByJobId, create, update, send, voidInvoice, refundInvoice, getInvoiceTotal };

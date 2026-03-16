@@ -1,6 +1,10 @@
 /**
  * Billing Routes
- * Endpoints for invoices, quotes, payments, and expenses.
+ * Endpoints for invoices, payments, and expenses.
+ * @swagger
+ * tags:
+ *   name: Billing
+ *   description: Invoices, payments, and expenses
  */
 const { Router } = require('express');
 const billingController = require('../../domains/billing/invoice.controller');
@@ -8,41 +12,26 @@ const { requireAuth } = require('../middlewares/auth.middleware');
 const { requireFields, validateUUID } = require('../middlewares/validate.middleware');
 
 const router = Router();
-
 router.use(requireAuth);
 
-// --- Invoices & Quotes ---
-// GET /api/billing/invoices/job/:jobId - Get all invoices/quotes for a job
+// --- Invoices ---
+router.get('/invoices', billingController.getAll);
 router.get('/invoices/job/:jobId', validateUUID('jobId'), billingController.getInvoicesByJob);
-
-// POST /api/billing/invoices - Create a new invoice or quote
-router.post(
-  '/invoices',
-  requireFields(['job_id', 'type', 'total_amount']),
-  billingController.createInvoice
-);
-
-// PATCH /api/billing/invoices/:id - Update an invoice/quote
+router.get('/invoices/:id', validateUUID('id'), billingController.getById);
+router.get('/invoices/:id/total', validateUUID('id'), billingController.getTotal);
+router.post('/invoices', requireFields(['job_id', 'business_id']), billingController.createInvoice);
 router.patch('/invoices/:id', validateUUID('id'), billingController.updateInvoice);
+router.post('/invoices/:id/send', validateUUID('id'), billingController.sendInvoice);
+router.post('/invoices/:id/void', validateUUID('id'), billingController.voidInvoice);
+router.post('/invoices/:id/refund', validateUUID('id'), billingController.refundInvoice);
 
 // --- Payments ---
-// POST /api/billing/payments/:invoiceId - Process a payment for an invoice
-router.post(
-  '/payments/:invoiceId',
-  validateUUID('invoiceId'),
-  requireFields(['amount', 'payment_method_id']),
-  billingController.processPayment
-);
+router.post('/payments/:invoiceId', validateUUID('invoiceId'), requireFields(['amount']), billingController.processPayment);
 
 // --- Expenses ---
-// GET /api/billing/expenses - List expenses (filterable)
 router.get('/expenses', billingController.getExpenses);
-
-// POST /api/billing/expenses - Create a new expense
-router.post(
-  '/expenses',
-  requireFields(['business_id', 'category', 'amount']),
-  billingController.createExpense
-);
+router.post('/expenses', requireFields(['business_id', 'amount']), billingController.createExpense);
+router.patch('/expenses/:id', validateUUID('id'), billingController.updateExpense);
+router.delete('/expenses/:id', validateUUID('id'), billingController.deleteExpense);
 
 module.exports = router;

@@ -16,11 +16,25 @@ datasource db {
 // ============================================
 
 enum JobStatus {
-  Pending
   Scheduled
   InProgress
   Completed
+  Invoiced
   Cancelled
+}
+
+enum QuoteStatus {
+  EstimateScheduled
+  Draft
+  Sent
+  Approved
+  Declined
+  Expired
+}
+
+enum JobType {
+  Job
+  ServiceCall
 }
 
 enum DocumentType {
@@ -34,6 +48,8 @@ enum InvoiceStatus {
   PartiallyPaid
   Paid
   Overdue
+  Refunded
+  Voided
   Cancelled
 }
 
@@ -50,76 +66,172 @@ enum AuthProvider {
   Google
 }
 
+enum UnknownServiceHandling {
+  FreeEstimate
+  PaidServiceCall
+  TransferCall
+}
+
+enum PriceType {
+  Fixed
+  Range
+  NeedsOnsite
+}
+
+enum VisitType {
+  FreeEstimate
+  PaidServiceCall
+}
+
+enum JobSource {
+  AI
+  Manual
+  SMS
+}
+
+enum ExpenseCategory {
+  Materials
+  Labor
+  Equipment
+  Fuel
+  Insurance
+  Utilities
+  Marketing
+  Other
+}
+
 // ============================================
 // Models
 // ============================================
 
 model User {
-  id              String       @id @default(uuid())
-  email           String       @unique
-  password_hash   String?
-  first_name      String?
-  last_name       String?
-  auth_provider   AuthProvider  @default(Email)
-  google_id       String?      @unique
-  onboarding_step Int          @default(1)
-  onboarding_completed Boolean @default(false)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  id                   String       @id @default(uuid())
+  email                String       @unique
+  password_hash        String?
+  first_name           String?
+  last_name            String?
+  auth_provider        AuthProvider @default(Email)
+  google_id            String?      @unique
+  onboarding_step      Int          @default(1)
+  onboarding_completed Boolean      @default(false)
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
 
-  // Relations
-  businesses      Business[]
+  businesses     Business[]
+  invoice_edits  InvoiceEditLog[]
 
   @@map("users")
 }
 
 model Business {
-  id                     String     @id @default(uuid())
-  name                   String
-  industry               String
-  dedicated_phone_number String?
-  owner_id               String?
-  company_email          String?
-  company_type           String?
-  company_phone          String?
-  street                 String?
-  city                   String?
-  postal_code            String?
-  country                String?
-  logo_url               String?
-  ai_phone_number        String?
-  ai_phone_country       String?
-  ai_phone_area_code     String?
-  createdAt              DateTime   @default(now())
-  updatedAt              DateTime   @updatedAt
+  id                        String                 @id @default(uuid())
+  name                      String
+  industry                  String
+  owner_id                  String?
+  company_email             String?
+  company_type              String?
+  company_phone             String?
+  street                    String?
+  city                      String?
+  postal_code               String?
+  country                   String?
+  logo_url                  String?
 
-  // Relations
-  owner                  User?      @relation(fields: [owner_id], references: [id], onDelete: SetNull)
-  staff                  Staff[]
-  customers              Customer[]
-  jobs                   Job[]
-  expenses               Expense[]
-  materials              Material[]
-  vehicles               Vehicle[]
+  // AI Phone / Dedicated Number
+  dedicated_phone_number    String?
+  ai_phone_number           String?
+  ai_phone_country          String?
+  ai_phone_area_code        String?
+
+  // Service Configuration (Onboarding)
+  ai_business_description   String?
+  home_base_zip             String?
+  service_radius_miles      Float?
+  cost_per_mile_over_radius Float?
+
+  // Unknown Service Handling
+  unknown_service_handling  UnknownServiceHandling @default(FreeEstimate)
+  unknown_service_call_fee  Float?
+
+  // Quote Settings
+  quote_expiry_days         Int                    @default(30)
+
+  // Payment Follow-up
+  payment_follow_up_days    Json?
+  payment_interval          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner              User?              @relation(fields: [owner_id], references: [id], onDelete: SetNull)
+  staff              Staff[]
+  customers          Customer[]
+  jobs               Job[]
+  quotes             Quote[]
+  expenses           Expense[]
+  materials          Material[]
+  vehicles           Vehicle[]
+  price_book_items   PriceBookItem[]
+  service_categories ServiceCategory[]
 
   @@map("businesses")
 }
 
-model Staff {
-  id           String    @id @default(uuid())
-  business_id  String
-  name         String
-  role         StaffRole @default(Technician)
-  hourly_rate  Float
-  email        String?
-  phone        String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+model ServiceCategory {
+  id                   String   @id @default(uuid())
+  business_id          String
+  name                 String
+  custom_description   String?
+  is_active            Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
-  // Relations
-  business     Business    @relation(fields: [business_id], references: [id], onDelete: Cascade)
-  assigned_jobs Job[]      @relation("AssignedStaff")
-  timesheets   Timesheet[]
+  business         Business        @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  price_book_items PriceBookItem[]
+
+  @@map("service_categories")
+}
+
+model PriceBookItem {
+  id                  String    @id @default(uuid())
+  business_id         String
+  category_id         String?
+  name                String
+  description         String?
+  can_quote_phone     Boolean   @default(false)
+  price_type          PriceType @default(NeedsOnsite)
+  price               Float?
+  price_min           Float?
+  price_max           Float?
+  visit_type          VisitType @default(FreeEstimate)
+  service_call_fee    Float?
+  suggested_materials Json?
+  usage_count         Int       @default(0)
+  is_active           Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  business  Business         @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  category  ServiceCategory? @relation(fields: [category_id], references: [id], onDelete: SetNull)
+
+  @@map("price_book_items")
+}
+
+model Staff {
+  id          String    @id @default(uuid())
+  business_id String
+  name        String
+  role        StaffRole @default(Technician)
+  hourly_rate Float
+  email       String?
+  phone       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  business      Business    @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  assigned_jobs Job[]       @relation("AssignedStaff")
+  assigned_quotes Quote[]   @relation("AssignedQuoteStaff")
+  timesheets    Timesheet[]
 
   @@map("staff")
 }
@@ -127,6 +239,7 @@ model Staff {
 model Timesheet {
   id          String    @id @default(uuid())
   staff_id    String
+  job_id      String?
   clock_in    DateTime
   clock_out   DateTime?
   total_hours Float?
@@ -134,8 +247,8 @@ model Timesheet {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  // Relations
-  staff       Staff     @relation(fields: [staff_id], references: [id], onDelete: Cascade)
+  staff Staff @relation(fields: [staff_id], references: [id], onDelete: Cascade)
+  job   Job?  @relation(fields: [job_id], references: [id], onDelete: SetNull)
 
   @@map("timesheets")
 }
@@ -148,121 +261,219 @@ model Customer {
   phone_number String?
   email        String?
   address      String?
+  zip_code     String?
+  notes        String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  // Relations
-  business     Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
-  jobs         Job[]
+  business Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  jobs     Job[]
+  quotes   Quote[]
 
   @@map("customers")
 }
 
+// Quotes: Estimate path (price unknown, needs on-site visit)
+model Quote {
+  id                      String      @id @default(uuid())
+  business_id             String
+  customer_id             String
+  assigned_staff_id       String?
+  status                  QuoteStatus @default(EstimateScheduled)
+  title                   String?
+  description             String?
+  price_book_item_id      String?
+  scheduled_estimate_date DateTime?
+  sent_at                 DateTime?
+  expires_at              DateTime?
+  approved_at             DateTime?
+  declined_at             DateTime?
+  total_amount            Float?
+  notes                   String?
+  is_emergency            Boolean     @default(false)
+  source                  JobSource   @default(Manual)
+  converted_to_job_id     String?
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  business       Business  @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  customer       Customer  @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  assigned_staff Staff?    @relation("AssignedQuoteStaff", fields: [assigned_staff_id], references: [id], onDelete: SetNull)
+  converted_job  Job?      @relation("QuoteConvertedJob", fields: [converted_to_job_id], references: [id], onDelete: SetNull)
+
+  @@map("quotes")
+}
+
+// Jobs: Direct job path (price known)
 model Job {
-  id                  String    @id @default(uuid())
-  business_id         String
-  customer_id         String
-  assigned_staff_id   String?
-  status              JobStatus @default(Pending)
+  id                   String    @id @default(uuid())
+  business_id          String
+  customer_id          String
+  assigned_staff_id    String?
+  type                 JobType   @default(Job)
+  status               JobStatus @default(Scheduled)
+  title                String?
+  job_details          String?
+  price_book_item_id   String?
+  service_call_fee     Float?
   scheduled_start_time DateTime?
   scheduled_end_time   DateTime?
-  job_details         String?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  actual_start_time    DateTime?
+  actual_end_time      DateTime?
+  photos_urls          Json?
+  is_emergency         Boolean   @default(false)
+  source               JobSource @default(Manual)
+  from_quote_id        String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
-  // Relations
-  business            Business        @relation(fields: [business_id], references: [id], onDelete: Cascade)
-  customer            Customer        @relation(fields: [customer_id], references: [id], onDelete: Cascade)
-  assigned_staff      Staff?          @relation("AssignedStaff", fields: [assigned_staff_id], references: [id], onDelete: SetNull)
-  quote_invoices      Quote_Invoice[]
-  job_materials       Job_Material[]
-  expenses            Expense[]
+  business       Business       @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  customer       Customer       @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  assigned_staff Staff?         @relation("AssignedStaff", fields: [assigned_staff_id], references: [id], onDelete: SetNull)
+  invoices       Invoice[]
+  job_materials  JobMaterial[]
+  expenses       Expense[]
+  timesheets     Timesheet[]
+  from_quote     Quote[]        @relation("QuoteConvertedJob")
 
   @@map("jobs")
 }
 
-model Quote_Invoice {
-  id           String        @id @default(uuid())
-  job_id       String
-  type         DocumentType
-  status       InvoiceStatus @default(Draft)
-  total_amount Float
-  amount_paid  Float         @default(0)
-  due_date     DateTime?
-  notes        String?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+model Invoice {
+  id             String        @id @default(uuid())
+  job_id         String
+  business_id    String
+  status         InvoiceStatus @default(Draft)
+  notes          String?
+  internal_notes String?
+  due_date       DateTime?
+  sent_at        DateTime?
+  paid_at        DateTime?
+  voided_at      DateTime?
+  refunded_at    DateTime?
+  refund_amount  Float?
+  refund_reason  String?
+  payment_url    String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
-  // Relations
-  job          Job           @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  job       Job              @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  line_items InvoiceLine[]
+  edit_logs  InvoiceEditLog[]
+  payments   Payment[]
 
-  @@map("quote_invoices")
+  @@map("invoices")
 }
 
-model Expense {
+model InvoiceLine {
   id          String   @id @default(uuid())
-  business_id String
-  job_id      String?
-  category    String
-  amount      Float
-  description String?
-  date        DateTime
+  invoice_id  String
+  description String
+  quantity    Float    @default(1)
+  unit_price  Float
+  total       Float
+  is_credit   Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  // Relations
-  business    Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
-  job         Job?     @relation(fields: [job_id], references: [id], onDelete: SetNull)
+  invoice Invoice @relation(fields: [invoice_id], references: [id], onDelete: Cascade)
+
+  @@map("invoice_lines")
+}
+
+model InvoiceEditLog {
+  id          String   @id @default(uuid())
+  invoice_id  String
+  edited_by   String?
+  changes     Json
+  edited_at   DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoice_id], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [edited_by], references: [id], onDelete: SetNull)
+
+  @@map("invoice_edit_logs")
+}
+
+model Payment {
+  id                String   @id @default(uuid())
+  invoice_id        String
+  amount            Float
+  payment_method    String?
+  stripe_payment_id String?
+  notes             String?
+  paid_at           DateTime @default(now())
+  createdAt         DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoice_id], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model Expense {
+  id          String          @id @default(uuid())
+  business_id String
+  job_id      String?
+  category    ExpenseCategory @default(Other)
+  amount      Float
+  description String?
+  receipt_url String?
+  date        DateTime
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  business Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  job      Job?     @relation(fields: [job_id], references: [id], onDelete: SetNull)
 
   @@map("expenses")
 }
 
 model Material {
-  id                String         @id @default(uuid())
+  id                String   @id @default(uuid())
   business_id       String
   name              String
-  quantity_on_hand  Int            @default(0)
-  restock_threshold Int            @default(5)
+  unit              String?
+  quantity_on_hand  Int      @default(0)
+  restock_threshold Int      @default(5)
   unit_cost         Float?
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  // Relations
-  business          Business       @relation(fields: [business_id], references: [id], onDelete: Cascade)
-  job_materials     Job_Material[]
+  business      Business      @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  job_materials JobMaterial[]
 
   @@map("materials")
 }
 
-model Job_Material {
+model JobMaterial {
   id            String   @id @default(uuid())
   job_id        String
   material_id   String
   quantity_used Int
+  unit_cost     Float?
   createdAt     DateTime @default(now())
 
-  // Relations
-  job           Job      @relation(fields: [job_id], references: [id], onDelete: Cascade)
-  material      Material @relation(fields: [material_id], references: [id], onDelete: Cascade)
+  job      Job      @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  material Material @relation(fields: [material_id], references: [id], onDelete: Cascade)
 
   @@map("job_materials")
 }
 
 model Vehicle {
-  id                      String   @id @default(uuid())
+  id                      String    @id @default(uuid())
   business_id             String
   make_model              String
+  year                    Int?
   license_plate           String?
-  mileage                 Int      @default(0)
+  mileage                 Int       @default(0)
   insurance_expiry        DateTime?
   registration_renewal    DateTime?
-  maintenance_cycle_miles Int      @default(5000)
-  last_maintenance_mileage Int     @default(0)
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  maintenance_cycle_miles Int       @default(5000)
+  last_maintenance_mileage Int      @default(0)
+  notes                   String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
-  // Relations
-  business                Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
 
   @@map("vehicles")
 }

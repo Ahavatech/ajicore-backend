@@ -2,39 +2,41 @@
  * Application-wide constants.
  */
 module.exports = {
-  // Pagination defaults
   DEFAULT_PAGE_SIZE: 20,
   MAX_PAGE_SIZE: 100,
 
-  // Job statuses
-  JOB_STATUSES: ['Pending', 'Scheduled', 'InProgress', 'Completed', 'Cancelled'],
+  JOB_STATUSES: ['Scheduled', 'InProgress', 'Completed', 'Invoiced', 'Cancelled'],
+  JOB_TYPES: ['Job', 'ServiceCall'],
+  JOB_SOURCES: ['AI', 'Manual', 'SMS'],
 
-  // Document types
-  DOCUMENT_TYPES: ['Quote', 'Invoice'],
+  QUOTE_STATUSES: ['EstimateScheduled', 'Draft', 'Sent', 'Approved', 'Declined', 'Expired'],
 
-  // Invoice statuses
-  INVOICE_STATUSES: ['Draft', 'Sent', 'PartiallyPaid', 'Paid', 'Overdue', 'Cancelled'],
+  INVOICE_STATUSES: ['Draft', 'Sent', 'PartiallyPaid', 'Paid', 'Overdue', 'Refunded', 'Voided', 'Cancelled'],
+  INVOICE_EDIT_RULES: {
+    Draft: 'full',
+    Sent: 'full',
+    PartiallyPaid: 'limited',
+    Paid: 'notes_only',
+    Overdue: 'full',
+    Refunded: 'locked',
+    Voided: 'locked',
+    Cancelled: 'locked',
+  },
 
-  // Staff roles
+  PRICE_TYPES: ['Fixed', 'Range', 'NeedsOnsite'],
+  VISIT_TYPES: ['FreeEstimate', 'PaidServiceCall'],
+  UNKNOWN_SERVICE_HANDLING: ['FreeEstimate', 'PaidServiceCall', 'TransferCall'],
+
   STAFF_ROLES: ['Owner', 'Manager', 'Technician', 'Apprentice', 'Admin'],
 
-  // Expense categories
-  EXPENSE_CATEGORIES: [
-    'Materials',
-    'Labor',
-    'Fuel',
-    'Equipment',
-    'Insurance',
-    'Rent',
-    'Utilities',
-    'Marketing',
-    'Miscellaneous',
-  ],
+  EXPENSE_CATEGORIES: ['Materials', 'Labor', 'Equipment', 'Fuel', 'Insurance', 'Utilities', 'Marketing', 'Other'],
 
-  // Cron schedule expressions
+  DEFAULT_QUOTE_EXPIRY_DAYS: 30,
+
   CRON_SCHEDULES: {
-    WEEKLY_REPORT: '0 8 * * 1',       // Every Monday at 8 AM
-    DAILY_REMINDERS: '0 7 * * *',     // Every day at 7 AM
-    INVENTORY_CHECK: '0 9 * * *',     // Every day at 9 AM
+    WEEKLY_REPORT: '0 8 * * 1',
+    DAILY_REMINDERS: '0 7 * * *',
+    INVENTORY_CHECK: '0 9 * * *',
+    QUOTE_EXPIRY: '0 0 * * *',
   },
 };

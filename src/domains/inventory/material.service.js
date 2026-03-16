@@ -6,20 +6,26 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const logger = require('../../utils/logger');
 
-async function getMaterials({ business_id, lowStock = false }) {
+async function getMaterials({ business_id, lowStock = false, page = 1, limit = 50 }) {
   const where = {};
   if (business_id) where.business_id = business_id;
+  if (lowStock) where.quantity_on_hand = { lte: prisma.material.fields.restock_threshold };
 
-  const materials = await prisma.material.findMany({
-    where,
-    orderBy: { name: 'asc' },
-  });
+  const skip = (page - 1) * limit;
 
+  let materials;
   if (lowStock) {
-    return materials.filter((m) => m.quantity_on_hand <= m.restock_threshold);
+    const all = await prisma.material.findMany({ where: { business_id }, orderBy: { name: 'asc' } });
+    materials = all.filter((m) => m.quantity_on_hand <= m.restock_threshold);
+    return { data: materials, total: materials.length, page: 1, limit: materials.length };
   }
 
-  return materials;
+  const [data, total] = await Promise.all([
+    prisma.material.findMany({ where, skip, take: limit, orderBy: { name: 'asc' } }),
+    prisma.material.count({ where }),
+  ]);
+
+  return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
 }
 
 async function getById(id) {
@@ -31,6 +37,7 @@ async function create(data) {
     data: {
       business_id: data.business_id,
       name: data.name,
+      unit: data.unit || null,
       quantity_on_hand: data.quantity_on_hand || 0,
       restock_threshold: data.restock_threshold || 5,
       unit_cost: data.unit_cost || null,
@@ -40,57 +47,42 @@ async function create(data) {
 
 async function update(id, data) {
   const updateData = {};
-  if (data.name) updateData.name = data.name;
-  if (data.quantity_on_hand !== undefined) updateData.quantity_on_hand = data.quantity_on_hand;
-  if (data.restock_threshold !== undefined) updateData.restock_threshold = data.restock_threshold;
-  if (data.unit_cost !== undefined) updateData.unit_cost = data.unit_cost;
-
+  const fields = ['name', 'unit', 'quantity_on_hand', 'restock_threshold', 'unit_cost'];
+  fields.forEach((f) => { if (data[f] !== undefined) updateData[f] = data[f]; });
   return prisma.material.update({ where: { id }, data: updateData });
 }
 
-/**
- * Deduct materials when a job is completed.
- * Also creates Job_Material records for tracking.
- * @param {string} jobId
- * @param {Array<{material_id: string, quantity: number}>} materials
- */
+async function restockMaterial(id, quantity) {
+  return prisma.material.update({
+    where: { id },
+    data: { quantity_on_hand: { increment: quantity } },
+  });
+}
+
 async function deductForJob(jobId, materials) {
   const results = [];
-
   for (const item of materials) {
     const material = await prisma.material.findUnique({ where: { id: item.material_id } });
+    if (!material) { results.push({ material_id: item.material_id, error: 'Not found' }); continue; }
 
-    if (!material) {
-      results.push({ material_id: item.material_id, error: 'Material not found' });
-      continue;
-    }
+    const newQty = Math.max(material.quantity_on_hand - item.quantity, 0);
+    const updated = await prisma.material.update({ where: { id: item.material_id }, data: { quantity_on_hand: newQty } });
 
-    const newQuantity = material.quantity_on_hand - item.quantity;
-
-    // Update stock
-    const updated = await prisma.material.update({
-      where: { id: item.material_id },
-      data: { quantity_on_hand: Math.max(newQuantity, 0) },
+    await prisma.jobMaterial.create({
+      data: { job_id: jobId, material_id: item.material_id, quantity_used: item.quantity, unit_cost: material.unit_cost },
     });
 
-    // Create Job_Material record
-    await prisma.job_Material.create({
-      data: {
-        job_id: jobId,
-        material_id: item.material_id,
-        quantity_used: item.quantity,
-      },
-    });
-
-    // Check for low stock alert
     if (updated.quantity_on_hand <= updated.restock_threshold) {
-      logger.warn(`Low stock alert: ${updated.name} (${updated.quantity_on_hand} remaining)`);
+      logger.warn(`Low stock: ${updated.name} (${updated.quantity_on_hand} remaining)`);
     }
 
     results.push({ material_id: item.material_id, name: updated.name, new_quantity: updated.quantity_on_hand });
   }
-
   return results;
 }
 
-module.exports = { getMaterials, getById, create, update, deductForJob };
+async function remove(id) {
+  return prisma.material.delete({ where: { id } });
+}
+
+module.exports = { getMaterials, getById, create, update, restockMaterial, deductForJob, remove };
