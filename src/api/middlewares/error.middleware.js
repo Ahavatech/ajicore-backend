@@ -19,21 +19,76 @@ function notFoundHandler(req, res, _next) {
  * Global error handler.
  * Catches all unhandled errors and returns a structured response.
  */
-function errorHandler(err, _req, res, _next) {
+function errorHandler(err, req, res, next) {
   const statusCode = err.statusCode || 500;
-  const message = err.message || 'Internal Server Error';
+  const requestId = req.id || require('crypto').randomUUID();
 
-  logger.error(`[${statusCode}] ${message}`, {
-    stack: env.isDevelopment ? err.stack : undefined,
+  // Log full error internally with request ID
+  logger.error(`[${requestId}] ${err.name}: ${err.message}`, {
+    stack: err.stack,
+    userId: req.user?.id,
+    path: req.path,
+    method: req.method,
+    ip: req.ip,
   });
 
-  res.status(statusCode).json({
-    error: statusCode >= 500 ? 'Internal Server Error' : 'Request Error',
-    message: env.isProduction && statusCode >= 500
-      ? 'An unexpected error occurred.'
-      : message,
-    ...(env.isDevelopment && { stack: err.stack }),
-  });
+  // Safe response - NEVER send stack traces to clients
+  const clientResponse = {
+    error: getErrorType(statusCode),
+    message: getClientMessage(statusCode, err.name),
+    requestId,  // Help users and support reference the error
+  };
+
+  if (statusCode >= 500) {
+    clientResponse.message = 'An internal error occurred. Please contact support with request ID: ' + requestId;
+  }
+
+  // Add retry-after header for rate limiting
+  if (err.name === 'RateLimitError' && err.retryAfter) {
+    res.set('Retry-After', err.retryAfter);
+  }
+
+  res.status(statusCode).json(clientResponse);
+}
+
+function getErrorType(statusCode) {
+  const types = {
+    400: 'Bad Request',
+    401: 'Unauthorized',
+    403: 'Forbidden',
+    404: 'Not Found',
+    409: 'Conflict',
+    422: 'Unprocessable Entity',
+    429: 'Too Many Requests',
+    500: 'Internal Server Error',
+    503: 'Service Unavailable',
+  };
+  return types[statusCode] || 'Error';
+}
+
+function getClientMessage(statusCode, errorName) {
+  // Generic messages to avoid information leakage
+  const messages = {
+    400: 'Invalid request data',
+    401: 'Authentication required',
+    403: 'Access denied',
+    404: 'Resource not found',
+    409: 'Resource conflict',
+    422: 'Invalid data format',
+    429: 'Too many requests. Please try again later',
+    500: 'An internal error occurred',
+    503: 'Service temporarily unavailable',
+  };
+
+  // Use specific message for known error types
+  if (errorName === 'ValidationError') {
+    return 'Validation failed. Please check your input.';
+  }
+  if (errorName === 'AuthenticationError') {
+    return 'Invalid credentials.';
+  }
+
+  return messages[statusCode] || 'An error occurred';
 }
 
 module.exports = { notFoundHandler, errorHandler };

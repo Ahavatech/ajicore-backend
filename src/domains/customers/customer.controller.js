@@ -6,7 +6,6 @@ const customerService = require('./customer.service');
 async function getAll(req, res, next) {
   try {
     const { business_id, search, page = 1, limit = 20 } = req.query;
-    if (!business_id) return res.status(400).json({ error: 'business_id is required' });
     const result = await customerService.getCustomers({ business_id, search, page: +page, limit: +limit });
     res.json(result);
   } catch (err) { next(err); }
@@ -23,7 +22,6 @@ async function getById(req, res, next) {
 async function findByPhone(req, res, next) {
   try {
     const { business_id, phone } = req.query;
-    if (!business_id || !phone) return res.status(400).json({ error: 'business_id and phone are required' });
     const customer = await customerService.findByPhone(business_id, phone);
     res.json(customer || null);
   } catch (err) { next(err); }

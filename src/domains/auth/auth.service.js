@@ -16,6 +16,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const env = require('../../config/env');
 const logger = require('../../utils/logger');
+const { ValidationError, ConflictError, AuthenticationError, NotFoundError } = require('../../utils/errors');
 
 const SALT_ROUNDS = 12;
 
@@ -29,15 +30,11 @@ const SALT_ROUNDS = 12;
 async function signup({ email, password }) {
   const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
   if (existing) {
-    const err = new Error('An account with this email already exists.');
-    err.statusCode = 409;
-    throw err;
+    throw new ConflictError('An account with this email already exists.');
   }
 
   if (!password || password.length < 8) {
-    const err = new Error('Password must be at least 8 characters long.');
-    err.statusCode = 400;
-    throw err;
+    throw new ValidationError('Password must be at least 8 characters long.');
   }
 
   const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
@@ -69,9 +66,7 @@ async function signup({ email, password }) {
  */
 async function googleSignup({ google_id, email, first_name, last_name }) {
   if (!google_id || !email) {
-    const err = new Error('Google ID and email are required.');
-    err.statusCode = 400;
-    throw err;
+    throw new ValidationError('Google ID and email are required.');
   }
 
   // Check if user already exists by google_id
@@ -93,9 +88,7 @@ async function googleSignup({ google_id, email, first_name, last_name }) {
   // Check if email already exists with a different provider
   const existingEmail = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
   if (existingEmail) {
-    const err = new Error('An account with this email already exists. Please sign in with your email and password.');
-    err.statusCode = 409;
-    throw err;
+    throw new ConflictError('An account with this email already exists. Please sign in with your email and password.');
   }
 
   // Create new Google user
@@ -133,9 +126,7 @@ async function onboardingStep2(userId, data) {
   const { first_name, last_name, company_name, company_email, company_type, company_phone } = data;
 
   if (!first_name || !last_name || !company_name) {
-    const err = new Error('First name, last name, and company name are required.');
-    err.statusCode = 400;
-    throw err;
+    throw new ValidationError('First name, last name, and company name are required.');
   }
 
   const result = await prisma.$transaction(async (tx) => {
@@ -199,16 +190,12 @@ async function onboardingStep3(userId, data) {
   const { street, city, postal_code, country } = data;
 
   if (!street || !city || !postal_code || !country) {
-    const err = new Error('Street, city, postal code, and country are required.');
-    err.statusCode = 400;
-    throw err;
+    throw new ValidationError('Street, city, postal code, and country are required.');
   }
 
   const business = await prisma.business.findFirst({ where: { owner_id: userId } });
   if (!business) {
-    const err = new Error('No business found. Please complete step 2 first.');
-    err.statusCode = 400;
-    throw err;
+    throw new ValidationError('No business found. Please complete step 2 first.');
   }
 
   const [user, updatedBusiness] = await Promise.all([
@@ -244,9 +231,7 @@ async function onboardingStep4(userId, data) {
 
   const business = await prisma.business.findFirst({ where: { owner_id: userId } });
   if (!business) {
-    const err = new Error('No business found. Please complete step 2 first.');
-    err.statusCode = 400;
-    throw err;
+    throw new ValidationError('No business found. Please complete step 2 first.');
   }
 
   const [user, updatedBusiness] = await Promise.all([
@@ -282,9 +267,7 @@ async function onboardingStep5(userId, data) {
 
   const business = await prisma.business.findFirst({ where: { owner_id: userId } });
   if (!business) {
-    const err = new Error('No business found. Please complete step 2 first.');
-    err.statusCode = 400;
-    throw err;
+    throw new ValidationError('No business found. Please complete step 2 first.');
   }
 
   // Generate a placeholder AI phone number
@@ -352,29 +335,21 @@ async function skipStep5(userId) {
  */
 async function signin({ email, password }) {
   if (!email || !password) {
-    const err = new Error('Email and password are required.');
-    err.statusCode = 400;
-    throw err;
+    throw new ValidationError('Email and password are required.');
   }
 
   const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
   if (!user) {
-    const err = new Error('Invalid email or password.');
-    err.statusCode = 401;
-    throw err;
+    throw new AuthenticationError('Invalid email or password.');
   }
 
   if (user.auth_provider === 'Google' && !user.password_hash) {
-    const err = new Error('This account uses Google sign-in. Please sign in with Google.');
-    err.statusCode = 400;
-    throw err;
+    throw new ValidationError('This account uses Google sign-in. Please sign in with Google.');
   }
 
   const isValid = await bcrypt.compare(password, user.password_hash);
   if (!isValid) {
-    const err = new Error('Invalid email or password.');
-    err.statusCode = 401;
-    throw err;
+    throw new AuthenticationError('Invalid email or password.');
   }
 
   const token = generateToken(user);
@@ -408,28 +383,20 @@ async function getUserById(id) {
 async function changePassword(userId, currentPassword, newPassword) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) {
-    const err = new Error('User not found.');
-    err.statusCode = 404;
-    throw err;
+    throw new NotFoundError('User not found.');
   }
 
   if (user.auth_provider === 'Google' && !user.password_hash) {
-    const err = new Error('This account uses Google sign-in. Password change is not available.');
-    err.statusCode = 400;
-    throw err;
+    throw new ValidationError('This account uses Google sign-in. Password change is not available.');
   }
 
   const isValid = await bcrypt.compare(currentPassword, user.password_hash);
   if (!isValid) {
-    const err = new Error('Current password is incorrect.');
-    err.statusCode = 401;
-    throw err;
+    throw new AuthenticationError('Current password is incorrect.');
   }
 
   if (!newPassword || newPassword.length < 8) {
-    const err = new Error('New password must be at least 8 characters long.');
-    err.statusCode = 400;
-    throw err;
+    throw new ValidationError('New password must be at least 8 characters long.');
   }
 
   const password_hash = await bcrypt.hash(newPassword, SALT_ROUNDS);

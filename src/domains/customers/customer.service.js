@@ -3,25 +3,55 @@
  * Business logic for customer management and lookup.
  */
 const { PrismaClient } = require('@prisma/client');
+const { ValidationError } = require('../../utils/errors');
 const prisma = new PrismaClient();
 
+function sanitizeSearchInput(input, maxLength = 100) {
+  if (!input) return null;
+
+  // Trim and limit length
+  let sanitized = String(input).trim().substring(0, maxLength);
+
+  // Remove special regex characters that could cause DOS
+  sanitized = sanitized.replace(/[.*+?^${}()|[\]\\]/g, '');
+
+  // Reject if contains suspicious patterns
+  if (sanitized.match(/[\x00-\x1f\x7f]/)) {
+    throw new ValidationError('Invalid search input');
+  }
+
+  return sanitized;
+}
+
+function validatePagination(page, limit) {
+  const MAX_LIMIT = 100;
+  const DEFAULT_LIMIT = 20;
+
+  page = Math.max(1, parseInt(page) || 1);
+  limit = Math.min(MAX_LIMIT, Math.max(1, parseInt(limit) || DEFAULT_LIMIT));
+
+  return { page, limit };
+}
+
 async function getCustomers({ business_id, search, page = 1, limit = 20 }) {
+  const { page: validPage, limit: validLimit } = validatePagination(page, limit);
   const where = { business_id };
   if (search) {
+    const cleanSearch = sanitizeSearchInput(search);
     where.OR = [
-      { first_name: { contains: search, mode: 'insensitive' } },
-      { last_name: { contains: search, mode: 'insensitive' } },
-      { email: { contains: search, mode: 'insensitive' } },
-      { phone_number: { contains: search } },
+      { first_name: { contains: cleanSearch, mode: 'insensitive' } },
+      { last_name: { contains: cleanSearch, mode: 'insensitive' } },
+      { email: { contains: cleanSearch, mode: 'insensitive' } },
+      { phone_number: { contains: cleanSearch } },
     ];
   }
 
-  const skip = (page - 1) * limit;
+  const skip = (validPage - 1) * validLimit;
   const [data, total] = await Promise.all([
     prisma.customer.findMany({
       where,
       skip,
-      take: limit,
+      take: validLimit,
       orderBy: { createdAt: 'desc' },
       include: {
         _count: { select: { jobs: true, quotes: true } },

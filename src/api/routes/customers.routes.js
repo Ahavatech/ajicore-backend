@@ -38,7 +38,7 @@ router.use(requireAuth);
  *       200:
  *         description: Paginated list of customers
  */
-router.get('/', customerController.getAll);
+router.get('/', requireFields(['business_id'], 'query'), customerController.getAll);
 
 /**
  * @swagger
@@ -60,7 +60,7 @@ router.get('/', customerController.getAll);
  *       200:
  *         description: Customer record or null
  */
-router.get('/lookup', customerController.findByPhone);
+router.get('/lookup', requireFields(['business_id', 'phone'], 'query'), customerController.findByPhone);
 
 /**
  * @swagger

@@ -87,7 +87,7 @@ async function sendQuote(id) {
     where: { id },
     include: { business: true },
   });
-  if (!quote) throw Object.assign(new Error('Quote not found'), { statusCode: 404 });
+  if (!quote) throw new NotFoundError('Quote not found.');
 
   const expiryDays = quote.business?.quote_expiry_days || 30;
   const expires_at = new Date();
@@ -112,8 +112,8 @@ async function approveAndConvert(id, jobData = {}) {
     where: { id },
     include: { customer: true },
   });
-  if (!quote) throw Object.assign(new Error('Quote not found'), { statusCode: 404 });
-  if (quote.status === 'Expired') throw Object.assign(new Error('Cannot approve an expired quote'), { statusCode: 400 });
+  if (!quote) throw new NotFoundError('Quote not found.');
+  if (quote.status === 'Expired') throw new ValidationError('Cannot approve an expired quote.');
 
   const job = await prisma.job.create({
     data: {

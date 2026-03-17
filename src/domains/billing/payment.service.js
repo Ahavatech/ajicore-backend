@@ -13,16 +13,16 @@ async function processPayment(invoiceId, paymentData) {
     include: { line_items: true, payments: true },
   });
 
-  if (!invoice) throw Object.assign(new Error('Invoice not found'), { statusCode: 404 });
+  if (!invoice) throw new NotFoundError('Invoice not found.');
   if (['Refunded', 'Voided', 'Cancelled'].includes(invoice.status)) {
-    throw Object.assign(new Error(`Cannot apply payment to a ${invoice.status} invoice`), { statusCode: 400 });
+    throw new ValidationError(`Cannot apply payment to a ${invoice.status} invoice.`);
   }
 
   const subtotal = invoice.line_items.reduce((sum, l) => sum + (l.is_credit ? -l.total : l.total), 0);
   const totalPaid = invoice.payments.reduce((sum, p) => sum + p.amount, 0);
   const remaining = subtotal - totalPaid;
 
-  if (remaining <= 0) throw Object.assign(new Error('Invoice is already fully paid'), { statusCode: 400 });
+  if (remaining <= 0) throw new ValidationError('Invoice is already fully paid.');
 
   const amount = Math.min(paymentData.amount, remaining);
   let stripePaymentId = null;

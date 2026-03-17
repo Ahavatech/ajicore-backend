@@ -88,10 +88,10 @@ async function create(data) {
  */
 async function update(id, data, userId) {
   const invoice = await prisma.invoice.findUnique({ where: { id } });
-  if (!invoice) throw Object.assign(new Error('Invoice not found'), { statusCode: 404 });
+  if (!invoice) throw new NotFoundError('Invoice not found.');
 
   if (['Refunded', 'Voided'].includes(invoice.status)) {
-    throw Object.assign(new Error(`Invoice is ${invoice.status} and cannot be edited`), { statusCode: 400 });
+    throw new ValidationError(`Invoice is ${invoice.status} and cannot be edited.`);
   }
 
   const isPaid = invoice.status === 'Paid';
@@ -143,14 +143,14 @@ async function update(id, data, userId) {
 
 async function send(id) {
   const invoice = await prisma.invoice.findUnique({ where: { id } });
-  if (!invoice) throw Object.assign(new Error('Invoice not found'), { statusCode: 404 });
+  if (!invoice) throw new NotFoundError('Invoice not found.');
   return prisma.invoice.update({ where: { id }, data: { status: 'Sent', sent_at: new Date() } });
 }
 
 async function voidInvoice(id, userId) {
   const invoice = await prisma.invoice.findUnique({ where: { id } });
-  if (!invoice) throw Object.assign(new Error('Invoice not found'), { statusCode: 404 });
-  if (invoice.status === 'Paid') throw Object.assign(new Error('Cannot void a paid invoice. Issue a refund instead.'), { statusCode: 400 });
+  if (!invoice) throw new NotFoundError('Invoice not found.');
+  if (invoice.status === 'Paid') throw new ValidationError('Cannot void a paid invoice. Issue a refund instead.');
 
   const updated = await prisma.invoice.update({ where: { id }, data: { status: 'Voided', voided_at: new Date() } });
   await prisma.invoiceEditLog.create({ data: { invoice_id: id, edited_by: userId || null, changes: { action: 'voided' } } });
@@ -159,16 +159,16 @@ async function voidInvoice(id, userId) {
 
 async function refundInvoice(id, { amount, reason, userId }) {
   const invoice = await prisma.invoice.findUnique({ where: { id }, include: { payments: true } });
-  if (!invoice) throw Object.assign(new Error('Invoice not found'), { statusCode: 404 });
+  if (!invoice) throw new NotFoundError('Invoice not found.');
   if (!['Paid', 'PartiallyPaid'].includes(invoice.status)) {
-    throw Object.assign(new Error('Invoice must be paid to issue a refund'), { statusCode: 400 });
+    throw new ValidationError('Invoice must be paid to issue a refund.');
   }
 
   const totalPaid = invoice.payments.reduce((sum, p) => sum + p.amount, 0);
   const refundAmt = amount || totalPaid;
 
   if (refundAmt > totalPaid) {
-    throw Object.assign(new Error('Refund amount cannot exceed amount paid'), { statusCode: 400 });
+    throw new ValidationError('Refund amount cannot exceed amount paid.');
   }
 
   const updated = await prisma.invoice.update({

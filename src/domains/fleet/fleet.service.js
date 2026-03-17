@@ -44,7 +44,7 @@ async function update(id, data) {
 
 async function updateMileage(id, newMileage) {
   const vehicle = await prisma.vehicle.findUnique({ where: { id } });
-  if (!vehicle) throw Object.assign(new Error('Vehicle not found'), { statusCode: 404 });
+  if (!vehicle) throw new NotFoundError('Vehicle not found.');
 
   const updated = await prisma.vehicle.update({ where: { id }, data: { mileage: newMileage } });
   const milesSinceMaintenance = newMileage - vehicle.last_maintenance_mileage;

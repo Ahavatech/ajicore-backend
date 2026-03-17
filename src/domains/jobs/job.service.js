@@ -90,15 +90,15 @@ async function updateJob(id, data) {
 
 async function startJob(id) {
   const job = await prisma.job.findUnique({ where: { id } });
-  if (!job) throw Object.assign(new Error('Job not found'), { statusCode: 404 });
-  if (job.status !== 'Scheduled') throw Object.assign(new Error('Job must be Scheduled to start'), { statusCode: 400 });
+  if (!job) throw new NotFoundError('Job not found.');
+  if (job.status !== 'Scheduled') throw new ValidationError('Job must be Scheduled to start.');
   return prisma.job.update({ where: { id }, data: { status: 'InProgress', actual_start_time: new Date() }, include: { customer: true, assigned_staff: true } });
 }
 
 async function completeJob(id) {
   const job = await prisma.job.findUnique({ where: { id } });
-  if (!job) throw Object.assign(new Error('Job not found'), { statusCode: 404 });
-  if (job.status !== 'InProgress') throw Object.assign(new Error('Job must be InProgress to complete'), { statusCode: 400 });
+  if (!job) throw new NotFoundError('Job not found.');
+  if (job.status !== 'InProgress') throw new ValidationError('Job must be InProgress to complete.');
   return prisma.job.update({ where: { id }, data: { status: 'Completed', actual_end_time: new Date() }, include: { customer: true, assigned_staff: true } });
 }
 
@@ -119,7 +119,7 @@ async function addMaterials(jobId, materials) {
 
 async function addPhotos(jobId, photoUrls) {
   const job = await prisma.job.findUnique({ where: { id: jobId } });
-  if (!job) throw Object.assign(new Error('Job not found'), { statusCode: 404 });
+  if (!job) throw new NotFoundError('Job not found.');
   const existing = Array.isArray(job.photos_urls) ? job.photos_urls : [];
   return prisma.job.update({ where: { id: jobId }, data: { photos_urls: [...existing, ...photoUrls] } });
 }
