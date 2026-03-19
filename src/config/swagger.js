@@ -18,26 +18,37 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
 
 ## Authentication
 - **Frontend routes**: Use \`Authorization: Bearer <jwt_token>\` header
+
 - **AI / Internal routes**: Use \`x-api-key: <internal_api_key>\` header
 
 ## Key Flows
 
 ### Quote → Job Conversion
 1. AI books estimate → \`POST /api/quotes\` (status: EstimateScheduled)
+
 2. Contractor goes on-site → \`PATCH /api/quotes/:id\` (add pricing, status: Draft)
+
 3. Send to customer → \`POST /api/quotes/:id/send\` (status: Sent, expiry set)
+
 4. Customer approves → \`POST /api/quotes/:id/approve\` (creates Job)
 
 ### Direct Job Booking (price known)
 1. AI/manual books job → \`POST /api/jobs\`
+
 2. Start work → \`POST /api/jobs/:id/start\`
+
 3. Complete → \`POST /api/jobs/:id/complete\`
+
 4. Invoice → \`POST /api/billing/invoices\`
+
 5. Payment → \`POST /api/billing/payments/:invoiceId\`
 
 ### Invoice Edit Rules
+
 - **Draft/Sent**: Full edit allowed
+
 - **Paid**: Only internal notes
+
 - **Refunded/Voided**: Locked
       `,
       contact: { name: 'Ajicore Team' },
@@ -131,6 +142,28 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             is_credit: { type: 'boolean', description: 'true = deduction (e.g., service call credit)' },
           },
         },
+              Payment: {
+        type: 'object',
+        properties: {
+          invoice_id: { type: 'string' },
+          amount: { type: 'number' },
+          method: { type: 'string' },
+          status: { type: 'string' }
+        }
+      },
+
+        Expense: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            business_id: { type: 'string' },
+            amount: { type: 'number' },
+            category: { type: 'string' },
+            description: { type: 'string' },
+            job_id: { type: 'string', nullable: true },
+            createdAt: { type: 'string', format: 'date-time' }
+          }
+        },
         PriceBookItem: {
           type: 'object',
           properties: {
@@ -180,6 +213,7 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
   },
   apis: [
     './src/api/routes/*.js',
+    './src/api/routes/docs/*swagger.js',
     './src/domains/**/*.js',
   ],
 };
