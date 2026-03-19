@@ -1,21 +1,4 @@
-/**
- * Auth Routes
- * Endpoints for user signup, signin, Google OAuth, and multi-step onboarding.
- *
- * Public routes (no auth required):
- *   POST /api/auth/signup    — Create account with email + password
- *   POST /api/auth/google    — Create account or sign in with Google
- *   POST /api/auth/signin    — Sign in with email + password
- *
- * Protected routes (Bearer token required):
- *   POST  /api/auth/onboarding/step2 — Organization contact info
- *   POST  /api/auth/onboarding/step3 — Organization address
- *   POST  /api/auth/onboarding/step4 — Logo upload
- *   POST  /api/auth/onboarding/step5 — AI business number
- *   POST  /api/auth/onboarding/skip5 — Skip AI number step
- *   GET   /api/auth/me               — Get current user profile
- *   PATCH /api/auth/change-password   — Change password
- */
+
 const { Router } = require('express');
 const authController = require('../../domains/auth/auth.controller');
 const { requireAuth } = require('../middlewares/auth.middleware');
