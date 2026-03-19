@@ -1,149 +1,119 @@
-# Ajicore v2.0
+# Ajicore
 
-AI-powered back-office platform for blue-collar service businesses (plumbing, HVAC, electrical, maintenance). Serves as a virtual office manager — automating scheduling, quoting, invoicing, inventory, fleet, and payroll. Dual API: JWT for frontend, API-key for AI call-center service.
+A comprehensive backend platform for service businesses — scheduling, invoicing, bookkeeping, inventory, fleet tracking, and AI-powered automation.
 
 ## Architecture
 
 - **Runtime**: Node.js 20
 - **Framework**: Express.js
-- **Database**: PostgreSQL
-- **ORM**: Prisma
-- **Auth**: JWT + bcryptjs (frontend) / x-api-key header (AI service)
-- **Dev Server**: nodemon
-- **Docs**: Swagger UI at `/api/docs` + raw JSON at `/api/docs.json`
-- **Postman**: `ajicore_postman_collection.json` (93 requests)
+- **Database**: PostgreSQL (Replit built-in) via Prisma ORM
+- **Auth**: JWT + Bcrypt; Google OAuth supported
+- **API Docs**: Swagger UI at `/api/docs`
 
 ## Project Structure
 
 ```
-prisma/
-  schema.prisma            # Full schema (all models + enums)
-  migrations/              # Applied migrations
 src/
-  app.js                   # Express app: all routes, Swagger, error handling
-  server.js                # Entry point
+  app.js              - Express setup (middleware, routes, error handling)
+  server.js           - Server entry point (port 5000, 0.0.0.0)
   config/
-    swagger.js             # OpenAPI 3.0 spec configuration
-    env.js                 # Environment variable loader
-    constants.js           # Enums, cron schedules, status arrays
+    env.js            - Environment variable loader & validation
+    swagger.js        - Swagger/OpenAPI config
   api/
-    routes/
-      auth.routes.js       # POST /signup /signin /me /onboarding
-      customers.routes.js  # /api/customers
-      jobs.routes.js       # /api/jobs (+ /start /complete /materials /photos)
-      quotes.routes.js     # /api/quotes (+ /send /approve /decline)
-      billing.routes.js    # /api/billing/invoices /payments /expenses
-      pricebook.routes.js  # /api/price-book (+ /categories)
-      dashboard.routes.js  # /api/dashboard/summary /weekly-report /revenue
-      inventory.routes.js  # /api/inventory (+ /restock)
-      fleet.routes.js      # /api/fleet (+ /mileage /maintenance-alerts)
-      staff.routes.js      # /api/staff (+ /clock-in /clock-out /timesheets)
-      ai_bridge.routes.js  # /api/internal/ai/* + /sms/* + schedule/jobs/quotes
-    middlewares/
-      auth.middleware.js   # requireAuth (JWT), requireInternalApiKey
-      validate.middleware.js
-      error.middleware.js
-  domains/
-    auth/                  # User auth, onboarding
-    customers/             # Customer CRUD, phone lookup, history
-    quotes/                # Quote lifecycle (EstimateScheduled→Approved→Job)
-    jobs/                  # Job lifecycle (Scheduled→Completed→Invoiced)
-    billing/
-      invoice.service.js   # Full invoice CRUD with line items, audit log, refund/void
-      payment.service.js   # Payment recording (Stripe optional)
-      expense.service.js   # Expense tracking
-    pricebook/             # Service categories + price book items
-    dashboard/             # KPI summary, revenue chart, jobs analytics
-    communications/        # SMS controller, notification service, AI routing
-    fleet/                 # Vehicle CRUD, mileage, maintenance alerts
-    inventory/             # Material CRUD, restock, low-stock detection
-    team/                  # Staff CRUD, clock-in/out, timesheets, payroll
+    routes/           - Express route definitions
+    middlewares/       - Auth (requireAuth), rate limiting, validation, error handling
+  domains/            - Business logic by feature (thin controllers, logic in services)
+    auth/             - Registration, login, onboarding (5 steps)
+    billing/          - Invoices, payments, expenses
+    jobs/             - Service jobs management
+    quotes/           - Quote/estimate management
+    fleet/            - Vehicle tracking
+    inventory/        - Materials & stock
+    pricebook/        - Price book items
+    team/             - Staff management & payroll
+    customers/        - Customer CRUD + computed `name` field in all responses
+    dashboard/        - Analytics & reporting
+    communications/   - SMS/notification service
+    follow_ups/       - Automated follow-up management (quotes, invoices)
+    team_checkins/    - Staff check-in scheduling and escalation
+    bookkeeping/      - Bank transactions + AI categorization rules
+    ai_logs/          - AI event audit log
   integrations/
-    payments/stripe_gateway.js  # Stripe (optional, isConfigured() check)
-    sms/twilio_gateway.js       # Twilio SMS
-  jobs/
-    automated_reports.cron.js   # Weekly report → SMS to owner
-    inventory_alerts.cron.js    # Daily low-stock alerts
-    maintenance_reminders.cron.js # Fleet alerts + quote expiry
-  utils/
-    logger.js
-    report_generator.js    # generateWeeklyReport, generateDashboardSummary
+    payments/         - Stripe gateway
+    sms/              - Twilio gateway
+  jobs/               - Background cron tasks
+  utils/              - Logger, error helpers, report generation
+prisma/
+  schema.prisma       - Database schema (v2)
+  migrations/         - Migration history
 ```
 
-## Key Business Flows
+## API Routes
 
-### Quote Path (Price Unknown / Needs On-Site)
-`POST /api/quotes` (EstimateScheduled) → visit site → `PATCH` (add pricing, Draft) → `POST .../send` (Sent) → `POST .../approve` → **Job created** (Scheduled)
+| Path | Description |
+|---|---|
+| `GET /api/health` | Health check |
+| `GET /api/docs` | Swagger UI |
+| `/api/auth` | Auth & onboarding |
+| `/api/customers` | Customer management |
+| `/api/jobs` | Job lifecycle |
+| `/api/quotes` | Quote/estimate flow |
+| `/api/billing` | Invoices, payments, expenses |
+| `/api/inventory` | Materials & stock |
+| `/api/fleet` | Vehicle fleet |
+| `/api/staff` | Staff & payroll |
+| `/api/price-book` | Price book items |
+| `/api/dashboard` | Analytics |
+| `/api/internal` | AI Bridge (API key protected) |
+| `/api/follow-ups` | Automated follow-ups |
+| `/api/team-checkins` | Staff check-ins & escalation |
+| `/api/bookkeeping` | Bank transactions & categorization rules |
+| `/api/ai-logs` | AI event audit logs |
 
-### Job Path (Price Known)
-`POST /api/jobs` (Scheduled) → `POST .../start` (InProgress) → `POST .../complete` (Completed) → `POST /api/billing/invoices` → `POST /api/billing/payments/:id`
+## Schema (v2 — AI Alignment)
 
-### AI Call Flow
-1. `GET /api/internal/ai/business-config` — load receptionist context
-2. `GET /api/internal/customers/lookup?phone=...` — identify caller
-3. `GET /api/internal/ai/price-lookup?service=...` — check pricing
-4. `POST /api/internal/ai/radius-check` — validate service area
-5. `POST /api/internal/ai/book` — create Quote or Job
+### Updated Models
+- **Business**: + `timezone`, `business_hours` (Json), `ai_receptionist_name`, `voice_gender`, `service_area_description`, `owner_phone`
+- **Job**: + `address`, `service_type`, `created_by`
+- **Quote**: + `follow_up_count`, `auto_reminders_paused`
+- **Invoice**: + `follow_up_count`, `auto_reminders_paused`, `last_follow_up`, `customer_responded`
+- **PriceBookItem**: + `recognition_tags` (Json), `estimated_duration_hours`
+- **Staff**: + `check_in_frequency_hours`, `active_job_id` (relation)
+- **Vehicle**: + `name`
+- **Customer**: computed `name` field (`first_name + last_name`) added to all API responses at service layer
 
-### Invoice Edit Rules
-| Status | Edit Rules |
-|--------|-----------|
-| Draft / Sent | Full edit (line items, notes, due date) |
-| Paid | internal_notes only |
-| Refunded / Voided | Locked |
-
-All edits on paid+ invoices are recorded in `invoice_edit_logs`.
-
-## API Domains (93 total endpoints)
-
-| Domain | Auth | Base Path |
-|--------|------|-----------|
-| Auth | Public / JWT | `/api/auth` |
-| Customers | JWT | `/api/customers` |
-| Quotes | JWT | `/api/quotes` |
-| Jobs | JWT | `/api/jobs` |
-| Billing | JWT | `/api/billing` |
-| Price Book | JWT | `/api/price-book` |
-| Inventory | JWT | `/api/inventory` |
-| Fleet | JWT | `/api/fleet` |
-| Staff | JWT | `/api/staff` |
-| Dashboard | JWT | `/api/dashboard` |
-| AI Bridge | x-api-key | `/api/internal` |
-
-## Documentation
-
-- **Swagger UI**: `GET /api/docs`
-- **OpenAPI JSON** (Postman import): `GET /api/docs.json`
-- **Postman Collection**: `ajicore_postman_collection.json` in project root
+### New Models
+- **FollowUp** (`follow_ups`): Scheduled follow-ups with channel, status, tone, attempt tracking
+- **TeamCheckin** (`team_checkins`): Staff check-in scheduling with escalation support
+- **BankTransaction** (`bank_transactions`): Imported financial transactions with AI categorization
+- **CategorizationRule** (`categorization_rules`): Vendor pattern → category auto-matching rules
+- **AiEventLog** (`ai_event_logs`): Full audit trail of all AI-driven actions
 
 ## Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DATABASE_URL` | Yes | PostgreSQL (auto-set by Replit) |
-| `DIRECT_URL` | Yes | Same as DATABASE_URL |
-| `PORT` | No | Default 3000 |
-| `NODE_ENV` | No | development/production |
-| `JWT_SECRET` | Yes | JWT signing key |
-| `JWT_EXPIRES_IN` | No | Default 7d |
-| `INTERNAL_API_KEY` | Yes | AI service auth key |
-| `STRIPE_SECRET_KEY` | No | Optional Stripe |
-| `STRIPE_WEBHOOK_SECRET` | No | Optional Stripe |
-| `TWILIO_ACCOUNT_SID` | No | Optional SMS |
-| `TWILIO_AUTH_TOKEN` | No | Optional SMS |
-| `TWILIO_PHONE_NUMBER` | No | Optional SMS |
+Required:
+- `DATABASE_URL` - PostgreSQL connection (set by Replit)
+- `NODE_ENV` - Runtime environment (`development`)
+- `PORT` - Server port (5000)
+- `JWT_SECRET` - Token signing secret
+- `INTERNAL_API_KEY` - AI bridge protection key
+- `ALLOWED_ORIGINS` - CORS allowed origins
 
-## Workflow
+Optional integrations:
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
+- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`
+- `AI_SERVICE_URL`, `AI_SERVICE_API_KEY`
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
 
-- **Start application**: `npm run dev` → port 3000
-- **Deployment**: autoscale, `node src/server.js`
+## Running
 
-## Cron Jobs (manual registration required)
+- **Dev**: `npm run dev` (nodemon, port 5000, 0.0.0.0)
+- **Production**: `node src/server.js`
+- **DB migrations**: `npx prisma migrate deploy`
 
-```js
-const cron = require('node-cron');
-cron.schedule('0 8 * * 1', () => require('./src/jobs/automated_reports.cron').runWeeklyReports());
-cron.schedule('0 9 * * *', () => require('./src/jobs/inventory_alerts.cron').runInventoryAlerts());
-cron.schedule('0 7 * * *', () => require('./src/jobs/maintenance_reminders.cron').runMaintenanceReminders());
-cron.schedule('0 0 * * *', () => require('./src/jobs/maintenance_reminders.cron').runQuoteExpiry());
-```
+## Notes
+
+- `directUrl` removed from `prisma/schema.prisma` — it was for Supabase; Replit's built-in DB doesn't need it.
+- Server listens on `0.0.0.0` for Replit's proxy to work correctly.
+- All business logic lives in service files; controllers are thin HTTP handlers only.
+- `business_id` flows from query params (GET) or request body (POST/PATCH) — consistent with existing pattern.

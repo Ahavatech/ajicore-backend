@@ -8,7 +8,7 @@ const logger = require('./utils/logger');
 
 const PORT = env.PORT;
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   logger.info(` Ajicore server running on port ${PORT} [${env.NODE_ENV}]`);
   logger.info(` Health check: http://localhost:${PORT}/api/health`);
 });

@@ -21,6 +21,10 @@ const staffRoutes = require('./api/routes/staff.routes');
 const priceBookRoutes = require('./api/routes/pricebook.routes');
 const dashboardRoutes = require('./api/routes/dashboard.routes');
 const aiBridgeRoutes = require('./api/routes/ai_bridge.routes');
+const followUpRoutes = require('./api/routes/follow_ups.routes');
+const teamCheckinRoutes = require('./api/routes/team_checkins.routes');
+const bookkeepingRoutes = require('./api/routes/bookkeeping.routes');
+const aiLogsRoutes = require('./api/routes/ai_logs.routes');
 
 // Middleware imports
 const { errorHandler, notFoundHandler } = require('./api/middlewares/error.middleware');
@@ -174,6 +178,10 @@ app.use('/api/staff', staffRoutes);
 app.use('/api/price-book', priceBookRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/internal', aiBridgeRoutes);
+app.use('/api/follow-ups', followUpRoutes);
+app.use('/api/team-checkins', teamCheckinRoutes);
+app.use('/api/bookkeeping', bookkeepingRoutes);
+app.use('/api/ai-logs', aiLogsRoutes);
 
 // ============================================
 // Error Handling

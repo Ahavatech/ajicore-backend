@@ -6,6 +6,15 @@ const { PrismaClient } = require('@prisma/client');
 const { ValidationError } = require('../../utils/errors');
 const prisma = new PrismaClient();
 
+function withComputedName(customer) {
+  if (!customer) return customer;
+  if (Array.isArray(customer)) return customer.map(withComputedName);
+  return {
+    ...customer,
+    name: `${customer.first_name || ''} ${customer.last_name || ''}`.trim(),
+  };
+}
+
 function sanitizeSearchInput(input, maxLength = 100) {
   if (!input) return null;
 
@@ -60,11 +69,11 @@ async function getCustomers({ business_id, search, page = 1, limit = 20 }) {
     prisma.customer.count({ where }),
   ]);
 
-  return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  return { data: withComputedName(data), total, page, limit, totalPages: Math.ceil(total / limit) };
 }
 
 async function getById(id) {
-  return prisma.customer.findUnique({
+  const customer = await prisma.customer.findUnique({
     where: { id },
     include: {
       jobs: {
@@ -78,10 +87,11 @@ async function getById(id) {
       },
     },
   });
+  return withComputedName(customer);
 }
 
 async function findByPhone(businessId, phoneNumber) {
-  return prisma.customer.findFirst({
+  const customer = await prisma.customer.findFirst({
     where: {
       business_id: businessId,
       phone_number: phoneNumber,
@@ -94,10 +104,11 @@ async function findByPhone(businessId, phoneNumber) {
       },
     },
   });
+  return withComputedName(customer);
 }
 
 async function create(data) {
-  return prisma.customer.create({
+  const customer = await prisma.customer.create({
     data: {
       business_id: data.business_id,
       first_name: data.first_name,
@@ -109,13 +120,15 @@ async function create(data) {
       notes: data.notes || null,
     },
   });
+  return withComputedName(customer);
 }
 
 async function update(id, data) {
   const updateData = {};
   const fields = ['first_name', 'last_name', 'phone_number', 'email', 'address', 'zip_code', 'notes'];
   fields.forEach((f) => { if (data[f] !== undefined) updateData[f] = data[f]; });
-  return prisma.customer.update({ where: { id }, data: updateData });
+  const customer = await prisma.customer.update({ where: { id }, data: updateData });
+  return withComputedName(customer);
 }
 
 async function remove(id) {

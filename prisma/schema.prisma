@@ -6,9 +6,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // ============================================
@@ -100,6 +99,40 @@ enum ExpenseCategory {
   Other
 }
 
+enum FollowUpStatus {
+  Scheduled
+  Sent
+  Delivered
+  Failed
+  Cancelled
+}
+
+enum FollowUpChannel {
+  SMS
+  Email
+  Call
+}
+
+enum FollowUpType {
+  Quote
+  Invoice
+  JobReminder
+  PaymentRequest
+}
+
+enum TeamCheckinStatus {
+  Pending
+  Received
+  Missed
+  Escalated
+}
+
+enum VoiceGender {
+  Male
+  Female
+  Neutral
+}
+
 // ============================================
 // Models
 // ============================================
@@ -131,23 +164,29 @@ model Business {
   company_email             String?
   company_type              String?
   company_phone             String?
+  owner_phone               String?
   street                    String?
   city                      String?
   postal_code               String?
   country                   String?
   logo_url                  String?
+  timezone                  String?
+  business_hours            Json?
 
   // AI Phone / Dedicated Number
   dedicated_phone_number    String?
   ai_phone_number           String?
   ai_phone_country          String?
   ai_phone_area_code        String?
+  ai_receptionist_name      String?
+  voice_gender              VoiceGender?
 
   // Service Configuration (Onboarding)
   ai_business_description   String?
   home_base_zip             String?
   service_radius_miles      Float?
   cost_per_mile_over_radius Float?
+  service_area_description  String?
 
   // Unknown Service Handling
   unknown_service_handling  UnknownServiceHandling @default(FreeEstimate)
@@ -163,16 +202,20 @@ model Business {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  owner              User?              @relation(fields: [owner_id], references: [id], onDelete: SetNull)
-  staff              Staff[]
-  customers          Customer[]
-  jobs               Job[]
-  quotes             Quote[]
-  expenses           Expense[]
-  materials          Material[]
-  vehicles           Vehicle[]
-  price_book_items   PriceBookItem[]
-  service_categories ServiceCategory[]
+  owner                User?              @relation(fields: [owner_id], references: [id], onDelete: SetNull)
+  staff                Staff[]
+  customers            Customer[]
+  jobs                 Job[]
+  quotes               Quote[]
+  expenses             Expense[]
+  materials            Material[]
+  vehicles             Vehicle[]
+  price_book_items     PriceBookItem[]
+  service_categories   ServiceCategory[]
+  follow_ups           FollowUp[]
+  bank_transactions    BankTransaction[]
+  categorization_rules CategorizationRule[]
+  ai_event_logs        AiEventLog[]
 
   @@map("businesses")
 }
@@ -193,23 +236,25 @@ model ServiceCategory {
 }
 
 model PriceBookItem {
-  id                  String    @id @default(uuid())
-  business_id         String
-  category_id         String?
-  name                String
-  description         String?
-  can_quote_phone     Boolean   @default(false)
-  price_type          PriceType @default(NeedsOnsite)
-  price               Float?
-  price_min           Float?
-  price_max           Float?
-  visit_type          VisitType @default(FreeEstimate)
-  service_call_fee    Float?
-  suggested_materials Json?
-  usage_count         Int       @default(0)
-  is_active           Boolean   @default(true)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  id                       String    @id @default(uuid())
+  business_id              String
+  category_id              String?
+  name                     String
+  description              String?
+  can_quote_phone          Boolean   @default(false)
+  price_type               PriceType @default(NeedsOnsite)
+  price                    Float?
+  price_min                Float?
+  price_max                Float?
+  visit_type               VisitType @default(FreeEstimate)
+  service_call_fee         Float?
+  suggested_materials      Json?
+  recognition_tags         Json?
+  estimated_duration_hours Float?
+  usage_count              Int       @default(0)
+  is_active                Boolean   @default(true)
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
   business  Business         @relation(fields: [business_id], references: [id], onDelete: Cascade)
   category  ServiceCategory? @relation(fields: [category_id], references: [id], onDelete: SetNull)
@@ -218,20 +263,24 @@ model PriceBookItem {
 }
 
 model Staff {
-  id          String    @id @default(uuid())
-  business_id String
-  name        String
-  role        StaffRole @default(Technician)
-  hourly_rate Float
-  email       String?
-  phone       String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id                      String    @id @default(uuid())
+  business_id             String
+  name                    String
+  role                    StaffRole @default(Technician)
+  hourly_rate             Float
+  email                   String?
+  phone                   String?
+  check_in_frequency_hours Float?
+  active_job_id           String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
-  business      Business    @relation(fields: [business_id], references: [id], onDelete: Cascade)
-  assigned_jobs Job[]       @relation("AssignedStaff")
-  assigned_quotes Quote[]   @relation("AssignedQuoteStaff")
-  timesheets    Timesheet[]
+  business        Business     @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  assigned_jobs   Job[]        @relation("AssignedStaff")
+  assigned_quotes Quote[]      @relation("AssignedQuoteStaff")
+  timesheets      Timesheet[]
+  active_job      Job?         @relation("StaffActiveJob", fields: [active_job_id], references: [id], onDelete: SetNull)
+  team_checkins   TeamCheckin[]
 
   @@map("staff")
 }
@@ -266,9 +315,11 @@ model Customer {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  business Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
-  jobs     Job[]
-  quotes   Quote[]
+  business  Business   @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  jobs      Job[]
+  quotes    Quote[]
+  follow_ups FollowUp[]
+  ai_event_logs AiEventLog[]
 
   @@map("customers")
 }
@@ -293,6 +344,8 @@ model Quote {
   is_emergency            Boolean     @default(false)
   source                  JobSource   @default(Manual)
   converted_to_job_id     String?
+  follow_up_count         Int         @default(0)
+  auto_reminders_paused   Boolean     @default(false)
   createdAt               DateTime    @default(now())
   updatedAt               DateTime    @updatedAt
 
@@ -316,6 +369,9 @@ model Job {
   job_details          String?
   price_book_item_id   String?
   service_call_fee     Float?
+  address              String?
+  service_type         String?
+  created_by           String?
   scheduled_start_time DateTime?
   scheduled_end_time   DateTime?
   actual_start_time    DateTime?
@@ -330,34 +386,41 @@ model Job {
   business       Business       @relation(fields: [business_id], references: [id], onDelete: Cascade)
   customer       Customer       @relation(fields: [customer_id], references: [id], onDelete: Cascade)
   assigned_staff Staff?         @relation("AssignedStaff", fields: [assigned_staff_id], references: [id], onDelete: SetNull)
+  active_staff   Staff[]        @relation("StaffActiveJob")
   invoices       Invoice[]
   job_materials  JobMaterial[]
   expenses       Expense[]
   timesheets     Timesheet[]
   from_quote     Quote[]        @relation("QuoteConvertedJob")
+  team_checkins  TeamCheckin[]
+  ai_event_logs  AiEventLog[]
 
   @@map("jobs")
 }
 
 model Invoice {
-  id             String        @id @default(uuid())
-  job_id         String
-  business_id    String
-  status         InvoiceStatus @default(Draft)
-  notes          String?
-  internal_notes String?
-  due_date       DateTime?
-  sent_at        DateTime?
-  paid_at        DateTime?
-  voided_at      DateTime?
-  refunded_at    DateTime?
-  refund_amount  Float?
-  refund_reason  String?
-  payment_url    String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id                    String        @id @default(uuid())
+  job_id                String
+  business_id           String
+  status                InvoiceStatus @default(Draft)
+  notes                 String?
+  internal_notes        String?
+  due_date              DateTime?
+  sent_at               DateTime?
+  paid_at               DateTime?
+  voided_at             DateTime?
+  refunded_at           DateTime?
+  refund_amount         Float?
+  refund_reason         String?
+  payment_url           String?
+  follow_up_count       Int           @default(0)
+  auto_reminders_paused Boolean       @default(false)
+  last_follow_up        DateTime?
+  customer_responded    Boolean       @default(false)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
 
-  job       Job              @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  job        Job              @relation(fields: [job_id], references: [id], onDelete: Cascade)
   line_items InvoiceLine[]
   edit_logs  InvoiceEditLog[]
   payments   Payment[]
@@ -459,21 +522,122 @@ model JobMaterial {
 }
 
 model Vehicle {
-  id                      String    @id @default(uuid())
-  business_id             String
-  make_model              String
-  year                    Int?
-  license_plate           String?
-  mileage                 Int       @default(0)
-  insurance_expiry        DateTime?
-  registration_renewal    DateTime?
-  maintenance_cycle_miles Int       @default(5000)
-  last_maintenance_mileage Int      @default(0)
-  notes                   String?
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
+  id                       String    @id @default(uuid())
+  business_id              String
+  name                     String?
+  make_model               String
+  year                     Int?
+  license_plate            String?
+  mileage                  Int       @default(0)
+  insurance_expiry         DateTime?
+  registration_renewal     DateTime?
+  maintenance_cycle_miles  Int       @default(5000)
+  last_maintenance_mileage Int       @default(0)
+  notes                    String?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
   business Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
 
   @@map("vehicles")
+}
+
+// ============================================
+// New Models
+// ============================================
+
+model FollowUp {
+  id             String          @id @default(uuid())
+  business_id    String
+  type           FollowUpType
+  reference_id   String
+  customer_id    String?
+  attempt_number Int             @default(1)
+  scheduled_for  DateTime?
+  sent_at        DateTime?
+  channel        FollowUpChannel @default(SMS)
+  status         FollowUpStatus  @default(Scheduled)
+  tone           String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  business Business  @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customer_id], references: [id], onDelete: SetNull)
+
+  @@map("follow_ups")
+}
+
+model TeamCheckin {
+  id           String            @id @default(uuid())
+  job_id       String?
+  staff_id     String
+  scheduled_at DateTime
+  received_at  DateTime?
+  message      String?
+  status       TeamCheckinStatus @default(Pending)
+  escalated    Boolean           @default(false)
+  escalated_at DateTime?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  job   Job?  @relation(fields: [job_id], references: [id], onDelete: SetNull)
+  staff Staff @relation(fields: [staff_id], references: [id], onDelete: Cascade)
+
+  @@map("team_checkins")
+}
+
+model BankTransaction {
+  id                String   @id @default(uuid())
+  business_id       String
+  vendor            String?
+  amount            Float
+  date              DateTime
+  category          String?
+  confidence        Float?
+  source            String?
+  is_income         Boolean  @default(false)
+  receipt_url       String?
+  raw_description   String?
+  normalized_vendor String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  business Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
+
+  @@map("bank_transactions")
+}
+
+model CategorizationRule {
+  id              String   @id @default(uuid())
+  business_id     String
+  vendor_pattern  String
+  category        String
+  auto_apply      Boolean  @default(true)
+  last_applied_at DateTime?
+  match_count     Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  business Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
+
+  @@map("categorization_rules")
+}
+
+model AiEventLog {
+  id          String   @id @default(uuid())
+  business_id String
+  event_type  String
+  timestamp   DateTime @default(now())
+  actor       String?
+  details     Json?
+  job_id      String?
+  customer_id String?
+  error       String?
+  createdAt   DateTime @default(now())
+
+  business Business  @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  job      Job?      @relation(fields: [job_id], references: [id], onDelete: SetNull)
+  customer Customer? @relation(fields: [customer_id], references: [id], onDelete: SetNull)
+
+  @@map("ai_event_logs")
 }
