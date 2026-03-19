@@ -1,1 +1,48 @@
-node_modules
+# Dependency directories
+node_modules/
+
+# Environment variables (CRITICAL: Do not commit these!)
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Prisma specific
+# (If you ever use SQLite for local testing, this ignores the local DB file)
+*.db
+*.db-journal
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE and Editor directories
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Testing/Coverage
+coverage/
+.nyc_output/
+
+# Build outputs (if you eventually compile with Babel/TypeScript)
+dist/
+build/
