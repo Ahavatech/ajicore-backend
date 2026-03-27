@@ -11,7 +11,7 @@
 
 const { Router } = require('express');
 const staffController = require('../../domains/team/staff.controller');
-const { requireAuth } = require('../middlewares/auth.middleware');
+const { requireAuth, requireBusinessAccess, requireResourceAccess } = require('../middlewares/auth.middleware');
 const { requireFields, validateUUID } = require('../middlewares/validate.middleware');
 
 const router = Router();
@@ -26,7 +26,7 @@ router.use(requireAuth);
  *     security:
  *       - bearerAuth: []
  */
-router.get('/', staffController.getAllStaff);
+router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), staffController.getAllStaff);
 
 /**
  * @swagger
@@ -37,7 +37,7 @@ router.get('/', staffController.getAllStaff);
  *     security:
  *       - bearerAuth: []
  */
-router.get('/payroll', staffController.calculatePayroll);
+router.get('/payroll', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), staffController.calculatePayroll);
 
 /**
  * @swagger
@@ -48,7 +48,7 @@ router.get('/payroll', staffController.calculatePayroll);
  *     security:
  *       - bearerAuth: []
  */
-router.get('/timesheets', staffController.getTimesheets);
+router.get('/timesheets', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), staffController.getTimesheets);
 
 /**
  * @swagger
@@ -65,7 +65,7 @@ router.get('/timesheets', staffController.getTimesheets);
  *         schema:
  *           type: string
  */
-router.get('/:id', validateUUID('id'), staffController.getStaffById);
+router.get('/:id', validateUUID('id'), requireResourceAccess('staff'), staffController.getStaffById);
 
 /**
  * @swagger
@@ -76,7 +76,7 @@ router.get('/:id', validateUUID('id'), staffController.getStaffById);
  *     security:
  *       - bearerAuth: []
  */
-router.post('/', requireFields(['business_id', 'name', 'hourly_rate']), staffController.createStaff);
+router.post('/', requireFields(['business_id', 'name', 'hourly_rate']), requireBusinessAccess('body'), staffController.createStaff);
 
 /**
  * @swagger
@@ -87,7 +87,7 @@ router.post('/', requireFields(['business_id', 'name', 'hourly_rate']), staffCon
  *     security:
  *       - bearerAuth: []
  */
-router.patch('/:id', validateUUID('id'), staffController.updateStaff);
+router.patch('/:id', validateUUID('id'), requireResourceAccess('staff'), staffController.updateStaff);
 
 /**
  * @swagger
@@ -98,7 +98,7 @@ router.patch('/:id', validateUUID('id'), staffController.updateStaff);
  *     security:
  *       - bearerAuth: []
  */
-router.delete('/:id', validateUUID('id'), staffController.deleteStaff);
+router.delete('/:id', validateUUID('id'), requireResourceAccess('staff'), staffController.deleteStaff);
 
 /**
  * @swagger
@@ -109,7 +109,7 @@ router.delete('/:id', validateUUID('id'), staffController.deleteStaff);
  *     security:
  *       - bearerAuth: []
  */
-router.post('/:id/clock-in', validateUUID('id'), staffController.clockIn);
+router.post('/:id/clock-in', validateUUID('id'), requireResourceAccess('staff'), staffController.clockIn);
 
 /**
  * @swagger
@@ -120,6 +120,6 @@ router.post('/:id/clock-in', validateUUID('id'), staffController.clockIn);
  *     security:
  *       - bearerAuth: []
  */
-router.post('/:id/clock-out', validateUUID('id'), staffController.clockOut);
+router.post('/:id/clock-out', validateUUID('id'), requireResourceAccess('staff'), staffController.clockOut);
 
 module.exports = router;

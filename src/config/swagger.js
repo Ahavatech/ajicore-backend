@@ -19,7 +19,7 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
 ## Authentication
 - **Frontend routes**: Use \`Authorization: Bearer <jwt_token>\` header
 
-- **AI / Internal routes**: Use \`x-api-key: <internal_api_key>\` header
+- **AI / Internal routes**: Use both \`x-api-key: <internal_api_key>\` and \`x-business-token: <business_internal_api_token>\`
 
 ## Key Flows
 
@@ -70,8 +70,41 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
           name: 'x-api-key',
           description: 'Internal API key for AI service endpoints',
         },
+        businessTokenAuth: {
+          type: 'apiKey',
+          in: 'header',
+          name: 'x-business-token',
+          description: 'Per-business internal bridge token, retrievable by the business owner from /api/auth/internal-api-token',
+        },
       },
       schemas: {
+        Business: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+            industry: { type: 'string' },
+            owner_id: { type: 'string', format: 'uuid', nullable: true },
+            business_structure: { type: 'string', nullable: true },
+            company_email: { type: 'string', format: 'email', nullable: true },
+            company_type: { type: 'string', nullable: true },
+            company_phone: { type: 'string', nullable: true },
+            ai_phone_number: { type: 'string', nullable: true },
+            home_base_zip: { type: 'string', nullable: true },
+            service_radius_miles: { type: 'number', nullable: true },
+            cost_per_mile_over_radius: { type: 'number', nullable: true },
+            quote_expiry_days: { type: 'integer' },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        InternalApiTokenResponse: {
+          type: 'object',
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            internal_api_token: { type: 'string' },
+          },
+        },
         Customer: {
           type: 'object',
           properties: {
@@ -208,7 +241,7 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
       { name: 'Fleet', description: 'Vehicle and fleet management' },
       { name: 'Staff', description: 'Staff, timesheets, and payroll' },
       { name: 'Dashboard', description: 'Analytics and reporting' },
-      { name: 'AI Bridge', description: 'Internal AI service API (x-api-key protected)' },
+      { name: 'AI Bridge', description: 'Internal AI service API (x-api-key required; business-scoped routes also require x-business-token)' },
     ],
   },
   apis: [

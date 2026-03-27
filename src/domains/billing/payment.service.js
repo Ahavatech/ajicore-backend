@@ -6,6 +6,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const stripeGateway = require('../../integrations/payments/stripe_gateway');
 const logger = require('../../utils/logger');
+const { NotFoundError, ValidationError } = require('../../utils/errors');
 
 async function processPayment(invoiceId, paymentData) {
   const invoice = await prisma.invoice.findUnique({

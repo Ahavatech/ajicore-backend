@@ -12,6 +12,7 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const logger = require('../../utils/logger');
+const { NotFoundError, ValidationError } = require('../../utils/errors');
 
 async function getInvoices({ business_id, job_id, status, page = 1, limit = 20 }) {
   const where = {};
@@ -32,7 +33,7 @@ async function getInvoices({ business_id, job_id, status, page = 1, limit = 20 }
 }
 
 async function getById(id) {
-  return prisma.invoice.findUnique({
+  const invoice = await prisma.invoice.findUnique({
     where: { id },
     include: {
       line_items: true,
@@ -41,6 +42,13 @@ async function getById(id) {
       job: { include: { customer: true, business: true } },
     },
   });
+
+  if (invoice?.job?.business) {
+    const { internal_api_token, ...safeBusiness } = invoice.job.business;
+    invoice.job.business = safeBusiness;
+  }
+
+  return invoice;
 }
 
 async function getByJobId(jobId) {

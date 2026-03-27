@@ -153,6 +153,15 @@ async function changePassword(req, res, next) {
   }
 }
 
+async function getInternalApiToken(req, res, next) {
+  try {
+    const result = await authService.getInternalApiToken(req.user.id, req.query.business_id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   signup,
   googleSignup,
@@ -168,4 +177,5 @@ module.exports = {
   onboardingStep5,
   getMe,
   changePassword,
+  getInternalApiToken,
 };

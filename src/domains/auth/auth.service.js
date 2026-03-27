@@ -13,7 +13,7 @@
  */
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const twilio = require('twilio');
+const { randomUUID } = require('crypto');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const env = require('../../config/env');
@@ -157,6 +157,7 @@ async function onboardingStep2(userId, data) {
           company_type: company_type || null,
           business_structure: business_structure,
           industry: company_type || 'General',
+          internal_api_token: business.internal_api_token || randomUUID(),
         },
       });
     } else {
@@ -168,6 +169,7 @@ async function onboardingStep2(userId, data) {
           company_email: company_email,
           company_type: company_type || null,
           business_structure: business_structure,
+          internal_api_token: randomUUID(),
         },
       });
     }
@@ -180,7 +182,7 @@ async function onboardingStep2(userId, data) {
   return {
     message: 'Organization contact info saved.',
     user: sanitizeUser(result.user),
-    business: result.business,
+    business: sanitizeBusiness(result.business),
     onboarding_step: 3,
   };
 }
@@ -299,7 +301,7 @@ async function onboardingStep3(userId, data) {
   return {
     message: 'AI business number provisioned.',
     user: sanitizeUser(user),
-    business: updatedBusiness,
+    business: sanitizeBusiness(updatedBusiness),
     ai_phone_number: phone_number,
     onboarding_step: 4,
   };
@@ -373,7 +375,7 @@ async function onboardingStep4(userId, data) {
   return {
     message: 'Service setup saved.',
     user: sanitizeUser(user),
-    business: updatedBusiness,
+    business: sanitizeBusiness(updatedBusiness),
     onboarding_step: 5,
   };
 }
@@ -413,7 +415,7 @@ async function onboardingStep5(userId, data) {
   return {
     message: 'Account created successfully!',
     user: sanitizeUser(user),
-    business: updatedBusiness,
+    business: sanitizeBusiness(updatedBusiness),
     ai_phone_number: updatedBusiness.ai_phone_number || null,
     onboarding_completed: true,
   };
@@ -467,7 +469,7 @@ async function getUserById(id) {
   });
 
   if (!user) return null;
-  return { ...sanitizeUser(user), businesses: user.businesses };
+  return { ...sanitizeUser(user), businesses: user.businesses.map(sanitizeBusiness) };
 }
 
 /**
@@ -496,6 +498,22 @@ async function changePassword(userId, currentPassword, newPassword) {
   await prisma.user.update({ where: { id: userId }, data: { password_hash } });
 
   logger.info(`Password changed for user: ${user.email}`);
+}
+
+async function getInternalApiToken(userId, businessId) {
+  const business = await prisma.business.findFirst({
+    where: { id: businessId, owner_id: userId },
+    select: { id: true, internal_api_token: true },
+  });
+
+  if (!business) {
+    throw new NotFoundError('Business');
+  }
+
+  return {
+    business_id: business.id,
+    internal_api_token: business.internal_api_token,
+  };
 }
 
 /**
@@ -551,13 +569,19 @@ async function sendOtp(userId, { phone_number }) {
   let otpForDev = null;
 
   if (hasTwilio) {
-    const client = twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
-    await client.messages.create({
-      body: `Your Ajicore verification code is: ${otp}. It expires in ${OTP_EXPIRY_MINUTES} minutes.`,
-      from: env.TWILIO_PHONE_NUMBER,
-      to: phone_number,
-    });
-    logger.info(`OTP sent via SMS to ${phone_number} for user: ${user.email}`);
+    try {
+      const twilio = require('twilio');
+      const client = twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
+      await client.messages.create({
+        body: `Your Ajicore verification code is: ${otp}. It expires in ${OTP_EXPIRY_MINUTES} minutes.`,
+        from: env.TWILIO_PHONE_NUMBER,
+        to: phone_number,
+      });
+      logger.info(`OTP sent via SMS to ${phone_number} for user: ${user.email}`);
+    } catch (err) {
+      logger.warn(`Twilio SDK unavailable or SMS send failed for ${user.email}: ${err.message}`);
+      if (env.isDevelopment) otpForDev = otp;
+    }
   } else {
     logger.warn(`Twilio not configured — OTP for ${user.email}: ${otp}`);
     if (env.isDevelopment) otpForDev = otp;
@@ -646,6 +670,12 @@ function sanitizeUser(user) {
   return safe;
 }
 
+function sanitizeBusiness(business) {
+  if (!business) return business;
+  const { internal_api_token, ...safe } = business;
+  return safe;
+}
+
 /** Mask a phone number for display: +234 ** **** 3239 */
 function maskPhone(phone) {
   const digits = phone.replace(/\D/g, '');
@@ -661,6 +691,7 @@ module.exports = {
   signin,
   getUserById,
   changePassword,
+  getInternalApiToken,
   verifyToken,
   onboardingStep2,
   getAvailableNumbers,

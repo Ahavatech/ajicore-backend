@@ -1,7 +1,7 @@
 
 const { Router } = require('express');
 const authController = require('../../domains/auth/auth.controller');
-const { requireAuth } = require('../middlewares/auth.middleware');
+const { requireAuth, requireBusinessAccess } = require('../middlewares/auth.middleware');
 const { requireFields } = require('../middlewares/validate.middleware');
 
 const router = Router();
@@ -105,6 +105,14 @@ router.post(
 
 // Get current user profile
 router.get('/me', requireAuth, authController.getMe);
+
+router.get(
+  '/internal-api-token',
+  requireAuth,
+  requireFields(['business_id'], 'query'),
+  requireBusinessAccess('query'),
+  authController.getInternalApiToken
+);
 
 // Change password
 router.patch(

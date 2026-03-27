@@ -11,7 +11,7 @@
 
 const { Router } = require('express');
 const materialController = require('../../domains/inventory/material.controller');
-const { requireAuth } = require('../middlewares/auth.middleware');
+const { requireAuth, requireBusinessAccess, requireResourceAccess } = require('../middlewares/auth.middleware');
 const { requireFields, validateUUID } = require('../middlewares/validate.middleware');
 
 const router = Router();
@@ -26,7 +26,7 @@ router.use(requireAuth);
  *     security:
  *       - bearerAuth: []
  */
-router.get('/', materialController.getAllMaterials);
+router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), materialController.getAllMaterials);
 
 /**
  * @swagger
@@ -43,7 +43,7 @@ router.get('/', materialController.getAllMaterials);
  *         schema:
  *           type: string
  */
-router.get('/:id', validateUUID('id'), materialController.getMaterialById);
+router.get('/:id', validateUUID('id'), requireResourceAccess('material'), materialController.getMaterialById);
 
 /**
  * @swagger
@@ -54,7 +54,7 @@ router.get('/:id', validateUUID('id'), materialController.getMaterialById);
  *     security:
  *       - bearerAuth: []
  */
-router.post('/', requireFields(['business_id', 'name']), materialController.createMaterial);
+router.post('/', requireFields(['business_id', 'name']), requireBusinessAccess('body'), materialController.createMaterial);
 
 /**
  * @swagger
@@ -65,7 +65,7 @@ router.post('/', requireFields(['business_id', 'name']), materialController.crea
  *     security:
  *       - bearerAuth: []
  */
-router.patch('/:id', validateUUID('id'), materialController.updateMaterial);
+router.patch('/:id', validateUUID('id'), requireResourceAccess('material'), materialController.updateMaterial);
 
 /**
  * @swagger
@@ -76,7 +76,7 @@ router.patch('/:id', validateUUID('id'), materialController.updateMaterial);
  *     security:
  *       - bearerAuth: []
  */
-router.post('/:id/restock', validateUUID('id'), requireFields(['quantity']), materialController.restockMaterial);
+router.post('/:id/restock', validateUUID('id'), requireResourceAccess('material'), requireFields(['quantity']), materialController.restockMaterial);
 
 /**
  * @swagger
@@ -87,7 +87,7 @@ router.post('/:id/restock', validateUUID('id'), requireFields(['quantity']), mat
  *     security:
  *       - bearerAuth: []
  */
-router.delete('/:id', validateUUID('id'), materialController.removeMaterial);
+router.delete('/:id', validateUUID('id'), requireResourceAccess('material'), materialController.removeMaterial);
 
 /**
  * @swagger
@@ -104,6 +104,6 @@ router.delete('/:id', validateUUID('id'), materialController.removeMaterial);
  *         schema:
  *           type: string
  */
-router.post('/deduct/:jobId', validateUUID('jobId'), requireFields(['materials']), materialController.deductMaterials);
+router.post('/deduct/:jobId', validateUUID('jobId'), requireResourceAccess('job', { field: 'jobId' }), requireFields(['materials']), materialController.deductMaterials);
 
 module.exports = router;

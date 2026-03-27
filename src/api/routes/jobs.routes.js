@@ -12,7 +12,7 @@
 
 const { Router } = require('express');
 const jobController = require('../../domains/jobs/job.controller');
-const { requireAuth } = require('../middlewares/auth.middleware');
+const { requireAuth, requireBusinessAccess, requireResourceAccess } = require('../middlewares/auth.middleware');
 const { requireFields, validateUUID } = require('../middlewares/validate.middleware');
 
 const router = Router();
@@ -27,7 +27,7 @@ router.use(requireAuth);
  *     security:
  *       - bearerAuth: []
  */
-router.get('/', jobController.getAllJobs);
+router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), jobController.getAllJobs);
 
 /**
  * @swagger
@@ -38,7 +38,7 @@ router.get('/', jobController.getAllJobs);
  *     security:
  *       - bearerAuth: []
  */
-router.get('/schedule', jobController.getSchedule);
+router.get('/schedule', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), jobController.getSchedule);
 
 /**
  * @swagger
@@ -49,7 +49,12 @@ router.get('/schedule', jobController.getSchedule);
  *     security:
  *       - bearerAuth: []
  */
-router.get('/availability', jobController.checkAvailability);
+router.get(
+  '/availability',
+  requireFields(['staff_id', 'start_time', 'end_time'], 'query'),
+  requireResourceAccess('staff', { source: 'query', field: 'staff_id', notFoundLabel: 'staff member' }),
+  jobController.checkAvailability
+);
 
 /**
  * @swagger
@@ -66,7 +71,7 @@ router.get('/availability', jobController.checkAvailability);
  *         schema:
  *           type: string
  */
-router.get('/:id', validateUUID('id'), jobController.getJobById);
+router.get('/:id', validateUUID('id'), requireResourceAccess('job'), jobController.getJobById);
 
 /**
  * @swagger
@@ -77,7 +82,7 @@ router.get('/:id', validateUUID('id'), jobController.getJobById);
  *     security:
  *       - bearerAuth: []
  */
-router.post('/', requireFields(['business_id', 'customer_id']), jobController.createJob);
+router.post('/', requireFields(['business_id', 'customer_id']), requireBusinessAccess('body'), jobController.createJob);
 
 /**
  * @swagger
@@ -88,7 +93,7 @@ router.post('/', requireFields(['business_id', 'customer_id']), jobController.cr
  *     security:
  *       - bearerAuth: []
  */
-router.patch('/:id', validateUUID('id'), jobController.updateJob);
+router.patch('/:id', validateUUID('id'), requireResourceAccess('job'), jobController.updateJob);
 
 /**
  * @swagger
@@ -99,7 +104,7 @@ router.patch('/:id', validateUUID('id'), jobController.updateJob);
  *     security:
  *       - bearerAuth: []
  */
-router.post('/:id/start', validateUUID('id'), jobController.startJob);
+router.post('/:id/start', validateUUID('id'), requireResourceAccess('job'), jobController.startJob);
 
 /**
  * @swagger
@@ -110,7 +115,7 @@ router.post('/:id/start', validateUUID('id'), jobController.startJob);
  *     security:
  *       - bearerAuth: []
  */
-router.post('/:id/complete', validateUUID('id'), jobController.completeJob);
+router.post('/:id/complete', validateUUID('id'), requireResourceAccess('job'), jobController.completeJob);
 
 /**
  * @swagger
@@ -121,7 +126,7 @@ router.post('/:id/complete', validateUUID('id'), jobController.completeJob);
  *     security:
  *       - bearerAuth: []
  */
-router.post('/:id/materials', validateUUID('id'), requireFields(['materials']), jobController.addMaterials);
+router.post('/:id/materials', validateUUID('id'), requireResourceAccess('job'), requireFields(['materials']), jobController.addMaterials);
 
 /**
  * @swagger
@@ -132,7 +137,7 @@ router.post('/:id/materials', validateUUID('id'), requireFields(['materials']), 
  *     security:
  *       - bearerAuth: []
  */
-router.post('/:id/photos', validateUUID('id'), requireFields(['photo_urls']), jobController.addPhotos);
+router.post('/:id/photos', validateUUID('id'), requireResourceAccess('job'), requireFields(['photo_urls']), jobController.addPhotos);
 
 /**
  * @swagger
@@ -143,6 +148,6 @@ router.post('/:id/photos', validateUUID('id'), requireFields(['photo_urls']), jo
  *     security:
  *       - bearerAuth: []
  */
-router.delete('/:id', validateUUID('id'), jobController.deleteJob);
+router.delete('/:id', validateUUID('id'), requireResourceAccess('job'), jobController.deleteJob);
 
 module.exports = router;

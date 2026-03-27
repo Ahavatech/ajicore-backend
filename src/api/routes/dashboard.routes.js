@@ -7,7 +7,8 @@
  */
 const { Router } = require('express');
 const dashboardController = require('../../domains/dashboard/dashboard.controller');
-const { requireAuth } = require('../middlewares/auth.middleware');
+const { requireAuth, requireBusinessAccess } = require('../middlewares/auth.middleware');
+const { requireFields } = require('../middlewares/validate.middleware');
 
 const router = Router();
 router.use(requireAuth);
@@ -28,7 +29,7 @@ router.use(requireAuth);
  *       200:
  *         description: Active jobs, today's jobs, pending quotes, overdue invoices, alerts
  */
-router.get('/summary', dashboardController.getSummary);
+router.get('/summary', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), dashboardController.getSummary);
 
 /**
  * @swagger
@@ -49,7 +50,7 @@ router.get('/summary', dashboardController.getSummary);
  *         name: end_date
  *         schema: {type: string, format: date}
  */
-router.get('/weekly-report', dashboardController.getWeeklyReport);
+router.get('/weekly-report', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), dashboardController.getWeeklyReport);
 
 /**
  * @swagger
@@ -67,7 +68,7 @@ router.get('/weekly-report', dashboardController.getWeeklyReport);
  *         name: period
  *         schema: {type: string, enum: [7d, 30d, 90d], default: 30d}
  */
-router.get('/revenue', dashboardController.getRevenueChart);
+router.get('/revenue', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), dashboardController.getRevenueChart);
 
 /**
  * @swagger
@@ -77,6 +78,6 @@ router.get('/revenue', dashboardController.getRevenueChart);
  *     tags: [Dashboard]
  *     security: [{bearerAuth: []}]
  */
-router.get('/jobs-analytics', dashboardController.getJobsAnalytics);
+router.get('/jobs-analytics', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), dashboardController.getJobsAnalytics);
 
 module.exports = router;

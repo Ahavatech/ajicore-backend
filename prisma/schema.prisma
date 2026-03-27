@@ -144,6 +144,8 @@ model User {
   id                   String       @id @default(uuid())
   email                String       @unique
   password_hash        String?
+  phone_otp            String?
+  phone_otp_expires_at DateTime?
   first_name           String?
   last_name            String?
   auth_provider        AuthProvider @default(Email)
@@ -164,6 +166,7 @@ model Business {
   name                      String
   industry                  String
   owner_id                  String?
+  business_structure        String?
   company_email             String?
   company_type              String?
   company_phone             String?
@@ -201,6 +204,7 @@ model Business {
   // Payment Follow-up
   payment_follow_up_days    Json?
   payment_interval          String?
+  internal_api_token        String                 @unique
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

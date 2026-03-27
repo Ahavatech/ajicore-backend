@@ -121,6 +121,39 @@
 
 /**
  * @swagger
+ * /api/auth/internal-api-token:
+ *   get:
+ *     tags: [Auth]
+ *     summary: Get the per-business internal bridge token
+ *     description: |
+ *       Returns the `x-business-token` value required together with `x-api-key`
+ *       for `/api/internal/*` routes.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: business_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Internal bridge token retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/InternalApiTokenResponse'
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Access denied
+ *       404:
+ *         description: Business not found
+ */
+
+/**
+ * @swagger
  * /api/auth/change-password:
  *   patch:
  *     tags: [Auth]
@@ -159,7 +192,7 @@
  *     summary: "Step 2: Organization contact info"
  *     description: |
  *       Sets the user's name and business details.
- *       Advances onboarding_step to 2 (ready for OTP verification).
+ *       Advances onboarding_step to 3 (ready for OTP verification).
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -184,10 +217,10 @@
  *                 example: HVAC
  *               business_structure:
  *                 type: string
- *                 enum: [sole_proprietorship, partnership, llc, corporation, s_corporation, nonprofit, other]
+ *                 example: llc
  *     responses:
  *       200:
- *         description: Step 2 complete — returns user, business, and onboarding_step 2
+ *         description: Step 2 complete — returns user, business, and onboarding_step 3
  */
 
 /**
@@ -303,7 +336,7 @@
  *         name: type
  *         schema:
  *           type: string
- *           enum: [local, toll_free]
+ *           enum: [city, area_code, toll_free]
  *       - in: query
  *         name: city
  *         schema:
@@ -337,10 +370,10 @@
  *                 type: string
  *               search_type:
  *                 type: string
- *                 enum: [local, toll_free]
+ *                 enum: [city, area_code, toll_free]
  *     responses:
  *       200:
- *         description: AI number provisioned — onboarding_step 3
+ *         description: AI number provisioned — onboarding_step 4
  */
 
 /**
@@ -380,7 +413,7 @@
  *                 type: number
  *     responses:
  *       200:
- *         description: Service area saved — onboarding_step 4
+ *         description: Service area saved — onboarding_step 5
  */
 
 /**

@@ -7,17 +7,17 @@
  */
 const { Router } = require('express');
 const pbController = require('../../domains/pricebook/pricebook.controller');
-const { requireAuth } = require('../middlewares/auth.middleware');
+const { requireAuth, requireBusinessAccess, requireResourceAccess } = require('../middlewares/auth.middleware');
 const { requireFields, validateUUID } = require('../middlewares/validate.middleware');
 
 const router = Router();
 router.use(requireAuth);
 
 // ---- Service Categories ----
-router.get('/categories', pbController.getCategories);
-router.post('/categories', requireFields(['business_id', 'name']), pbController.createCategory);
-router.patch('/categories/:id', validateUUID('id'), pbController.updateCategory);
-router.delete('/categories/:id', validateUUID('id'), pbController.deleteCategory);
+router.get('/categories', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), pbController.getCategories);
+router.post('/categories', requireFields(['business_id', 'name']), requireBusinessAccess('body'), pbController.createCategory);
+router.patch('/categories/:id', validateUUID('id'), requireResourceAccess('serviceCategory'), pbController.updateCategory);
+router.delete('/categories/:id', validateUUID('id'), requireResourceAccess('serviceCategory'), pbController.deleteCategory);
 
 // ---- Price Book Items ----
 /**
@@ -42,9 +42,9 @@ router.delete('/categories/:id', validateUUID('id'), pbController.deleteCategory
  *         name: can_quote_phone
  *         schema: {type: boolean}
  */
-router.get('/', pbController.getItems);
-router.get('/suggestions', pbController.getSuggestions);
-router.get('/:id', validateUUID('id'), pbController.getItemById);
+router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), pbController.getItems);
+router.get('/suggestions', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), pbController.getSuggestions);
+router.get('/:id', validateUUID('id'), requireResourceAccess('priceBookItem'), pbController.getItemById);
 
 /**
  * @swagger
@@ -72,8 +72,8 @@ router.get('/:id', validateUUID('id'), pbController.getItemById);
  *               visit_type: {type: string, enum: [FreeEstimate, PaidServiceCall]}
  *               service_call_fee: {type: number}
  */
-router.post('/', requireFields(['business_id', 'name']), pbController.createItem);
-router.patch('/:id', validateUUID('id'), pbController.updateItem);
-router.delete('/:id', validateUUID('id'), pbController.deleteItem);
+router.post('/', requireFields(['business_id', 'name']), requireBusinessAccess('body'), pbController.createItem);
+router.patch('/:id', validateUUID('id'), requireResourceAccess('priceBookItem'), pbController.updateItem);
+router.delete('/:id', validateUUID('id'), requireResourceAccess('priceBookItem'), pbController.deleteItem);
 
 module.exports = router;

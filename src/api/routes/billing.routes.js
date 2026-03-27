@@ -12,7 +12,7 @@
 
 const { Router } = require('express');
 const billingController = require('../../domains/billing/invoice.controller');
-const { requireAuth } = require('../middlewares/auth.middleware');
+const { requireAuth, requireBusinessAccess, requireResourceAccess } = require('../middlewares/auth.middleware');
 const { requireFields, validateUUID } = require('../middlewares/validate.middleware');
 
 const router = Router();
@@ -29,7 +29,7 @@ router.use(requireAuth);
  *     security:
  *       - bearerAuth: []
  */
-router.get('/invoices', billingController.getAll);
+router.get('/invoices', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), billingController.getAll);
 
 /**
  * @swagger
@@ -46,7 +46,7 @@ router.get('/invoices', billingController.getAll);
  *         schema:
  *           type: string
  */
-router.get('/invoices/job/:jobId', validateUUID('jobId'), billingController.getInvoicesByJob);
+router.get('/invoices/job/:jobId', validateUUID('jobId'), requireResourceAccess('job', { field: 'jobId' }), billingController.getInvoicesByJob);
 
 /**
  * @swagger
@@ -57,7 +57,7 @@ router.get('/invoices/job/:jobId', validateUUID('jobId'), billingController.getI
  *     security:
  *       - bearerAuth: []
  */
-router.get('/invoices/:id', validateUUID('id'), billingController.getById);
+router.get('/invoices/:id', validateUUID('id'), requireResourceAccess('invoice'), billingController.getById);
 
 /**
  * @swagger
@@ -68,7 +68,7 @@ router.get('/invoices/:id', validateUUID('id'), billingController.getById);
  *     security:
  *       - bearerAuth: []
  */
-router.get('/invoices/:id/total', validateUUID('id'), billingController.getTotal);
+router.get('/invoices/:id/total', validateUUID('id'), requireResourceAccess('invoice'), billingController.getTotal);
 
 /**
  * @swagger
@@ -79,7 +79,7 @@ router.get('/invoices/:id/total', validateUUID('id'), billingController.getTotal
  *     security:
  *       - bearerAuth: []
  */
-router.post('/invoices', requireFields(['job_id', 'business_id']), billingController.createInvoice);
+router.post('/invoices', requireFields(['job_id', 'business_id']), requireBusinessAccess('body'), billingController.createInvoice);
 
 /**
  * @swagger
@@ -90,7 +90,7 @@ router.post('/invoices', requireFields(['job_id', 'business_id']), billingContro
  *     security:
  *       - bearerAuth: []
  */
-router.patch('/invoices/:id', validateUUID('id'), billingController.updateInvoice);
+router.patch('/invoices/:id', validateUUID('id'), requireResourceAccess('invoice'), billingController.updateInvoice);
 
 /**
  * @swagger
@@ -101,7 +101,7 @@ router.patch('/invoices/:id', validateUUID('id'), billingController.updateInvoic
  *     security:
  *       - bearerAuth: []
  */
-router.post('/invoices/:id/send', validateUUID('id'), billingController.sendInvoice);
+router.post('/invoices/:id/send', validateUUID('id'), requireResourceAccess('invoice'), billingController.sendInvoice);
 
 /**
  * @swagger
@@ -112,7 +112,7 @@ router.post('/invoices/:id/send', validateUUID('id'), billingController.sendInvo
  *     security:
  *       - bearerAuth: []
  */
-router.post('/invoices/:id/void', validateUUID('id'), billingController.voidInvoice);
+router.post('/invoices/:id/void', validateUUID('id'), requireResourceAccess('invoice'), billingController.voidInvoice);
 
 /**
  * @swagger
@@ -123,7 +123,7 @@ router.post('/invoices/:id/void', validateUUID('id'), billingController.voidInvo
  *     security:
  *       - bearerAuth: []
  */
-router.post('/invoices/:id/refund', validateUUID('id'), billingController.refundInvoice);
+router.post('/invoices/:id/refund', validateUUID('id'), requireResourceAccess('invoice'), billingController.refundInvoice);
 
 // --- Payments ---
 
@@ -142,7 +142,7 @@ router.post('/invoices/:id/refund', validateUUID('id'), billingController.refund
  *         schema:
  *           type: string
  */
-router.post('/payments/:invoiceId', validateUUID('invoiceId'), requireFields(['amount']), billingController.processPayment);
+router.post('/payments/:invoiceId', validateUUID('invoiceId'), requireResourceAccess('invoice', { field: 'invoiceId' }), requireFields(['amount']), billingController.processPayment);
 
 // --- Expenses ---
 
@@ -155,7 +155,7 @@ router.post('/payments/:invoiceId', validateUUID('invoiceId'), requireFields(['a
  *     security:
  *       - bearerAuth: []
  */
-router.get('/expenses', billingController.getExpenses);
+router.get('/expenses', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), billingController.getExpenses);
 
 /**
  * @swagger
@@ -166,7 +166,7 @@ router.get('/expenses', billingController.getExpenses);
  *     security:
  *       - bearerAuth: []
  */
-router.post('/expenses', requireFields(['business_id', 'amount']), billingController.createExpense);
+router.post('/expenses', requireFields(['business_id', 'amount']), requireBusinessAccess('body'), billingController.createExpense);
 
 /**
  * @swagger
@@ -177,7 +177,7 @@ router.post('/expenses', requireFields(['business_id', 'amount']), billingContro
  *     security:
  *       - bearerAuth: []
  */
-router.patch('/expenses/:id', validateUUID('id'), billingController.updateExpense);
+router.patch('/expenses/:id', validateUUID('id'), requireResourceAccess('expense'), billingController.updateExpense);
 
 /**
  * @swagger
@@ -188,6 +188,6 @@ router.patch('/expenses/:id', validateUUID('id'), billingController.updateExpens
  *     security:
  *       - bearerAuth: []
  */
-router.delete('/expenses/:id', validateUUID('id'), billingController.deleteExpense);
+router.delete('/expenses/:id', validateUUID('id'), requireResourceAccess('expense'), billingController.deleteExpense);
 
 module.exports = router;

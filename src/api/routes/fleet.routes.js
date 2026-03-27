@@ -11,7 +11,7 @@
 
 const { Router } = require('express');
 const vehicleController = require('../../domains/fleet/vehicle.controller');
-const { requireAuth } = require('../middlewares/auth.middleware');
+const { requireAuth, requireBusinessAccess, requireResourceAccess } = require('../middlewares/auth.middleware');
 const { requireFields, validateUUID } = require('../middlewares/validate.middleware');
 
 const router = Router();
@@ -26,7 +26,7 @@ router.use(requireAuth);
  *     security:
  *       - bearerAuth: []
  */
-router.get('/', vehicleController.getAllVehicles);
+router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), vehicleController.getAllVehicles);
 
 /**
  * @swagger
@@ -37,7 +37,7 @@ router.get('/', vehicleController.getAllVehicles);
  *     security:
  *       - bearerAuth: []
  */
-router.get('/maintenance-alerts', vehicleController.getMaintenanceAlerts);
+router.get('/maintenance-alerts', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), vehicleController.getMaintenanceAlerts);
 
 /**
  * @swagger
@@ -54,7 +54,7 @@ router.get('/maintenance-alerts', vehicleController.getMaintenanceAlerts);
  *         schema:
  *           type: string
  */
-router.get('/:id', validateUUID('id'), vehicleController.getVehicleById);
+router.get('/:id', validateUUID('id'), requireResourceAccess('vehicle'), vehicleController.getVehicleById);
 
 /**
  * @swagger
@@ -65,7 +65,7 @@ router.get('/:id', validateUUID('id'), vehicleController.getVehicleById);
  *     security:
  *       - bearerAuth: []
  */
-router.post('/', requireFields(['business_id', 'make_model']), vehicleController.createVehicle);
+router.post('/', requireFields(['business_id', 'make_model']), requireBusinessAccess('body'), vehicleController.createVehicle);
 
 /**
  * @swagger
@@ -76,7 +76,7 @@ router.post('/', requireFields(['business_id', 'make_model']), vehicleController
  *     security:
  *       - bearerAuth: []
  */
-router.patch('/:id', validateUUID('id'), vehicleController.updateVehicle);
+router.patch('/:id', validateUUID('id'), requireResourceAccess('vehicle'), vehicleController.updateVehicle);
 
 /**
  * @swagger
@@ -87,7 +87,7 @@ router.patch('/:id', validateUUID('id'), vehicleController.updateVehicle);
  *     security:
  *       - bearerAuth: []
  */
-router.patch('/:id/mileage', validateUUID('id'), requireFields(['mileage']), vehicleController.updateMileage);
+router.patch('/:id/mileage', validateUUID('id'), requireResourceAccess('vehicle'), requireFields(['mileage']), vehicleController.updateMileage);
 
 /**
  * @swagger
@@ -98,6 +98,6 @@ router.patch('/:id/mileage', validateUUID('id'), requireFields(['mileage']), veh
  *     security:
  *       - bearerAuth: []
  */
-router.delete('/:id', validateUUID('id'), vehicleController.deleteVehicle);
+router.delete('/:id', validateUUID('id'), requireResourceAccess('vehicle'), vehicleController.deleteVehicle);
 
 module.exports = router;

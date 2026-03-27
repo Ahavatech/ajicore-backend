@@ -1,15 +1,20 @@
 /**
  * AI Bridge Routes
  * Internal API for the AI service (call center, SMS, data queries).
- * Protected by x-api-key header.
+ * Protected by x-api-key, with most business-scoped routes also requiring x-business-token.
  *
  * @swagger
  * tags:
  *   name: AI Bridge
- *   description: Internal AI service endpoints (x-api-key required)
+ *   description: Internal AI service endpoints (x-api-key required; most business-scoped routes also require x-business-token)
  */
 const { Router } = require('express');
-const { requireInternalApiKey } = require('../middlewares/auth.middleware');
+const {
+  requireInternalApiKey,
+  requireInternalBusinessAccess,
+  requireInternalResourceAccess,
+} = require('../middlewares/auth.middleware');
+const { requireFields } = require('../middlewares/validate.middleware');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
@@ -32,38 +37,38 @@ router.use(requireInternalApiKey);
 // ============================================
 // Schedule & Jobs
 // ============================================
-router.get('/schedule', jobController.getSchedule);
-router.get('/jobs', jobController.getAllJobs);
-router.post('/jobs', jobController.createJob);
-router.patch('/jobs/:id', jobController.updateJob);
-router.post('/jobs/:id/start', jobController.startJob);
-router.post('/jobs/:id/complete', jobController.completeJob);
+router.get('/schedule', requireFields(['business_id'], 'query'), requireInternalBusinessAccess('query'), jobController.getSchedule);
+router.get('/jobs', requireFields(['business_id'], 'query'), requireInternalBusinessAccess('query'), jobController.getAllJobs);
+router.post('/jobs', requireFields(['business_id', 'customer_id'], 'body'), requireInternalBusinessAccess('body'), jobController.createJob);
+router.patch('/jobs/:id', requireInternalResourceAccess('job'), jobController.updateJob);
+router.post('/jobs/:id/start', requireInternalResourceAccess('job'), jobController.startJob);
+router.post('/jobs/:id/complete', requireInternalResourceAccess('job'), jobController.completeJob);
 
 // ============================================
 // Quotes
 // ============================================
-router.get('/quotes', quoteController.getAll);
-router.post('/quotes', quoteController.create);
-router.patch('/quotes/:id', quoteController.update);
-router.post('/quotes/:id/send', quoteController.sendQuote);
-router.post('/quotes/:id/approve', quoteController.approve);
+router.get('/quotes', requireFields(['business_id'], 'query'), requireInternalBusinessAccess('query'), quoteController.getAll);
+router.post('/quotes', requireFields(['business_id', 'customer_id'], 'body'), requireInternalBusinessAccess('body'), quoteController.create);
+router.patch('/quotes/:id', requireInternalResourceAccess('quote'), quoteController.update);
+router.post('/quotes/:id/send', requireInternalResourceAccess('quote'), quoteController.sendQuote);
+router.post('/quotes/:id/approve', requireInternalResourceAccess('quote'), quoteController.approve);
 
 // ============================================
 // Customers
 // ============================================
-router.get('/customers', customerController.getAll);
-router.get('/customers/lookup', customerController.findByPhone);
-router.post('/customers', customerController.create);
+router.get('/customers', requireFields(['business_id'], 'query'), requireInternalBusinessAccess('query'), customerController.getAll);
+router.get('/customers/lookup', requireFields(['business_id', 'phone'], 'query'), requireInternalBusinessAccess('query'), customerController.findByPhone);
+router.post('/customers', requireFields(['business_id', 'first_name', 'last_name'], 'body'), requireInternalBusinessAccess('body'), customerController.create);
 
 // ============================================
 // Inventory
 // ============================================
-router.get('/inventory', materialController.getAllMaterials);
+router.get('/inventory', requireFields(['business_id'], 'query'), requireInternalBusinessAccess('query'), materialController.getAllMaterials);
 
 // ============================================
 // Dashboard
 // ============================================
-router.get('/dashboard/summary', async (req, res, next) => {
+router.get('/dashboard/summary', requireFields(['business_id'], 'query'), requireInternalBusinessAccess('query'), async (req, res, next) => {
   try {
     const { business_id } = req.query;
     if (!business_id) return res.status(400).json({ error: 'business_id required' });
@@ -93,7 +98,7 @@ router.get('/dashboard/summary', async (req, res, next) => {
  *         schema: {type: string}
  *         description: Service name or description from caller
  */
-router.get('/ai/price-lookup', async (req, res, next) => {
+router.get('/ai/price-lookup', requireFields(['business_id', 'service'], 'query'), requireInternalBusinessAccess('query'), async (req, res, next) => {
   try {
     const { business_id, service } = req.query;
     if (!business_id || !service) return res.status(400).json({ error: 'business_id and service are required' });
@@ -112,9 +117,9 @@ router.get('/ai/price-lookup', async (req, res, next) => {
  *   post:
  *     summary: Check if customer ZIP is within service radius and calculate any mileage fee
  *     tags: [AI Bridge]
- *     security: [{apiKeyAuth: []}]
+ *     security: [{apiKeyAuth: [], businessTokenAuth: []}]
  */
-router.post('/ai/radius-check', async (req, res, next) => {
+router.post('/ai/radius-check', requireFields(['business_id', 'customer_zip'], 'body'), requireInternalBusinessAccess('body'), async (req, res, next) => {
   try {
     const { business_id, customer_zip } = req.body;
     if (!business_id || !customer_zip) return res.status(400).json({ error: 'business_id and customer_zip required' });
@@ -144,7 +149,7 @@ router.post('/ai/radius-check', async (req, res, next) => {
  *   post:
  *     summary: Book a job or quote from AI call flow
  *     tags: [AI Bridge]
- *     security: [{apiKeyAuth: []}]
+ *     security: [{apiKeyAuth: [], businessTokenAuth: []}]
  *     requestBody:
  *       required: true
  *       content:
@@ -164,7 +169,7 @@ router.post('/ai/radius-check', async (req, res, next) => {
  *               is_emergency: {type: boolean}
  *               notes: {type: string}
  */
-router.post('/ai/book', async (req, res, next) => {
+router.post('/ai/book', requireFields(['business_id', 'booking_type'], 'body'), requireInternalBusinessAccess('body'), async (req, res, next) => {
   try {
     const { business_id, booking_type, customer, customer_id, service_name,
       price_book_item_id, service_call_fee, scheduled_start_time, is_emergency, notes } = req.body;
@@ -232,9 +237,9 @@ router.post('/ai/book', async (req, res, next) => {
  *   get:
  *     summary: Get complete business configuration for AI receptionist
  *     tags: [AI Bridge]
- *     security: [{apiKeyAuth: []}]
+ *     security: [{apiKeyAuth: [], businessTokenAuth: []}]
  */
-router.get('/ai/business-config', async (req, res, next) => {
+router.get('/ai/business-config', requireFields(['business_id'], 'query'), requireInternalBusinessAccess('query'), async (req, res, next) => {
   try {
     const { business_id } = req.query;
     if (!business_id) return res.status(400).json({ error: 'business_id required' });
@@ -278,7 +283,7 @@ router.get('/ai/business-config', async (req, res, next) => {
  *   post:
  *     summary: Twilio webhook for incoming SMS (text command center)
  *     tags: [AI Bridge]
- *     security: [{apiKeyAuth: []}]
+ *     security: [{apiKeyAuth: [], businessTokenAuth: []}]
  */
 router.post('/sms/incoming', smsController.handleIncomingSms);
 
@@ -288,8 +293,8 @@ router.post('/sms/incoming', smsController.handleIncomingSms);
  *   post:
  *     summary: Send outbound SMS
  *     tags: [AI Bridge]
- *     security: [{apiKeyAuth: []}]
+ *     security: [{apiKeyAuth: [], businessTokenAuth: []}]
  */
-router.post('/sms/send', smsController.sendSms);
+router.post('/sms/send', requireFields(['business_id', 'to', 'message'], 'body'), requireInternalBusinessAccess('body'), smsController.sendSms);
 
 module.exports = router;

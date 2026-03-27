@@ -6,6 +6,7 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const logger = require('../../utils/logger');
+const { NotFoundError, ValidationError } = require('../../utils/errors');
 
 async function getJobs({ business_id, status, type, customer_id, page = 1, limit = 20 }) {
   const where = {};
