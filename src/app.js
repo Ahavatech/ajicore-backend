@@ -58,19 +58,27 @@ app.use(helmet({
 }));
 
 // Secure CORS configuration
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()).filter(Boolean) || [];
 
 if (process.env.NODE_ENV === 'production' && allowedOrigins.length === 0) {
   throw new Error('ALLOWED_ORIGINS environment variable must be set in production');
 }
 
+const isDevelopment = process.env.NODE_ENV !== 'production';
+
 app.use(cors({
   origin: function(origin, callback) {
-    // Allow no origin (mobile apps, curl, etc.)
+    // Allow no origin (mobile apps, curl, Postman, etc.)
     if (!origin) return callback(null, true);
 
+    // In development, automatically allow all localhost/127.0.0.1 origins
+    // so the Vite dev server (port 5173) and any other local frontend can connect.
+    if (isDevelopment) {
+      const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+      if (isLocalhost) return callback(null, true);
+    }
+
     if (allowedOrigins.includes('*')) {
-      // Development only
       console.warn('WARNING: CORS wildcard enabled. DO NOT USE IN PRODUCTION');
       return callback(null, true);
     }

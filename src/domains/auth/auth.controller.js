@@ -4,16 +4,20 @@
  * and multi-step onboarding flow.
  *
  * Flow:
- *   POST /signup           → Step 1: Create account (email+password)
- *   POST /google           → Step 1: Create account (Google OAuth)
- *   POST /signin           → Sign in existing user
- *   POST /onboarding/step2 → Step 2: Organization contact info
- *   POST /onboarding/step3 → Step 3: Organization address
- *   POST /onboarding/step4 → Step 4: Logo upload
- *   POST /onboarding/step5 → Step 5: AI business number
- *   POST /onboarding/skip5 → Skip step 5
- *   GET  /me               → Get current user profile
- *   PATCH /change-password  → Change password
+ *   POST /signup                          → Step 1: Create account (email+password)
+ *   POST /google                          → Step 1: Create account (Google OAuth)
+ *   POST /signin                          → Sign in existing user
+ *   POST /onboarding/step2               → Step 2: Organization contact info
+ *   POST /onboarding/send-otp            → Step 2→3: Send SMS OTP to phone number
+ *   POST /onboarding/verify-otp          → Step 2→3: Verify OTP, advance to step 3
+ *   POST /onboarding/skip-otp            → Step 2→3: Skip phone verification
+ *   GET  /onboarding/available-numbers   → Step 3: Search available AI phone numbers
+ *   POST /onboarding/step3               → Step 3: Provision AI business number
+ *   POST /onboarding/skip3               → Step 3: Skip AI number
+ *   POST /onboarding/step4               → Step 4: Service area setup
+ *   POST /onboarding/step5               → Step 5: Logo upload (marks onboarding complete)
+ *   GET  /me                             → Get current user profile
+ *   PATCH /change-password               → Change password
  */
 const authService = require('./auth.service');
 
@@ -56,9 +60,55 @@ async function onboardingStep2(req, res, next) {
   }
 }
 
+async function sendOtp(req, res, next) {
+  try {
+    const result = await authService.sendOtp(req.user.id, req.body);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function verifyOtp(req, res, next) {
+  try {
+    const result = await authService.verifyOtp(req.user.id, req.body);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function skipOtp(req, res, next) {
+  try {
+    const result = await authService.skipOtp(req.user.id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getAvailableNumbers(req, res, next) {
+  try {
+    const { type, city, area_code } = req.query;
+    const result = await authService.getAvailableNumbers({ type, city, area_code });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function onboardingStep3(req, res, next) {
   try {
     const result = await authService.onboardingStep3(req.user.id, req.body);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function skipStep3(req, res, next) {
+  try {
+    const result = await authService.skipStep3(req.user.id);
     res.json(result);
   } catch (err) {
     next(err);
@@ -77,15 +127,6 @@ async function onboardingStep4(req, res, next) {
 async function onboardingStep5(req, res, next) {
   try {
     const result = await authService.onboardingStep5(req.user.id, req.body);
-    res.json(result);
-  } catch (err) {
-    next(err);
-  }
-}
-
-async function skipStep5(req, res, next) {
-  try {
-    const result = await authService.skipStep5(req.user.id);
     res.json(result);
   } catch (err) {
     next(err);
@@ -117,10 +158,14 @@ module.exports = {
   googleSignup,
   signin,
   onboardingStep2,
+  sendOtp,
+  verifyOtp,
+  skipOtp,
+  getAvailableNumbers,
   onboardingStep3,
+  skipStep3,
   onboardingStep4,
   onboardingStep5,
-  skipStep5,
   getMe,
   changePassword,
 };

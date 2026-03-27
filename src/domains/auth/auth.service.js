@@ -5,13 +5,15 @@
  *
  * Onboarding Steps:
  *   Step 1: Account creation (email+password or Google) — handled by signup/googleSignup
- *   Step 2: Organization contact info (first_name, last_name, company_name, company_email, company_type, company_phone)
- *   Step 3: Organization address (street, city, postal_code, country)
- *   Step 4: Logo upload (logo_url)
- *   Step 5: AI business number (country, area_code) — can be skipped
+ *   Step 2: Organization contact info (first_name, last_name, company_name, company_email, company_type, business_structure)
+ *   2→3:    Phone verification via SMS OTP (send-otp / verify-otp / skip-otp)
+ *   Step 3: AI business number (search_type, city/area_code/toll_free, phone_number) — can be skipped
+ *   Step 4: Service setup (home_base_zip, service_radius_miles, cost_per_mile_over_radius)
+ *   Step 5: Logo upload (logo_url) — marks onboarding complete
  */
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const twilio = require('twilio');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const env = require('../../config/env');
@@ -19,6 +21,7 @@ const logger = require('../../utils/logger');
 const { ValidationError, ConflictError, AuthenticationError, NotFoundError } = require('../../utils/errors');
 
 const SALT_ROUNDS = 12;
+const OTP_EXPIRY_MINUTES = 10;
 
 // ============================================
 // Step 1: Account Creation
@@ -121,12 +124,14 @@ async function googleSignup({ google_id, email, first_name, last_name }) {
 
 /**
  * Save organization contact info and create the Business record.
+ * Required: first_name, last_name, company_name, company_email, business_structure
+ * Optional: company_type
  */
 async function onboardingStep2(userId, data) {
-  const { first_name, last_name, company_name, company_email, company_type, company_phone } = data;
+  const { first_name, last_name, company_name, company_email, company_type, business_structure } = data;
 
-  if (!first_name || !last_name || !company_name) {
-    throw new ValidationError('First name, last name, and company name are required.');
+  if (!first_name || !last_name || !company_name || !company_email || !business_structure) {
+    throw new ValidationError('First name, last name, company name, company email, and business structure are required.');
   }
 
   const result = await prisma.$transaction(async (tx) => {
@@ -148,9 +153,10 @@ async function onboardingStep2(userId, data) {
         where: { id: business.id },
         data: {
           name: company_name,
-          company_email: company_email || null,
+          company_email: company_email,
           company_type: company_type || null,
-          company_phone: company_phone || null,
+          business_structure: business_structure,
+          industry: company_type || 'General',
         },
       });
     } else {
@@ -159,9 +165,9 @@ async function onboardingStep2(userId, data) {
           name: company_name,
           industry: company_type || 'General',
           owner_id: userId,
-          company_email: company_email || null,
+          company_email: company_email,
           company_type: company_type || null,
-          company_phone: company_phone || null,
+          business_structure: business_structure,
         },
       });
     }
@@ -180,18 +186,92 @@ async function onboardingStep2(userId, data) {
 }
 
 // ============================================
-// Step 3: Organization Address
+// Step 3: AI Business Number
 // ============================================
 
 /**
- * Save organization address.
+ * Return a list of available placeholder phone numbers based on search type.
+ * In production this would call Twilio's available numbers API.
+ *
+ * @param {string} type - 'city' | 'area_code' | 'toll_free'
+ * @param {string} [city] - city name (used when type=city)
+ * @param {string} [area_code] - area code digits (used when type=area_code)
+ */
+async function getAvailableNumbers({ type, city, area_code }) {
+  const validTypes = ['city', 'area_code', 'toll_free'];
+  if (!type || !validTypes.includes(type)) {
+    throw new ValidationError(`type must be one of: ${validTypes.join(', ')}`);
+  }
+
+  // Generate realistic-looking placeholder numbers based on search type
+  const numbers = [];
+
+  if (type === 'toll_free') {
+    const tollFreePrefixes = ['800', '888', '877', '866', '855'];
+    for (let i = 0; i < 5; i++) {
+      const prefix = tollFreePrefixes[i % tollFreePrefixes.length];
+      const digits = Math.floor(1000000 + Math.random() * 9000000).toString();
+      numbers.push({
+        phone_number: `+1${prefix}${digits}`,
+        friendly_name: `(${prefix}) ${digits.slice(0, 3)}-${digits.slice(3)}`,
+        type: 'toll_free',
+      });
+    }
+  } else if (type === 'area_code') {
+    if (!area_code) throw new ValidationError('area_code is required when type is area_code.');
+    const cleaned = area_code.replace(/\D/g, '').slice(0, 3);
+    if (cleaned.length < 3) throw new ValidationError('area_code must be a 3-digit code.');
+    for (let i = 0; i < 5; i++) {
+      const digits = Math.floor(1000000 + Math.random() * 9000000).toString();
+      numbers.push({
+        phone_number: `+1${cleaned}${digits}`,
+        friendly_name: `(${cleaned}) ${digits.slice(0, 3)}-${digits.slice(3)}`,
+        type: 'local',
+        area_code: cleaned,
+      });
+    }
+  } else {
+    // city
+    if (!city) throw new ValidationError('city is required when type is city.');
+    // Map a few cities to area codes; fall back to a generic local number
+    const cityAreaCodes = {
+      'new york': '212', 'los angeles': '213', 'chicago': '312',
+      'houston': '713', 'phoenix': '602', 'philadelphia': '215',
+      'san antonio': '210', 'san diego': '619', 'dallas': '214',
+      'san jose': '408', 'austin': '512', 'jacksonville': '904',
+      'lagos': '234', 'london': '44', 'toronto': '416',
+    };
+    const key = city.toLowerCase().trim();
+    const areaCode = cityAreaCodes[key] || '555';
+    for (let i = 0; i < 5; i++) {
+      const digits = Math.floor(1000000 + Math.random() * 9000000).toString();
+      numbers.push({
+        phone_number: `+1${areaCode}${digits}`,
+        friendly_name: `(${areaCode}) ${digits.slice(0, 3)}-${digits.slice(3)}`,
+        type: 'local',
+        city,
+        area_code: areaCode,
+      });
+    }
+  }
+
+  return {
+    type,
+    numbers,
+    count: numbers.length,
+  };
+}
+
+/**
+ * Provision the selected AI business phone number.
+ * @param {string} userId
+ * @param {object} data - { phone_number, search_type, city?, area_code? }
  */
 async function onboardingStep3(userId, data) {
-  const { street, city, postal_code, country } = data;
+  const { phone_number, search_type } = data;
 
-  if (!street || !city || !postal_code || !country) {
-    throw new ValidationError('Street, city, postal code, and country are required.');
-  }
+  if (!phone_number) throw new ValidationError('phone_number is required.');
+  if (!search_type) throw new ValidationError('search_type is required.');
 
   const business = await prisma.business.findFirst({ where: { owner_id: userId } });
   if (!business) {
@@ -205,29 +285,68 @@ async function onboardingStep3(userId, data) {
     }),
     prisma.business.update({
       where: { id: business.id },
-      data: { street, city, postal_code, country },
+      data: {
+        ai_phone_number: phone_number,
+        dedicated_phone_number: phone_number,
+        ai_phone_country: data.country || null,
+        ai_phone_area_code: data.area_code || null,
+      },
     }),
   ]);
 
-  logger.info(`Onboarding step 3 completed for user: ${user.email}`);
+  logger.info(`Onboarding step 3 completed for user: ${user.email}, AI number: ${phone_number}`);
 
   return {
-    message: 'Organization address saved.',
+    message: 'AI business number provisioned.',
     user: sanitizeUser(user),
     business: updatedBusiness,
+    ai_phone_number: phone_number,
+    onboarding_step: 4,
+  };
+}
+
+/**
+ * Skip step 3 (AI business number) and continue to step 4.
+ */
+async function skipStep3(userId) {
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { onboarding_step: 4 },
+  });
+
+  logger.info(`Onboarding step 3 skipped for user: ${user.email}`);
+
+  return {
+    message: 'AI number setup skipped.',
+    user: sanitizeUser(user),
     onboarding_step: 4,
   };
 }
 
 // ============================================
-// Step 4: Logo Upload
+// Step 4: Service Setup
 // ============================================
 
 /**
- * Save organization logo URL.
+ * Save service area configuration.
+ * Required: home_base_zip, service_radius_miles, cost_per_mile_over_radius
  */
 async function onboardingStep4(userId, data) {
-  const { logo_url } = data;
+  const { home_base_zip, service_radius_miles, cost_per_mile_over_radius } = data;
+
+  if (!home_base_zip || service_radius_miles === undefined || service_radius_miles === null || cost_per_mile_over_radius === undefined || cost_per_mile_over_radius === null) {
+    throw new ValidationError('home_base_zip, service_radius_miles, and cost_per_mile_over_radius are required.');
+  }
+
+  const radiusMiles = parseFloat(service_radius_miles);
+  const costPerMile = parseFloat(cost_per_mile_over_radius);
+
+  if (isNaN(radiusMiles) || radiusMiles < 0) {
+    throw new ValidationError('service_radius_miles must be a non-negative number.');
+  }
+  if (isNaN(costPerMile) || costPerMile < 0) {
+    throw new ValidationError('cost_per_mile_over_radius must be a non-negative number.');
+  }
 
   const business = await prisma.business.findFirst({ where: { owner_id: userId } });
   if (!business) {
@@ -241,14 +360,18 @@ async function onboardingStep4(userId, data) {
     }),
     prisma.business.update({
       where: { id: business.id },
-      data: { logo_url: logo_url || null },
+      data: {
+        home_base_zip,
+        service_radius_miles: radiusMiles,
+        cost_per_mile_over_radius: costPerMile,
+      },
     }),
   ]);
 
   logger.info(`Onboarding step 4 completed for user: ${user.email}`);
 
   return {
-    message: 'Logo saved.',
+    message: 'Service setup saved.',
     user: sanitizeUser(user),
     business: updatedBusiness,
     onboarding_step: 5,
@@ -256,24 +379,20 @@ async function onboardingStep4(userId, data) {
 }
 
 // ============================================
-// Step 5: AI Business Number
+// Step 5: Logo Upload (Completion)
 // ============================================
 
 /**
- * Generate and save AI business phone number.
+ * Save organization logo URL and mark onboarding as complete.
+ * logo_url is optional — user may skip uploading.
  */
 async function onboardingStep5(userId, data) {
-  const { country, area_code } = data;
+  const { logo_url } = data;
 
   const business = await prisma.business.findFirst({ where: { owner_id: userId } });
   if (!business) {
     throw new ValidationError('No business found. Please complete step 2 first.');
   }
-
-  // Generate a placeholder AI phone number
-  // In production, this would call Twilio to provision a real number
-  const randomDigits = Math.floor(1000000 + Math.random() * 9000000).toString();
-  const aiPhoneNumber = `+${getCountryCode(country)}${area_code || ''}${randomDigits}`;
 
   const [user, updatedBusiness] = await Promise.all([
     prisma.user.update({
@@ -285,43 +404,17 @@ async function onboardingStep5(userId, data) {
     }),
     prisma.business.update({
       where: { id: business.id },
-      data: {
-        ai_phone_number: aiPhoneNumber,
-        ai_phone_country: country || null,
-        ai_phone_area_code: area_code || null,
-        dedicated_phone_number: aiPhoneNumber,
-      },
+      data: { logo_url: logo_url || null },
     }),
   ]);
 
-  logger.info(`Onboarding completed for user: ${user.email}, AI number: ${aiPhoneNumber}`);
+  logger.info(`Onboarding completed for user: ${user.email}`);
 
   return {
     message: 'Account created successfully!',
     user: sanitizeUser(user),
     business: updatedBusiness,
-    ai_phone_number: aiPhoneNumber,
-    onboarding_completed: true,
-  };
-}
-
-/**
- * Skip step 5 (AI business number) and complete onboarding.
- */
-async function skipStep5(userId) {
-  const user = await prisma.user.update({
-    where: { id: userId },
-    data: {
-      onboarding_step: 6,
-      onboarding_completed: true,
-    },
-  });
-
-  logger.info(`Onboarding completed (step 5 skipped) for user: ${user.email}`);
-
-  return {
-    message: 'Account created successfully!',
-    user: sanitizeUser(user),
+    ai_phone_number: updatedBusiness.ai_phone_number || null,
     onboarding_completed: true,
   };
 }
@@ -417,6 +510,126 @@ function verifyToken(token) {
 }
 
 // ============================================
+// Phone OTP Verification (between Step 2 and Step 3)
+// ============================================
+
+/**
+ * Generate a 5-digit OTP, save it on the user with a 10-minute expiry,
+ * store the phone number on the business, and send the OTP via SMS.
+ *
+ * In development (no Twilio credentials), the OTP is logged and returned
+ * in the response so the flow can be tested without a real Twilio account.
+ */
+async function sendOtp(userId, { phone_number }) {
+  if (!phone_number) throw new ValidationError('phone_number is required.');
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new NotFoundError('User not found.');
+
+  // Generate a 5-digit OTP
+  const otp = Math.floor(10000 + Math.random() * 90000).toString();
+  const expires = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+
+  // Persist OTP + expiry and store phone on the business record
+  const business = await prisma.business.findFirst({ where: { owner_id: userId } });
+
+  await Promise.all([
+    prisma.user.update({
+      where: { id: userId },
+      data: { phone_otp: otp, phone_otp_expires_at: expires },
+    }),
+    business
+      ? prisma.business.update({
+          where: { id: business.id },
+          data: { company_phone: phone_number },
+        })
+      : Promise.resolve(),
+  ]);
+
+  // Send SMS via Twilio if credentials are available, otherwise log
+  const hasTwilio = env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_PHONE_NUMBER;
+  let otpForDev = null;
+
+  if (hasTwilio) {
+    const client = twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
+    await client.messages.create({
+      body: `Your Ajicore verification code is: ${otp}. It expires in ${OTP_EXPIRY_MINUTES} minutes.`,
+      from: env.TWILIO_PHONE_NUMBER,
+      to: phone_number,
+    });
+    logger.info(`OTP sent via SMS to ${phone_number} for user: ${user.email}`);
+  } else {
+    logger.warn(`Twilio not configured — OTP for ${user.email}: ${otp}`);
+    if (env.isDevelopment) otpForDev = otp;
+  }
+
+  const response = {
+    message: `A 5-digit OTP has been sent to ${maskPhone(phone_number)}. It expires in ${OTP_EXPIRY_MINUTES} minutes.`,
+    phone_number: maskPhone(phone_number),
+  };
+  if (otpForDev) response.dev_otp = otpForDev;
+  return response;
+}
+
+/**
+ * Validate the OTP the user entered. On success, advances onboarding to step 3.
+ */
+async function verifyOtp(userId, { otp }) {
+  if (!otp) throw new ValidationError('otp is required.');
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new NotFoundError('User not found.');
+
+  if (!user.phone_otp || !user.phone_otp_expires_at) {
+    throw new ValidationError('No OTP found. Please request a new one via send-otp.');
+  }
+
+  if (new Date() > new Date(user.phone_otp_expires_at)) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { phone_otp: null, phone_otp_expires_at: null },
+    });
+    throw new ValidationError('OTP has expired. Please request a new one.');
+  }
+
+  if (user.phone_otp !== otp.toString().trim()) {
+    throw new ValidationError('Incorrect OTP. Please try again.');
+  }
+
+  // Clear OTP and advance to step 3
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: { phone_otp: null, phone_otp_expires_at: null, onboarding_step: 3 },
+  });
+
+  logger.info(`Phone OTP verified for user: ${user.email}`);
+
+  return {
+    message: 'Phone number verified successfully.',
+    user: sanitizeUser(updatedUser),
+    onboarding_step: 3,
+  };
+}
+
+/**
+ * Skip phone OTP verification and advance to step 3.
+ */
+async function skipOtp(userId) {
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { phone_otp: null, phone_otp_expires_at: null, onboarding_step: 3 },
+  });
+
+  logger.info(`Phone OTP skipped for user: ${user.email}`);
+
+  return {
+    message: 'Phone verification skipped.',
+    user: sanitizeUser(user),
+    onboarding_step: 3,
+  };
+}
+
+// ============================================
 // Helpers
 // ============================================
 
@@ -429,39 +642,17 @@ function generateToken(user) {
 }
 
 function sanitizeUser(user) {
-  const { password_hash, ...safe } = user;
+  const { password_hash, phone_otp, phone_otp_expires_at, ...safe } = user;
   return safe;
 }
 
-/**
- * Get country dialing code from country name.
- */
-function getCountryCode(country) {
-  const codes = {
-    'United States': '1',
-    'US': '1',
-    'Canada': '1',
-    'CA': '1',
-    'United Kingdom': '44',
-    'UK': '44',
-    'Australia': '61',
-    'AU': '61',
-    'Germany': '49',
-    'DE': '49',
-    'France': '33',
-    'FR': '33',
-    'India': '91',
-    'IN': '91',
-    'Nigeria': '234',
-    'NG': '234',
-    'South Africa': '27',
-    'ZA': '27',
-    'Mexico': '52',
-    'MX': '52',
-    'Brazil': '55',
-    'BR': '55',
-  };
-  return codes[country] || '1';
+/** Mask a phone number for display: +234 ** **** 3239 */
+function maskPhone(phone) {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 6) return phone;
+  const country = phone.startsWith('+') ? phone.slice(0, phone.indexOf(digits.slice(3, 4)) + 1) : '';
+  const last4 = digits.slice(-4);
+  return `${country || '+'}** **** ${last4}`;
 }
 
 module.exports = {
@@ -472,8 +663,12 @@ module.exports = {
   changePassword,
   verifyToken,
   onboardingStep2,
+  getAvailableNumbers,
   onboardingStep3,
+  skipStep3,
   onboardingStep4,
   onboardingStep5,
-  skipStep5,
+  sendOtp,
+  verifyOtp,
+  skipOtp,
 };

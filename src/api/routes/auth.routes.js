@@ -39,37 +39,68 @@ router.post(
 router.post(
   '/onboarding/step2',
   requireAuth,
-  requireFields(['first_name', 'last_name', 'company_name']),
+  requireFields(['first_name', 'last_name', 'company_name', 'company_email', 'business_structure']),
   authController.onboardingStep2
 );
 
-// Step 3: Organization address
+// Step 2→3: Send 5-digit OTP to user's phone number
+router.post(
+  '/onboarding/send-otp',
+  requireAuth,
+  requireFields(['phone_number']),
+  authController.sendOtp
+);
+
+// Step 2→3: Verify the OTP and advance to step 3
+router.post(
+  '/onboarding/verify-otp',
+  requireAuth,
+  requireFields(['otp']),
+  authController.verifyOtp
+);
+
+// Step 2→3: Skip phone OTP verification
+router.post(
+  '/onboarding/skip-otp',
+  requireAuth,
+  authController.skipOtp
+);
+
+// Step 3: Search available AI phone numbers (used before provisioning)
+router.get(
+  '/onboarding/available-numbers',
+  requireAuth,
+  authController.getAvailableNumbers
+);
+
+// Step 3: Provision AI business number
 router.post(
   '/onboarding/step3',
   requireAuth,
-  requireFields(['street', 'city', 'postal_code', 'country']),
+  requireFields(['phone_number', 'search_type']),
   authController.onboardingStep3
 );
 
-// Step 4: Logo upload (logo_url is optional — user may skip)
+// Step 3: Skip AI number setup
+router.post(
+  '/onboarding/skip3',
+  requireAuth,
+  authController.skipStep3
+);
+
+// Step 4: Service area setup
 router.post(
   '/onboarding/step4',
   requireAuth,
+  requireFields(['home_base_zip', 'service_radius_miles', 'cost_per_mile_over_radius']),
   authController.onboardingStep4
 );
 
-// Step 5: AI business number
+// Step 5: Logo upload (optional logo_url) — marks onboarding complete
 router.post(
   '/onboarding/step5',
   requireAuth,
   authController.onboardingStep5
-);
-
-// Skip step 5
-router.post(
-  '/onboarding/skip5',
-  requireAuth,
-  authController.skipStep5
 );
 
 // Get current user profile
