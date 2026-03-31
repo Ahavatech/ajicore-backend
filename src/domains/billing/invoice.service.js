@@ -12,7 +12,14 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const logger = require('../../utils/logger');
+const { logActivitySafe } = require('../ai_logs/activity_log.service');
 const { NotFoundError, ValidationError } = require('../../utils/errors');
+
+function buildCustomerName(customer) {
+  if (!customer) return 'Unknown Customer';
+  const fullName = [customer.first_name, customer.last_name].filter(Boolean).join(' ').trim();
+  return fullName || 'Unknown Customer';
+}
 
 async function getInvoices({ business_id, job_id, status, page = 1, limit = 20 }) {
   const where = {};
@@ -85,7 +92,21 @@ async function create(data) {
     });
   }
 
-  return getById(invoice.id);
+  const createdInvoice = await getById(invoice.id);
+
+  await logActivitySafe({
+    business_id: data.business_id,
+    customer_id: createdInvoice.job?.customer?.id,
+    job_id: createdInvoice.job_id,
+    event_type: 'invoice.created',
+    title: `Invoice created for ${buildCustomerName(createdInvoice.job?.customer)}`,
+    details: {
+      invoice_id: createdInvoice.id,
+      status: createdInvoice.status,
+    },
+  });
+
+  return createdInvoice;
 }
 
 /**
@@ -146,13 +167,43 @@ async function update(id, data, userId) {
     logger.info(`Invoice ${id} edited`, { userId, changes });
   }
 
-  return getById(id);
+  const updatedInvoiceWithRelations = await getById(id);
+
+  await logActivitySafe({
+    business_id: updatedInvoiceWithRelations.business_id,
+    customer_id: updatedInvoiceWithRelations.job?.customer?.id,
+    job_id: updatedInvoiceWithRelations.job_id,
+    event_type: 'invoice.updated',
+    title: `Invoice updated for ${buildCustomerName(updatedInvoiceWithRelations.job?.customer)}`,
+    details: {
+      invoice_id: updatedInvoiceWithRelations.id,
+      status: updatedInvoiceWithRelations.status,
+      changes,
+    },
+  });
+
+  return updatedInvoiceWithRelations;
 }
 
 async function send(id) {
   const invoice = await prisma.invoice.findUnique({ where: { id } });
   if (!invoice) throw new NotFoundError('Invoice not found.');
-  return prisma.invoice.update({ where: { id }, data: { status: 'Sent', sent_at: new Date() } });
+  await prisma.invoice.update({ where: { id }, data: { status: 'Sent', sent_at: new Date() } });
+  const sentInvoice = await getById(id);
+
+  await logActivitySafe({
+    business_id: sentInvoice.business_id,
+    customer_id: sentInvoice.job?.customer?.id,
+    job_id: sentInvoice.job_id,
+    event_type: 'invoice.sent',
+    title: `Invoice sent to ${buildCustomerName(sentInvoice.job?.customer)}`,
+    details: {
+      invoice_id: sentInvoice.id,
+      status: sentInvoice.status,
+    },
+  });
+
+  return sentInvoice;
 }
 
 async function voidInvoice(id, userId) {
@@ -162,6 +213,20 @@ async function voidInvoice(id, userId) {
 
   const updated = await prisma.invoice.update({ where: { id }, data: { status: 'Voided', voided_at: new Date() } });
   await prisma.invoiceEditLog.create({ data: { invoice_id: id, edited_by: userId || null, changes: { action: 'voided' } } });
+  const voidedInvoice = await getById(id);
+
+  await logActivitySafe({
+    business_id: voidedInvoice.business_id,
+    customer_id: voidedInvoice.job?.customer?.id,
+    job_id: voidedInvoice.job_id,
+    event_type: 'invoice.voided',
+    title: `Invoice voided for ${buildCustomerName(voidedInvoice.job?.customer)}`,
+    details: {
+      invoice_id: voidedInvoice.id,
+      status: voidedInvoice.status,
+    },
+  });
+
   return updated;
 }
 
@@ -189,6 +254,22 @@ async function refundInvoice(id, { amount, reason, userId }) {
   });
 
   logger.info(`Invoice ${id} refunded: $${refundAmt}`);
+  const refundedInvoice = await getById(id);
+
+  await logActivitySafe({
+    business_id: refundedInvoice.business_id,
+    customer_id: refundedInvoice.job?.customer?.id,
+    job_id: refundedInvoice.job_id,
+    event_type: 'invoice.refunded',
+    title: `Invoice refunded for ${buildCustomerName(refundedInvoice.job?.customer)}`,
+    details: {
+      invoice_id: refundedInvoice.id,
+      amount: refundAmt,
+      reason: reason || null,
+      status: refundedInvoice.status,
+    },
+  });
+
   return updated;
 }
 

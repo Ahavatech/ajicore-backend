@@ -211,6 +211,160 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             service_call_fee: { type: 'number', nullable: true },
           },
         },
+        DashboardChartPoint: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', example: 'Mon' },
+            value: { type: 'number', example: 1200 },
+          },
+        },
+        DashboardTodayJob: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            time: { type: 'string', example: '09:00 AM' },
+            technician: { type: 'string', example: 'Mike Davis' },
+            jobType: { type: 'string', example: 'Plumbing Repair' },
+            status: { type: 'string', example: 'In Progress' },
+          },
+        },
+        DashboardPendingQuote: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            customerName: { type: 'string', example: 'Sarah Johnson' },
+            jobType: { type: 'string', example: 'HVAC Installation' },
+            quoteId: { type: 'string', example: 'EST-1001ABCD' },
+          },
+        },
+        DashboardRecentActivity: {
+          type: 'object',
+          properties: {
+            type: { type: 'string', enum: ['call', 'job', 'sms', 'invoice', 'schedule'] },
+            title: { type: 'string', example: 'Missed call from Sarah Johnson' },
+            time: { type: 'string', example: '10 mins ago' },
+          },
+        },
+        DashboardActiveTeamMember: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            name: { type: 'string', example: 'Chris Brown' },
+            role: { type: 'string', example: 'Technician' },
+            status: { type: 'string', enum: ['On Job', 'Traveling', 'On Break'] },
+            location: { type: 'string', example: '123 Main St, Dallas TX' },
+          },
+        },
+        DashboardSummary: {
+          type: 'object',
+          properties: {
+            revenue: { type: 'number', example: 14250.0 },
+            active_jobs: { type: 'integer', example: 12 },
+            jobs_trend: { type: 'number', example: 8.5 },
+            pending_invoices: { type: 'integer', example: 5 },
+            overdue_invoices: { type: 'integer', example: 2 },
+            calls_handled: { type: 'integer', example: 47 },
+            todays_jobs: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/DashboardTodayJob' },
+            },
+            pending_quotes: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/DashboardPendingQuote' },
+            },
+            recent_activity: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/DashboardRecentActivity' },
+            },
+            active_team: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/DashboardActiveTeamMember' },
+            },
+          },
+        },
+        DashboardRevenue: {
+          type: 'object',
+          properties: {
+            total: { type: 'number', example: 14250.0 },
+            trend: { type: 'number', example: 15.2 },
+            chart_data: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/DashboardChartPoint' },
+            },
+          },
+        },
+        DashboardJobsAnalytics: {
+          type: 'object',
+          properties: {
+            period: { type: 'string', enum: ['7d', '30d', '90d'], example: '7d' },
+            total: { type: 'integer', example: 18 },
+            by_status: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  status: { type: 'string', example: 'Completed' },
+                  count: { type: 'integer', example: 8 },
+                },
+              },
+            },
+            by_type: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  type: { type: 'string', example: 'Job' },
+                  count: { type: 'integer', example: 12 },
+                },
+              },
+            },
+            chart_data: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/DashboardChartPoint' },
+            },
+          },
+        },
+        InternalActivityEventInput: {
+          type: 'object',
+          required: ['business_id', 'event_type'],
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            event_type: {
+              type: 'string',
+              example: 'call.missed',
+              description: 'Must start with call., sms., job., invoice., schedule., or quote.',
+            },
+            title: { type: 'string', example: 'Missed call from Sarah Johnson' },
+            message: { type: 'string', example: 'Customer did not answer callback attempt.' },
+            actor: { type: 'string', example: 'ai-receptionist' },
+            timestamp: { type: 'string', format: 'date-time' },
+            job_id: { type: 'string', format: 'uuid', nullable: true },
+            customer_id: { type: 'string', format: 'uuid', nullable: true },
+            error: { type: 'string', nullable: true },
+            details: {
+              type: 'object',
+              additionalProperties: true,
+            },
+          },
+        },
+        InternalActivityEvent: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            business_id: { type: 'string', format: 'uuid' },
+            event_type: { type: 'string', example: 'call.missed' },
+            actor: { type: 'string', nullable: true },
+            timestamp: { type: 'string', format: 'date-time' },
+            details: {
+              type: 'object',
+              additionalProperties: true,
+            },
+            job_id: { type: 'string', format: 'uuid', nullable: true },
+            customer_id: { type: 'string', format: 'uuid', nullable: true },
+            error: { type: 'string', nullable: true },
+            createdAt: { type: 'string', format: 'date-time' },
+          },
+        },
         Error: {
           type: 'object',
           properties: {

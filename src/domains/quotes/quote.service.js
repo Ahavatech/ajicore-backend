@@ -5,7 +5,14 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const logger = require('../../utils/logger');
+const { logActivitySafe } = require('../ai_logs/activity_log.service');
 const { NotFoundError, ValidationError } = require('../../utils/errors');
+
+function buildCustomerName(customer) {
+  if (!customer) return 'Unknown Customer';
+  const fullName = [customer.first_name, customer.last_name].filter(Boolean).join(' ').trim();
+  return fullName || 'Unknown Customer';
+}
 
 async function getQuotes({ business_id, status, customer_id, page = 1, limit = 20 }) {
   const where = { business_id };
@@ -42,10 +49,7 @@ async function getById(id) {
 }
 
 async function create(data) {
-  const business = await prisma.business.findUnique({ where: { id: data.business_id } });
-  const expiryDays = business?.quote_expiry_days || 30;
-
-  return prisma.quote.create({
+  const quote = await prisma.quote.create({
     data: {
       business_id: data.business_id,
       customer_id: data.customer_id,
@@ -62,6 +66,22 @@ async function create(data) {
     },
     include: { customer: true, assigned_staff: true },
   });
+
+  await logActivitySafe({
+    business_id: quote.business_id,
+    customer_id: quote.customer_id,
+    event_type: quote.scheduled_estimate_date ? 'schedule.quote_created' : 'quote.created',
+    title: quote.scheduled_estimate_date
+      ? `Estimate scheduled for ${buildCustomerName(quote.customer)}`
+      : `Quote created for ${buildCustomerName(quote.customer)}`,
+    details: {
+      quote_id: quote.id,
+      status: quote.status,
+      source: quote.source,
+    },
+  });
+
+  return quote;
 }
 
 async function update(id, data) {
@@ -73,11 +93,26 @@ async function update(id, data) {
   if (data.scheduled_estimate_date) updateData.scheduled_estimate_date = new Date(data.scheduled_estimate_date);
   if (data.status) updateData.status = data.status;
 
-  return prisma.quote.update({
+  const quote = await prisma.quote.update({
     where: { id },
     data: updateData,
     include: { customer: true, assigned_staff: true },
   });
+
+  await logActivitySafe({
+    business_id: quote.business_id,
+    customer_id: quote.customer_id,
+    event_type: 'quote.updated',
+    title: data.status
+      ? `Quote status updated to ${data.status} for ${buildCustomerName(quote.customer)}`
+      : `Quote updated for ${buildCustomerName(quote.customer)}`,
+    details: {
+      quote_id: quote.id,
+      status: quote.status,
+    },
+  });
+
+  return quote;
 }
 
 /**
@@ -94,7 +129,7 @@ async function sendQuote(id) {
   const expires_at = new Date();
   expires_at.setDate(expires_at.getDate() + expiryDays);
 
-  return prisma.quote.update({
+  const updatedQuote = await prisma.quote.update({
     where: { id },
     data: {
       status: 'Sent',
@@ -103,6 +138,19 @@ async function sendQuote(id) {
     },
     include: { customer: true },
   });
+
+  await logActivitySafe({
+    business_id: updatedQuote.business_id,
+    customer_id: updatedQuote.customer_id,
+    event_type: 'quote.sent',
+    title: `Quote sent to ${buildCustomerName(updatedQuote.customer)}`,
+    details: {
+      quote_id: updatedQuote.id,
+      expires_at: updatedQuote.expires_at,
+    },
+  });
+
+  return updatedQuote;
 }
 
 /**
@@ -142,6 +190,32 @@ async function approveAndConvert(id, jobData = {}) {
   });
 
   logger.info(`Quote ${id} approved and converted to Job ${job.id}`);
+
+  await Promise.all([
+    logActivitySafe({
+      business_id: quote.business_id,
+      customer_id: quote.customer_id,
+      job_id: job.id,
+      event_type: 'quote.approved',
+      title: `Quote approved by ${buildCustomerName(quote.customer)}`,
+      details: {
+        quote_id: quote.id,
+        converted_to_job_id: job.id,
+      },
+    }),
+    logActivitySafe({
+      business_id: quote.business_id,
+      customer_id: quote.customer_id,
+      job_id: job.id,
+      event_type: job.scheduled_start_time ? 'schedule.job_created' : 'job.created',
+      title: `Job created from quote for ${buildCustomerName(quote.customer)}`,
+      details: {
+        quote_id: quote.id,
+        job_id: job.id,
+      },
+    }),
+  ]);
+
   return { quote: { id, status: 'Approved', converted_to_job_id: job.id }, job };
 }
 
@@ -149,14 +223,30 @@ async function approveAndConvert(id, jobData = {}) {
  * Decline a quote.
  */
 async function declineQuote(id, reason) {
-  return prisma.quote.update({
+  const quote = await prisma.quote.update({
     where: { id },
     data: {
       status: 'Declined',
       declined_at: new Date(),
       notes: reason ? `Declined: ${reason}` : undefined,
     },
+    include: {
+      customer: true,
+    },
   });
+
+  await logActivitySafe({
+    business_id: quote.business_id,
+    customer_id: quote.customer_id,
+    event_type: 'quote.declined',
+    title: `Quote declined for ${buildCustomerName(quote.customer)}`,
+    details: {
+      quote_id: quote.id,
+      reason: reason || null,
+    },
+  });
+
+  return quote;
 }
 
 /**

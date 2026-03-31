@@ -28,7 +28,8 @@ const quoteService = require('../../domains/quotes/quote.service');
 const jobService = require('../../domains/jobs/job.service');
 const customerService = require('../../domains/customers/customer.service');
 const notificationService = require('../../domains/communications/notification.service');
-const { generateDashboardSummary } = require('../../utils/report_generator');
+const dashboardService = require('../../domains/dashboard/dashboard.service');
+const { logActivity } = require('../../domains/ai_logs/activity_log.service');
 const logger = require('../../utils/logger');
 
 const router = Router();
@@ -70,10 +71,42 @@ router.get('/inventory', requireFields(['business_id'], 'query'), requireInterna
 // ============================================
 router.get('/dashboard/summary', requireFields(['business_id'], 'query'), requireInternalBusinessAccess('query'), async (req, res, next) => {
   try {
-    const { business_id } = req.query;
+    const { business_id, period } = req.query;
     if (!business_id) return res.status(400).json({ error: 'business_id required' });
-    const summary = await generateDashboardSummary(business_id);
+    const summary = await dashboardService.getDashboardSummary(business_id, period);
     res.json(summary);
+  } catch (err) { next(err); }
+});
+
+/**
+ * @swagger
+ * /api/internal/events:
+ *   post:
+ *     summary: Record a dashboard activity event from internal AI or call systems
+ *     tags: [AI Bridge]
+ *     security: [{apiKeyAuth: [], businessTokenAuth: []}]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/InternalActivityEventInput'
+ *     responses:
+ *       201:
+ *         description: Event recorded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   $ref: '#/components/schemas/InternalActivityEvent'
+ */
+router.post('/events', requireFields(['business_id', 'event_type'], 'body'), requireInternalBusinessAccess('body'), async (req, res, next) => {
+  try {
+    const entry = await logActivity(req.body);
+    res.status(201).json({ success: true, data: entry });
   } catch (err) { next(err); }
 });
 

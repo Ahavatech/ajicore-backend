@@ -6,12 +6,27 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const stripeGateway = require('../../integrations/payments/stripe_gateway');
 const logger = require('../../utils/logger');
+const { logActivitySafe } = require('../ai_logs/activity_log.service');
 const { NotFoundError, ValidationError } = require('../../utils/errors');
+
+function buildCustomerName(customer) {
+  if (!customer) return 'Unknown Customer';
+  const fullName = [customer.first_name, customer.last_name].filter(Boolean).join(' ').trim();
+  return fullName || 'Unknown Customer';
+}
 
 async function processPayment(invoiceId, paymentData) {
   const invoice = await prisma.invoice.findUnique({
     where: { id: invoiceId },
-    include: { line_items: true, payments: true },
+    include: {
+      line_items: true,
+      payments: true,
+      job: {
+        include: {
+          customer: true,
+        },
+      },
+    },
   });
 
   if (!invoice) throw new NotFoundError('Invoice not found.');
@@ -19,8 +34,8 @@ async function processPayment(invoiceId, paymentData) {
     throw new ValidationError(`Cannot apply payment to a ${invoice.status} invoice.`);
   }
 
-  const subtotal = invoice.line_items.reduce((sum, l) => sum + (l.is_credit ? -l.total : l.total), 0);
-  const totalPaid = invoice.payments.reduce((sum, p) => sum + p.amount, 0);
+  const subtotal = invoice.line_items.reduce((sum, line) => sum + (line.is_credit ? -line.total : line.total), 0);
+  const totalPaid = invoice.payments.reduce((sum, payment) => sum + payment.amount, 0);
   const remaining = subtotal - totalPaid;
 
   if (remaining <= 0) throw new ValidationError('Invoice is already fully paid.');
@@ -28,7 +43,6 @@ async function processPayment(invoiceId, paymentData) {
   const amount = Math.min(paymentData.amount, remaining);
   let stripePaymentId = null;
 
-  // Try Stripe if payment_method_id provided
   if (paymentData.payment_method_id && stripeGateway.isConfigured()) {
     try {
       const charge = await stripeGateway.createPaymentIntent({
@@ -62,10 +76,28 @@ async function processPayment(invoiceId, paymentData) {
   });
 
   if (newStatus === 'Paid') {
-    await prisma.job.updateMany({ where: { invoices: { some: { id: invoiceId } } }, data: { status: 'Invoiced' } }).catch(() => {});
+    await prisma.job.updateMany({
+      where: { invoices: { some: { id: invoiceId } } },
+      data: { status: 'Invoiced' },
+    }).catch(() => {});
   }
 
-  logger.info(`Payment of $${amount} applied to invoice ${invoiceId} → ${newStatus}`);
+  logger.info(`Payment of $${amount} applied to invoice ${invoiceId} -> ${newStatus}`);
+
+  await logActivitySafe({
+    business_id: invoice.job.business_id,
+    customer_id: invoice.job.customer_id,
+    job_id: invoice.job_id,
+    event_type: 'invoice.payment_received',
+    title: `Payment received from ${buildCustomerName(invoice.job.customer)}`,
+    details: {
+      invoice_id: invoiceId,
+      amount,
+      status: newStatus,
+      payment_method: payment.payment_method,
+    },
+  });
+
   return { payment, invoice: updatedInvoice };
 }
 

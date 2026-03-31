@@ -34,8 +34,8 @@ async function handleIncomingSms(req, res, next) {
  */
 async function sendSms(req, res, next) {
   try {
-    const { to, message } = req.body;
-    const result = await notificationService.sendSms(to, message);
+    const { business_id, to, message, customer_id, customer_name, job_id } = req.body;
+    const result = await notificationService.sendSms(to, message, { business_id, customer_id, customer_name, job_id });
     res.json(result);
   } catch (err) {
     next(err);

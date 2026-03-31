@@ -6,7 +6,18 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const logger = require('../../utils/logger');
+const { logActivitySafe } = require('../ai_logs/activity_log.service');
 const { NotFoundError, ValidationError } = require('../../utils/errors');
+
+function buildCustomerName(customer) {
+  if (!customer) return 'Unknown Customer';
+  const fullName = [customer.first_name, customer.last_name].filter(Boolean).join(' ').trim();
+  return fullName || 'Unknown Customer';
+}
+
+function buildJobLabel(job) {
+  return job.service_type || job.title || job.type || 'Service Job';
+}
 
 async function getJobs({ business_id, status, type, customer_id, page = 1, limit = 20 }) {
   const where = {};
@@ -73,6 +84,26 @@ async function createJob(data) {
     }).catch(() => {});
   }
 
+  if (job.assigned_staff_id && job.status === 'InProgress') {
+    await prisma.staff.update({
+      where: { id: job.assigned_staff_id },
+      data: { active_job_id: job.id },
+    }).catch(() => {});
+  }
+
+  await logActivitySafe({
+    business_id: job.business_id,
+    customer_id: job.customer_id,
+    job_id: job.id,
+    event_type: job.scheduled_start_time ? 'schedule.job_created' : 'job.created',
+    title: `${buildJobLabel(job)} created for ${buildCustomerName(job.customer)}`,
+    details: {
+      job_id: job.id,
+      status: job.status,
+      source: job.source,
+    },
+  });
+
   return job;
 }
 
@@ -86,21 +117,109 @@ async function updateJob(id, data) {
   if (data.actual_start_time) updateData.actual_start_time = new Date(data.actual_start_time);
   if (data.actual_end_time) updateData.actual_end_time = new Date(data.actual_end_time);
 
-  return prisma.job.update({ where: { id }, data: updateData, include: { customer: true, assigned_staff: true } });
+  const job = await prisma.job.update({ where: { id }, data: updateData, include: { customer: true, assigned_staff: true } });
+
+  if (job.assigned_staff_id) {
+    if (job.status === 'InProgress') {
+      await prisma.staff.update({
+        where: { id: job.assigned_staff_id },
+        data: { active_job_id: job.id },
+      }).catch(() => {});
+    } else if (['Completed', 'Cancelled', 'Invoiced'].includes(job.status)) {
+      await prisma.staff.updateMany({
+        where: { id: job.assigned_staff_id, active_job_id: job.id },
+        data: { active_job_id: null },
+      }).catch(() => {});
+    }
+  }
+
+  await logActivitySafe({
+    business_id: job.business_id,
+    customer_id: job.customer_id,
+    job_id: job.id,
+    event_type: 'job.updated',
+    title: `${buildJobLabel(job)} updated for ${buildCustomerName(job.customer)}`,
+    details: {
+      job_id: job.id,
+      status: job.status,
+    },
+  });
+
+  return job;
 }
 
 async function startJob(id) {
   const job = await prisma.job.findUnique({ where: { id } });
   if (!job) throw new NotFoundError('Job not found.');
   if (job.status !== 'Scheduled') throw new ValidationError('Job must be Scheduled to start.');
-  return prisma.job.update({ where: { id }, data: { status: 'InProgress', actual_start_time: new Date() }, include: { customer: true, assigned_staff: true } });
+
+  const startedJob = await prisma.$transaction(async (tx) => {
+    const updatedJob = await tx.job.update({
+      where: { id },
+      data: { status: 'InProgress', actual_start_time: new Date() },
+      include: { customer: true, assigned_staff: true },
+    });
+
+    if (updatedJob.assigned_staff_id) {
+      await tx.staff.update({
+        where: { id: updatedJob.assigned_staff_id },
+        data: { active_job_id: updatedJob.id },
+      }).catch(() => {});
+    }
+
+    return updatedJob;
+  });
+
+  await logActivitySafe({
+    business_id: startedJob.business_id,
+    customer_id: startedJob.customer_id,
+    job_id: startedJob.id,
+    event_type: 'job.started',
+    title: `${buildJobLabel(startedJob)} started for ${buildCustomerName(startedJob.customer)}`,
+    details: {
+      job_id: startedJob.id,
+      status: startedJob.status,
+    },
+  });
+
+  return startedJob;
 }
 
 async function completeJob(id) {
   const job = await prisma.job.findUnique({ where: { id } });
   if (!job) throw new NotFoundError('Job not found.');
   if (job.status !== 'InProgress') throw new ValidationError('Job must be InProgress to complete.');
-  return prisma.job.update({ where: { id }, data: { status: 'Completed', actual_end_time: new Date() }, include: { customer: true, assigned_staff: true } });
+
+  const completedJob = await prisma.$transaction(async (tx) => {
+    const updatedJob = await tx.job.update({
+      where: { id },
+      data: { status: 'Completed', actual_end_time: new Date() },
+      include: { customer: true, assigned_staff: true },
+    });
+
+    if (updatedJob.assigned_staff_id) {
+      await tx.staff.updateMany({
+        where: { id: updatedJob.assigned_staff_id, active_job_id: updatedJob.id },
+        data: { active_job_id: null },
+      });
+    }
+
+    return updatedJob;
+  });
+
+  await logActivitySafe({
+    business_id: completedJob.business_id,
+    customer_id: completedJob.customer_id,
+    job_id: completedJob.id,
+    event_type: 'job.completed',
+    title: `${buildJobLabel(completedJob)} completed for ${buildCustomerName(completedJob.customer)}`,
+    details: {
+      job_id: completedJob.id,
+      status: completedJob.status,
+    },
+  });
+
+  return completedJob;
 }
 
 async function addMaterials(jobId, materials) {

@@ -46,3 +46,4 @@ coverage/
 # Build outputs (if you eventually compile with Babel/TypeScript)
 dist/
 build/
+node_modules
