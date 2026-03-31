@@ -21,6 +21,12 @@ const DEFAULT_LIMITS = {
   // Custom limits can be added as needed
 };
 
+function isRateLimitingEnabled() {
+  if (process.env.ENABLE_RATE_LIMIT === 'true') return true;
+  if (process.env.ENABLE_RATE_LIMIT === 'false') return false;
+  return process.env.NODE_ENV === 'production';
+}
+
 /**
  * Rate limiting middleware factory.
  * @param {Object} options - Configuration options
@@ -41,6 +47,10 @@ function rateLimit(options = {}) {
   } = options;
 
   return (req, res, next) => {
+    if (!isRateLimitingEnabled()) {
+      return next();
+    }
+
     const key = keyGenerator(req);
     const now = Date.now();
 
@@ -202,8 +212,11 @@ function getRateLimitStats() {
   };
 }
 
-// Auto-cleanup every 30 minutes
-setInterval(cleanupRateLimitStore, 30 * 60 * 1000);
+// Auto-cleanup every 30 minutes without keeping the process alive.
+const cleanupTimer = setInterval(cleanupRateLimitStore, 30 * 60 * 1000);
+if (typeof cleanupTimer.unref === 'function') {
+  cleanupTimer.unref();
+}
 
 module.exports = {
   rateLimit,

@@ -2,12 +2,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const jwt = require('jsonwebtoken');
 const { randomUUID } = require('node:crypto');
-const { PrismaClient } = require('@prisma/client');
 
 process.env.NODE_ENV = 'test';
 process.env.INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || 'test-internal-key';
 
-const prisma = new PrismaClient();
+const prisma = require('../src/lib/prisma');
 const app = require('../src/app');
 
 const DAY_MS = 24 * 60 * 60 * 1000;

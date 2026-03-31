@@ -2,8 +2,7 @@
  * Schedule Service
  * Handles schedule queries, availability checks, and conflict detection.
  */
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../lib/prisma');
 
 /**
  * Get all scheduled jobs within a date range for a business.

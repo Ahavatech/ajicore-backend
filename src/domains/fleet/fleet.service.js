@@ -2,8 +2,7 @@
  * Fleet Service
  * Business logic for vehicle management, mileage tracking, and maintenance alerts.
  */
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../lib/prisma');
 const logger = require('../../utils/logger');
 const { NotFoundError } = require('../../utils/errors');
 

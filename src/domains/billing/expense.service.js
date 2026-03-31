@@ -2,8 +2,7 @@
  * Expense Service
  * Business logic for tracking and querying business expenses.
  */
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../lib/prisma');
 
 async function getExpenses({ business_id, category, job_id, start_date, end_date, page = 1, limit = 50 }) {
   const where = {};

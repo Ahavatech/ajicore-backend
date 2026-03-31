@@ -2,8 +2,7 @@
  * Team Check-In Service
  * Manages scheduled staff check-ins and escalations.
  */
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../lib/prisma');
 
 async function getCheckins({ business_id, job_id, staff_id, status, page = 1, limit = 20 }) {
   const parsedPage = Math.max(1, parseInt(page) || 1);

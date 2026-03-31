@@ -2,8 +2,7 @@
  * Payment Service
  * Records payments against invoices. Integrates with Stripe when available.
  */
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../lib/prisma');
 const stripeGateway = require('../../integrations/payments/stripe_gateway');
 const logger = require('../../utils/logger');
 const { logActivitySafe } = require('../ai_logs/activity_log.service');

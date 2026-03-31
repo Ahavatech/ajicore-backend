@@ -2,8 +2,7 @@
  * Payroll Service
  * Calculates staff payroll based on timesheets and hourly rates.
  */
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../lib/prisma');
 
 /**
  * Calculate payroll for all staff in a business within a date range.

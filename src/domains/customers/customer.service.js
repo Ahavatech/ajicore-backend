@@ -2,9 +2,8 @@
  * Customer Service
  * Business logic for customer management and lookup.
  */
-const { PrismaClient } = require('@prisma/client');
 const { ValidationError } = require('../../utils/errors');
-const prisma = new PrismaClient();
+const prisma = require('../../lib/prisma');
 
 function withComputedName(customer) {
   if (!customer) return customer;

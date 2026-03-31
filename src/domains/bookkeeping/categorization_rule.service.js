@@ -2,8 +2,7 @@
  * Categorization Rule Service
  * Manages vendor pattern → category auto-categorization rules.
  */
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../lib/prisma');
 
 async function getRules(business_id) {
   return prisma.categorizationRule.findMany({

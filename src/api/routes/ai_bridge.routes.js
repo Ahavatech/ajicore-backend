@@ -15,8 +15,7 @@ const {
   requireInternalResourceAccess,
 } = require('../middlewares/auth.middleware');
 const { requireFields } = require('../middlewares/validate.middleware');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../lib/prisma');
 
 const jobController = require('../../domains/jobs/job.controller');
 const quoteController = require('../../domains/quotes/quote.controller');

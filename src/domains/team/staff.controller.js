@@ -2,8 +2,7 @@
  * Staff Controller
  * Handles HTTP logic for staff management, timesheets, and payroll.
  */
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../lib/prisma');
 const payrollService = require('./payroll.service');
 
 async function getAllStaff(req, res, next) {

@@ -2,8 +2,7 @@
  * Follow-Up Service
  * Manages automated follow-ups for quotes and invoices.
  */
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../lib/prisma');
 
 async function getFollowUps({ business_id, type, status, page = 1, limit = 20 }) {
   const parsedPage = Math.max(1, parseInt(page) || 1);

@@ -9,8 +9,7 @@
  *   Paid: Notes/photos only
  *   Refunded/Voided: Locked
  */
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../lib/prisma');
 const logger = require('../../utils/logger');
 const { logActivitySafe } = require('../ai_logs/activity_log.service');
 const { NotFoundError, ValidationError } = require('../../utils/errors');

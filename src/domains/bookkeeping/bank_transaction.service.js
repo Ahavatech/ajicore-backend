@@ -2,8 +2,7 @@
  * Bank Transaction Service
  * Manages imported bank transactions and AI categorization.
  */
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../lib/prisma');
 
 async function getTransactions({ business_id, is_income, category, page = 1, limit = 20 }) {
   const parsedPage = Math.max(1, parseInt(page) || 1);
