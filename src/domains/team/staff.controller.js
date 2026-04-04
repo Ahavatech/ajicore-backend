@@ -6,13 +6,49 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const payrollService = require('./payroll.service');
 
+function buildStaffResponse(staff) {
+  const activeJob = staff.active_job || null;
+  const openTimesheet = Array.isArray(staff.timesheets) && staff.timesheets.length > 0 ? staff.timesheets[0] : null;
+
+  return {
+    ...staff,
+    has_open_timesheet: Boolean(openTimesheet),
+    open_timesheet: openTimesheet,
+    active_job_summary: activeJob
+      ? {
+          id: activeJob.id,
+          title: activeJob.title,
+          status: activeJob.status,
+          address: activeJob.address,
+          scheduled_start_time: activeJob.scheduled_start_time,
+          customer: activeJob.customer || null,
+        }
+      : null,
+  };
+}
+
 async function getAllStaff(req, res, next) {
   try {
     const { business_id } = req.query;
     const where = {};
     if (business_id) where.business_id = business_id;
-    const staff = await prisma.staff.findMany({ where, orderBy: { name: 'asc' } });
-    res.json(staff);
+    const staff = await prisma.staff.findMany({
+      where,
+      orderBy: { name: 'asc' },
+      include: {
+        active_job: {
+          include: {
+            customer: { select: { id: true, first_name: true, last_name: true } },
+          },
+        },
+        timesheets: {
+          where: { clock_out: null },
+          orderBy: { clock_in: 'desc' },
+          take: 1,
+        },
+      },
+    });
+    res.json(staff.map(buildStaffResponse));
   } catch (err) { next(err); }
 }
 
@@ -20,10 +56,17 @@ async function getStaffById(req, res, next) {
   try {
     const staff = await prisma.staff.findUnique({
       where: { id: req.params.id },
-      include: { timesheets: { orderBy: { clock_in: 'desc' }, take: 20, include: { job: true } } },
+      include: {
+        active_job: {
+          include: {
+            customer: { select: { id: true, first_name: true, last_name: true } },
+          },
+        },
+        timesheets: { orderBy: { clock_in: 'desc' }, take: 20, include: { job: true } },
+      },
     });
     if (!staff) return res.status(404).json({ error: 'Staff member not found' });
-    res.json(staff);
+    res.json(buildStaffResponse(staff));
   } catch (err) { next(err); }
 }
 
@@ -37,6 +80,7 @@ async function createStaff(req, res, next) {
         hourly_rate: req.body.hourly_rate,
         email: req.body.email || null,
         phone: req.body.phone || null,
+        check_in_frequency_hours: req.body.check_in_frequency_hours ?? null,
       },
     });
     res.status(201).json(staff);
@@ -46,7 +90,7 @@ async function createStaff(req, res, next) {
 async function updateStaff(req, res, next) {
   try {
     const updateData = {};
-    const fields = ['name', 'role', 'hourly_rate', 'email', 'phone'];
+    const fields = ['name', 'role', 'hourly_rate', 'email', 'phone', 'check_in_frequency_hours'];
     fields.forEach((f) => { if (req.body[f] !== undefined) updateData[f] = req.body[f]; });
     const staff = await prisma.staff.update({ where: { id: req.params.id }, data: updateData });
     res.json(staff);

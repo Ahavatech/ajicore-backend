@@ -31,6 +31,84 @@ router.post(
   authController.signin
 );
 
+/**
+ * @swagger
+ * /api/auth/forgot-password:
+ *   post:
+ *     summary: Request a password reset code
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AuthForgotPasswordInput'
+ *     responses:
+ *       200:
+ *         description: Reset code request accepted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AuthForgotPasswordResponse'
+ */
+router.post(
+  '/forgot-password',
+  requireFields(['email']),
+  authController.forgotPassword
+);
+
+/**
+ * @swagger
+ * /api/auth/verify-reset-code:
+ *   post:
+ *     summary: Verify a password reset code
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AuthVerifyResetCodeInput'
+ *     responses:
+ *       200:
+ *         description: Reset code is valid
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AuthVerifyResetCodeResponse'
+ */
+router.post(
+  '/verify-reset-code',
+  requireFields(['email', 'code']),
+  authController.verifyResetCode
+);
+
+/**
+ * @swagger
+ * /api/auth/reset-password:
+ *   post:
+ *     summary: Reset password with a verified code
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AuthResetPasswordInput'
+ *     responses:
+ *       200:
+ *         description: Password reset completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AuthResetPasswordResponse'
+ */
+router.post(
+  '/reset-password',
+  requireFields(['email', 'code', 'new_password']),
+  authController.resetPassword
+);
+
 // ============================================
 // Protected Routes (require Bearer token)
 // ============================================

@@ -204,6 +204,9 @@ model Business {
   // Payment Follow-up
   payment_follow_up_days    Json?
   payment_interval          String?
+  alert_settings            Json?
+  automation_settings       Json?
+  communication_settings    Json?
   internal_api_token        String                 @unique
 
   createdAt DateTime @default(now())

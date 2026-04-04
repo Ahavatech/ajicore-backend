@@ -26,6 +26,38 @@ router.use(requireAuth);
  *     tags: [Jobs]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: business_id
+ *         required: true
+ *         schema: { type: string }
+ *       - in: query
+ *         name: assigned_staff_id
+ *         schema: { type: string }
+ *       - in: query
+ *         name: status
+ *         schema: { type: string }
+ *       - in: query
+ *         name: type
+ *         schema: { type: string }
+ *       - in: query
+ *         name: customer_id
+ *         schema: { type: string }
+ *       - in: query
+ *         name: start_date
+ *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: end_date
+ *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20 }
  */
 router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), jobController.getAllJobs);
 
@@ -81,6 +113,26 @@ router.get('/:id', validateUUID('id'), requireResourceAccess('job'), jobControll
  *     tags: [Jobs]
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [business_id, customer_id]
+ *             properties:
+ *               business_id: { type: string }
+ *               customer_id: { type: string }
+ *               assigned_staff_id: { type: string }
+ *               title: { type: string }
+ *               job_details: { type: string }
+ *               service_type: { type: string }
+ *               address: { type: string }
+ *               scheduled_start_time: { type: string, format: date-time }
+ *               scheduled_end_time: { type: string, format: date-time }
+ *               service_call_fee: { type: number }
+ *               is_emergency: { type: boolean }
+ *               status: { type: string }
  */
 router.post('/', requireFields(['business_id', 'customer_id']), requireBusinessAccess('body'), jobController.createJob);
 
@@ -92,6 +144,23 @@ router.post('/', requireFields(['business_id', 'customer_id']), requireBusinessA
  *     tags: [Jobs]
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               assigned_staff_id: { type: string }
+ *               title: { type: string }
+ *               job_details: { type: string }
+ *               service_type: { type: string }
+ *               address: { type: string }
+ *               scheduled_start_time: { type: string, format: date-time }
+ *               scheduled_end_time: { type: string, format: date-time }
+ *               service_call_fee: { type: number }
+ *               is_emergency: { type: boolean }
+ *               status: { type: string }
  */
 router.patch('/:id', validateUUID('id'), requireResourceAccess('job'), jobController.updateJob);
 

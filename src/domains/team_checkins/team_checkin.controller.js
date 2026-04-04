@@ -6,8 +6,17 @@ const checkinService = require('./team_checkin.service');
 
 async function list(req, res, next) {
   try {
-    const { business_id, job_id, staff_id, status, page, limit } = req.query;
-    const result = await checkinService.getCheckins({ business_id, job_id, staff_id, status, page, limit });
+    const { business_id, job_id, staff_id, status, start_date, end_date, page, limit } = req.query;
+    const result = await checkinService.getCheckins({
+      business_id,
+      job_id,
+      staff_id,
+      status,
+      start_date,
+      end_date,
+      page,
+      limit,
+    });
     res.json({ success: true, ...result });
   } catch (err) {
     next(err);

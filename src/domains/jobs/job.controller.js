@@ -7,8 +7,30 @@ const scheduleService = require('./schedule.service');
 
 async function getAllJobs(req, res, next) {
   try {
-    const { business_id, status, type, customer_id, page = 1, limit = 20 } = req.query;
-    const jobs = await jobService.getJobs({ business_id, status, type, customer_id, page: +page, limit: +limit });
+    const {
+      business_id,
+      status,
+      type,
+      customer_id,
+      assigned_staff_id,
+      start_date,
+      end_date,
+      search,
+      page = 1,
+      limit = 20,
+    } = req.query;
+    const jobs = await jobService.getJobs({
+      business_id,
+      status,
+      type,
+      customer_id,
+      assigned_staff_id,
+      start_date,
+      end_date,
+      search,
+      page: +page,
+      limit: +limit,
+    });
     res.json(jobs);
   } catch (err) { next(err); }
 }

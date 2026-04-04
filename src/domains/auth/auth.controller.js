@@ -17,6 +17,9 @@
  *   POST /onboarding/step4               → Step 4: Service area setup
  *   POST /onboarding/step5               → Step 5: Logo upload (marks onboarding complete)
  *   GET  /me                             → Get current user profile
+ *   POST /forgot-password                → Request a password reset code
+ *   POST /verify-reset-code             → Verify a password reset code
+ *   POST /reset-password                → Reset password with a valid code
  *   PATCH /change-password               → Change password
  */
 const authService = require('./auth.service');
@@ -143,6 +146,33 @@ async function getMe(req, res, next) {
   }
 }
 
+async function forgotPassword(req, res, next) {
+  try {
+    const result = await authService.forgotPassword(req.body.email);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function verifyResetCode(req, res, next) {
+  try {
+    const result = await authService.verifyResetCode(req.body.email, req.body.code);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function resetPassword(req, res, next) {
+  try {
+    const result = await authService.resetPassword(req.body.email, req.body.code, req.body.new_password);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function changePassword(req, res, next) {
   try {
     const { current_password, new_password } = req.body;
@@ -176,6 +206,9 @@ module.exports = {
   onboardingStep4,
   onboardingStep5,
   getMe,
+  forgotPassword,
+  verifyResetCode,
+  resetPassword,
   changePassword,
   getInternalApiToken,
 };

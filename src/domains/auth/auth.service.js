@@ -22,6 +22,7 @@ const { ValidationError, ConflictError, AuthenticationError, NotFoundError } = r
 
 const SALT_ROUNDS = 12;
 const OTP_EXPIRY_MINUTES = 10;
+const RESET_CODE_EXPIRY_MINUTES = 10;
 
 // ============================================
 // Step 1: Account Creation
@@ -472,6 +473,94 @@ async function getUserById(id) {
   return { ...sanitizeUser(user), businesses: user.businesses.map(sanitizeBusiness) };
 }
 
+async function forgotPassword(email) {
+  if (!email) {
+    throw new ValidationError('Email is required.');
+  }
+
+  const normalizedEmail = email.toLowerCase().trim();
+  const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+  let dev_reset_code = null;
+
+  if (user && user.auth_provider !== 'Google') {
+    const code = Math.floor(10000 + Math.random() * 90000).toString();
+    const expires = new Date(Date.now() + RESET_CODE_EXPIRY_MINUTES * 60 * 1000);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        phone_otp: code,
+        phone_otp_expires_at: expires,
+      },
+    });
+
+    if (!env.isProduction) {
+      dev_reset_code = code;
+    }
+
+    logger.info(`Password reset code generated for user: ${user.email}`);
+  }
+
+  const response = {
+    message: 'If an account exists for this email, a password reset code has been generated.',
+  };
+
+  if (dev_reset_code) {
+    response.dev_reset_code = dev_reset_code;
+  }
+
+  return response;
+}
+
+async function verifyResetCode(email, code) {
+  if (!email || !code) {
+    throw new ValidationError('Email and code are required.');
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { email: email.toLowerCase().trim() },
+  });
+
+  validateStoredResetCode(user, code);
+
+  return {
+    message: 'Reset code verified.',
+    valid: true,
+  };
+}
+
+async function resetPassword(email, code, newPassword) {
+  if (!email || !code || !newPassword) {
+    throw new ValidationError('Email, code, and new_password are required.');
+  }
+
+  if (newPassword.length < 8) {
+    throw new ValidationError('New password must be at least 8 characters long.');
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { email: email.toLowerCase().trim() },
+  });
+
+  validateStoredResetCode(user, code);
+
+  const password_hash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      password_hash,
+      phone_otp: null,
+      phone_otp_expires_at: null,
+    },
+  });
+
+  logger.info(`Password reset completed for user: ${user.email}`);
+
+  return {
+    message: 'Password reset successfully.',
+  };
+}
+
 /**
  * Change user password.
  */
@@ -676,6 +765,24 @@ function sanitizeBusiness(business) {
   return safe;
 }
 
+function validateStoredResetCode(user, code) {
+  if (!user || user.auth_provider === 'Google') {
+    throw new ValidationError('Invalid or expired reset code.');
+  }
+
+  if (!user.phone_otp || !user.phone_otp_expires_at) {
+    throw new ValidationError('Invalid or expired reset code.');
+  }
+
+  if (new Date() > new Date(user.phone_otp_expires_at)) {
+    throw new ValidationError('Invalid or expired reset code.');
+  }
+
+  if (String(user.phone_otp).trim() !== String(code).trim()) {
+    throw new ValidationError('Invalid or expired reset code.');
+  }
+}
+
 /** Mask a phone number for display: +234 ** **** 3239 */
 function maskPhone(phone) {
   const digits = phone.replace(/\D/g, '');
@@ -690,6 +797,9 @@ module.exports = {
   googleSignup,
   signin,
   getUserById,
+  forgotPassword,
+  verifyResetCode,
+  resetPassword,
   changePassword,
   getInternalApiToken,
   verifyToken,

@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const jwt = require('jsonwebtoken');
 const { randomUUID } = require('node:crypto');
+const bcrypt = require('bcryptjs');
 const { PrismaClient } = require('@prisma/client');
 
 process.env.NODE_ENV = 'test';
@@ -47,10 +48,11 @@ async function requestJson(path, { method = 'GET', headers = {}, body } = {}) {
 
 async function createBusinessFixture(t, label) {
   const suffix = `${label}-${randomUUID().slice(0, 8)}`;
+  const password_hash = await bcrypt.hash('CurrentPass123', 4);
   const owner = await prisma.user.create({
     data: {
       email: `${suffix}@example.com`,
-      password_hash: 'hash',
+      password_hash,
       onboarding_step: 6,
       onboarding_completed: true,
     },
@@ -76,6 +78,25 @@ async function createBusinessFixture(t, label) {
     business,
     token: buildAuthToken(owner),
   };
+}
+
+async function createAuthOnlyUserFixture(t, label) {
+  const suffix = `${label}-${randomUUID().slice(0, 8)}`;
+  const password_hash = await bcrypt.hash('CurrentPass123', 4);
+  const user = await prisma.user.create({
+    data: {
+      email: `${suffix}@example.com`,
+      password_hash,
+      onboarding_step: 2,
+      onboarding_completed: false,
+    },
+  });
+
+  t.after(async () => {
+    await prisma.user.deleteMany({ where: { id: user.id } });
+  });
+
+  return user;
 }
 
 async function seedDashboardData(business, options = {}) {
@@ -382,7 +403,7 @@ test('dashboard summary reflects backend activity logs and internal call events'
 
   assert.equal(quoteCreateResponse.status, 201);
 
-  const internalEventResponse = await requestJson('/api/internal/events', {
+  const internalEventResponse = await requestJson('/api/internal/ai/events', {
     method: 'POST',
     headers: {
       'x-api-key': process.env.INTERNAL_API_KEY,
@@ -428,5 +449,242 @@ test('swagger docs expose the updated dashboard and internal activity schemas', 
     docsResponse.body.paths['/api/dashboard/summary'].get.responses['200'].content['application/json'].schema.$ref,
     '#/components/schemas/DashboardSummary'
   );
-  assert.ok(docsResponse.body.paths['/api/internal/events'].post);
+  assert.ok(docsResponse.body.paths['/api/internal/ai/events'].post);
+  assert.ok(docsResponse.body.paths['/api/auth/forgot-password'].post);
+  assert.ok(docsResponse.body.paths['/api/business/profile'].get);
+  assert.ok(docsResponse.body.paths['/api/conversations'].get);
+});
+
+test('auth reset flow verifies codes and allows sign-in with the new password', async (t) => {
+  const user = await createAuthOnlyUserFixture(t, 'reset-flow');
+
+  const forgotResponse = await requestJson('/api/auth/forgot-password', {
+    method: 'POST',
+    body: { email: user.email },
+  });
+
+  assert.equal(forgotResponse.status, 200);
+  assert.ok(forgotResponse.body.message.includes('If an account exists'));
+  assert.ok(forgotResponse.body.dev_reset_code);
+
+  const verifyFailResponse = await requestJson('/api/auth/verify-reset-code', {
+    method: 'POST',
+    body: { email: user.email, code: '00000' },
+  });
+
+  assert.equal(verifyFailResponse.status, 400);
+
+  const verifyResponse = await requestJson('/api/auth/verify-reset-code', {
+    method: 'POST',
+    body: { email: user.email, code: forgotResponse.body.dev_reset_code },
+  });
+
+  assert.equal(verifyResponse.status, 200);
+  assert.equal(verifyResponse.body.valid, true);
+
+  const resetResponse = await requestJson('/api/auth/reset-password', {
+    method: 'POST',
+    body: {
+      email: user.email,
+      code: forgotResponse.body.dev_reset_code,
+      new_password: 'BrandNewPass123',
+    },
+  });
+
+  assert.equal(resetResponse.status, 200);
+
+  const signinResponse = await requestJson('/api/auth/signin', {
+    method: 'POST',
+    body: { email: user.email, password: 'BrandNewPass123' },
+  });
+
+  assert.equal(signinResponse.status, 200);
+  assert.ok(signinResponse.body.token);
+});
+
+test('jobs and quotes list endpoints support team filters, search, and date ranges', async (t) => {
+  const fixture = await createBusinessFixture(t, 'team-filters');
+  const seeded = await seedDashboardData(fixture.business, { currentRevenue: 700, previousRevenue: 500 });
+  const futureDate = new Date(Date.now() + 4 * DAY_MS).toISOString();
+
+  const createdJob = await requestJson('/api/jobs', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${fixture.token}` },
+    body: {
+      business_id: fixture.business.id,
+      customer_id: seeded.secondaryCustomer.id,
+      assigned_staff_id: seeded.staff.travelingStaff.id,
+      title: 'Filterable HVAC Job',
+      service_type: 'HVAC Tune-Up',
+      address: '998 Filter Ave',
+      scheduled_start_time: futureDate,
+    },
+  });
+
+  assert.equal(createdJob.status, 201);
+
+  const createdQuote = await requestJson('/api/quotes', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${fixture.token}` },
+    body: {
+      business_id: fixture.business.id,
+      customer_id: seeded.secondaryCustomer.id,
+      assigned_staff_id: seeded.staff.travelingStaff.id,
+      title: 'Filterable Estimate',
+      description: 'Tune-up estimate',
+      scheduled_estimate_date: futureDate,
+    },
+  });
+
+  assert.equal(createdQuote.status, 201);
+
+  const jobsResponse = await requestJson(
+    `/api/jobs?business_id=${fixture.business.id}&assigned_staff_id=${seeded.staff.travelingStaff.id}&search=Filterable&start_date=${encodeURIComponent(new Date(Date.now() + 3 * DAY_MS).toISOString())}&end_date=${encodeURIComponent(new Date(Date.now() + 5 * DAY_MS).toISOString())}`,
+    {
+      headers: { Authorization: `Bearer ${fixture.token}` },
+    }
+  );
+
+  assert.equal(jobsResponse.status, 200);
+  assert.ok(jobsResponse.body.data.some((job) => job.title === 'Filterable HVAC Job'));
+
+  const quotesResponse = await requestJson(
+    `/api/quotes?business_id=${fixture.business.id}&assigned_staff_id=${seeded.staff.travelingStaff.id}&search=Filterable&start_date=${encodeURIComponent(new Date(Date.now() + 3 * DAY_MS).toISOString())}&end_date=${encodeURIComponent(new Date(Date.now() + 5 * DAY_MS).toISOString())}`,
+    {
+      headers: { Authorization: `Bearer ${fixture.token}` },
+    }
+  );
+
+  assert.equal(quotesResponse.status, 200);
+  assert.ok(quotesResponse.body.data.some((quote) => quote.title === 'Filterable Estimate'));
+});
+
+test('business settings, staff detail, and conversations expose frontend-ready data', async (t) => {
+  const fixture = await createBusinessFixture(t, 'settings-convo');
+  const seeded = await seedDashboardData(fixture.business, { currentRevenue: 500, previousRevenue: 250 });
+
+  const unauthorizedBusinessProfile = await requestJson(`/api/business/profile?business_id=${fixture.business.id}`);
+  assert.equal(unauthorizedBusinessProfile.status, 401);
+
+  const staffUpdateResponse = await requestJson(`/api/staff/${seeded.staff.travelingStaff.id}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${fixture.token}` },
+    body: { check_in_frequency_hours: 2 },
+  });
+
+  assert.equal(staffUpdateResponse.status, 200);
+  assert.equal(staffUpdateResponse.body.check_in_frequency_hours, 2);
+
+  const staffListResponse = await requestJson(`/api/staff?business_id=${fixture.business.id}`, {
+    headers: { Authorization: `Bearer ${fixture.token}` },
+  });
+
+  assert.equal(staffListResponse.status, 200);
+  assert.ok(staffListResponse.body.some((staff) => staff.has_open_timesheet === true));
+  assert.ok(staffListResponse.body.some((staff) => staff.active_job_summary));
+
+  const businessProfileResponse = await requestJson(`/api/business/profile?business_id=${fixture.business.id}`, {
+    headers: { Authorization: `Bearer ${fixture.token}` },
+  });
+
+  assert.equal(businessProfileResponse.status, 200);
+  assert.equal(businessProfileResponse.body.business_id, fixture.business.id);
+
+  const businessAlertsResponse = await requestJson('/api/business/alerts', {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${fixture.token}` },
+    body: {
+      business_id: fixture.business.id,
+      settings: {
+        missed_calls: false,
+        overdue_invoices: true,
+      },
+    },
+  });
+
+  assert.equal(businessAlertsResponse.status, 200);
+  assert.equal(businessAlertsResponse.body.settings.missed_calls, false);
+
+  const businessAutomationResponse = await requestJson('/api/business/automation', {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${fixture.token}` },
+    body: {
+      business_id: fixture.business.id,
+      payment_interval: 'weekly',
+      payment_follow_up_days: ['1', '3'],
+      settings: {
+        default_check_in_frequency_hours: 3,
+      },
+    },
+  });
+
+  assert.equal(businessAutomationResponse.status, 200);
+  assert.equal(businessAutomationResponse.body.settings.payment_interval, 'weekly');
+  assert.equal(businessAutomationResponse.body.settings.default_check_in_frequency_hours, 3);
+
+  const businessCommunicationResponse = await requestJson('/api/business/communication', {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${fixture.token}` },
+    body: {
+      business_id: fixture.business.id,
+      ai_receptionist_name: 'Aji',
+      settings: {
+        send_job_updates: false,
+      },
+    },
+  });
+
+  assert.equal(businessCommunicationResponse.status, 200);
+  assert.equal(businessCommunicationResponse.body.settings.ai_receptionist_name, 'Aji');
+  assert.equal(businessCommunicationResponse.body.settings.send_job_updates, false);
+
+  const callEventResponse = await requestJson('/api/internal/ai/events', {
+    method: 'POST',
+    headers: {
+      'x-api-key': process.env.INTERNAL_API_KEY,
+      'x-business-token': fixture.business.internal_api_token,
+    },
+    body: {
+      business_id: fixture.business.id,
+      customer_id: seeded.customer.id,
+      event_type: 'call.missed',
+      title: 'Missed call from Sarah Johnson',
+    },
+  });
+
+  assert.equal(callEventResponse.status, 201);
+
+  const smsEventResponse = await requestJson('/api/internal/ai/events', {
+    method: 'POST',
+    headers: {
+      'x-api-key': process.env.INTERNAL_API_KEY,
+      'x-business-token': fixture.business.internal_api_token,
+    },
+    body: {
+      business_id: fixture.business.id,
+      customer_id: seeded.customer.id,
+      event_type: 'sms.outbound_sent',
+      title: 'Sent appointment confirmation',
+    },
+  });
+
+  assert.equal(smsEventResponse.status, 201);
+
+  const conversationListResponse = await requestJson(`/api/conversations?business_id=${fixture.business.id}`, {
+    headers: { Authorization: `Bearer ${fixture.token}` },
+  });
+
+  assert.equal(conversationListResponse.status, 200);
+  assert.ok(conversationListResponse.body.data.some((item) => item.customer_id === seeded.customer.id));
+
+  const conversationDetailResponse = await requestJson(
+    `/api/conversations/${seeded.customer.id}?business_id=${fixture.business.id}`,
+    {
+      headers: { Authorization: `Bearer ${fixture.token}` },
+    }
+  );
+
+  assert.equal(conversationDetailResponse.status, 200);
+  assert.ok(conversationDetailResponse.body.entries.some((entry) => entry.event_type === 'call.missed'));
+  assert.ok(conversationDetailResponse.body.entries.some((entry) => entry.event_type === 'sms.outbound_sent'));
 });

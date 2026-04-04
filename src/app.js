@@ -25,6 +25,8 @@ const followUpRoutes = require('./api/routes/follow_ups.routes');
 const teamCheckinRoutes = require('./api/routes/team_checkins.routes');
 const bookkeepingRoutes = require('./api/routes/bookkeeping.routes');
 const aiLogsRoutes = require('./api/routes/ai_logs.routes');
+const businessRoutes = require('./api/routes/business.routes');
+const conversationRoutes = require('./api/routes/conversations.routes');
 
 // Middleware imports
 const { errorHandler, notFoundHandler } = require('./api/middlewares/error.middleware');
@@ -190,6 +192,8 @@ app.use('/api/follow-ups', followUpRoutes);
 app.use('/api/team-checkins', teamCheckinRoutes);
 app.use('/api/bookkeeping', bookkeepingRoutes);
 app.use('/api/ai-logs', aiLogsRoutes);
+app.use('/api/business', businessRoutes);
+app.use('/api/conversations', conversationRoutes);
 
 // ============================================
 // Error Handling

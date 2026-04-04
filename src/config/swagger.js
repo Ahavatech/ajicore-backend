@@ -105,6 +105,50 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             internal_api_token: { type: 'string' },
           },
         },
+        AuthForgotPasswordInput: {
+          type: 'object',
+          required: ['email'],
+          properties: {
+            email: { type: 'string', format: 'email' },
+          },
+        },
+        AuthForgotPasswordResponse: {
+          type: 'object',
+          properties: {
+            message: { type: 'string' },
+            dev_reset_code: { type: 'string', nullable: true },
+          },
+        },
+        AuthVerifyResetCodeInput: {
+          type: 'object',
+          required: ['email', 'code'],
+          properties: {
+            email: { type: 'string', format: 'email' },
+            code: { type: 'string' },
+          },
+        },
+        AuthVerifyResetCodeResponse: {
+          type: 'object',
+          properties: {
+            message: { type: 'string' },
+            valid: { type: 'boolean' },
+          },
+        },
+        AuthResetPasswordInput: {
+          type: 'object',
+          required: ['email', 'code', 'new_password'],
+          properties: {
+            email: { type: 'string', format: 'email' },
+            code: { type: 'string' },
+            new_password: { type: 'string', minLength: 8 },
+          },
+        },
+        AuthResetPasswordResponse: {
+          type: 'object',
+          properties: {
+            message: { type: 'string' },
+          },
+        },
         Customer: {
           type: 'object',
           properties: {
@@ -365,6 +409,422 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             createdAt: { type: 'string', format: 'date-time' },
           },
         },
+        InternalEventTypeListResponse: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'array',
+              items: { type: 'string' },
+            },
+          },
+        },
+        AIBridgeWebhookResponse: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: true },
+            business_id: { type: 'string', format: 'uuid' },
+            customer_id: { type: 'string', format: 'uuid', nullable: true },
+            reply: { type: 'string', nullable: true },
+            status: { type: 'string', nullable: true },
+            call_sid: { type: 'string', nullable: true },
+            data: {
+              type: 'object',
+              additionalProperties: true,
+              nullable: true,
+            },
+          },
+        },
+        AIBridgeInboundSmsInput: {
+          type: 'object',
+          properties: {
+            from: { type: 'string', example: '+15550101010' },
+            to: { type: 'string', example: '+15551234567' },
+            message: { type: 'string', example: 'Need help with my AC' },
+            From: { type: 'string', example: '+15550101010' },
+            To: { type: 'string', example: '+15551234567' },
+            Body: { type: 'string', example: 'Need help with my AC' },
+          },
+        },
+        AIBridgeInboundCallInput: {
+          type: 'object',
+          properties: {
+            from: { type: 'string', example: '+15550101010' },
+            to: { type: 'string', example: '+15551234567' },
+            call_sid: { type: 'string', example: 'CA123' },
+            status: { type: 'string', example: 'ringing' },
+            intent: { type: 'string', example: 'schedule_service' },
+            transcript: { type: 'string', nullable: true },
+            recording_url: { type: 'string', nullable: true },
+            duration_seconds: { type: 'integer', nullable: true },
+            outcome: { type: 'string', nullable: true },
+            From: { type: 'string', example: '+15550101010' },
+            To: { type: 'string', example: '+15551234567' },
+            CallSid: { type: 'string', example: 'CA123' },
+            CallStatus: { type: 'string', example: 'ringing' },
+          },
+        },
+        AIBridgeCallStatusInput: {
+          allOf: [
+            { $ref: '#/components/schemas/AIBridgeInboundCallInput' },
+          ],
+        },
+        AIBusinessConfigResponse: {
+          type: 'object',
+          properties: {
+            business: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                name: { type: 'string' },
+                industry: { type: 'string', nullable: true },
+                business_hours: {
+                  type: 'object',
+                  additionalProperties: true,
+                  nullable: true,
+                },
+                timezone: { type: 'string', nullable: true },
+                company_phone: { type: 'string', nullable: true },
+                owner_phone: { type: 'string', nullable: true },
+                dedicated_phone_number: { type: 'string', nullable: true },
+                ai_phone_number: { type: 'string', nullable: true },
+                ai_receptionist_name: { type: 'string', nullable: true },
+                voice_gender: { type: 'string', nullable: true },
+                ai_business_description: { type: 'string', nullable: true },
+                home_base_zip: { type: 'string', nullable: true },
+                service_radius_miles: { type: 'number', nullable: true },
+                cost_per_mile_over_radius: { type: 'number', nullable: true },
+                service_area_description: { type: 'string', nullable: true },
+                unknown_service_handling: { type: 'string', nullable: true },
+                unknown_service_call_fee: { type: 'number', nullable: true },
+                quote_expiry_days: { type: 'integer', nullable: true },
+                payment_follow_up_days: {
+                  type: 'array',
+                  items: { type: 'string' },
+                },
+                payment_interval: { type: 'string', nullable: true },
+                alert_settings: { $ref: '#/components/schemas/BusinessAlertSettings' },
+                automation_settings: { $ref: '#/components/schemas/BusinessAutomationSettings' },
+                communication_settings: { $ref: '#/components/schemas/BusinessCommunicationSettings' },
+              },
+            },
+            service_categories: {
+              type: 'array',
+              items: {
+                type: 'object',
+                additionalProperties: true,
+              },
+            },
+            price_book: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/PriceBookItem' },
+            },
+          },
+        },
+        AIPriceLookupResponse: {
+          type: 'object',
+          properties: {
+            items: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/PriceBookItem' },
+            },
+            unknown_service_handling: { type: 'string', nullable: true },
+            unknown_service_call_fee: { type: 'number', nullable: true },
+          },
+        },
+        AIBookCustomerInput: {
+          type: 'object',
+          properties: {
+            first_name: { type: 'string' },
+            last_name: { type: 'string' },
+            phone_number: { type: 'string' },
+            email: { type: 'string', format: 'email', nullable: true },
+            address: { type: 'string', nullable: true },
+            zip_code: { type: 'string', nullable: true },
+            notes: { type: 'string', nullable: true },
+          },
+        },
+        AIBookingInput: {
+          type: 'object',
+          required: ['business_id', 'booking_type'],
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            booking_type: { type: 'string', enum: ['Quote', 'Job', 'ServiceCall'] },
+            customer_id: { type: 'string', format: 'uuid', nullable: true },
+            customer: { $ref: '#/components/schemas/AIBookCustomerInput' },
+            assigned_staff_id: { type: 'string', format: 'uuid', nullable: true },
+            service_name: { type: 'string', nullable: true },
+            service_type: { type: 'string', nullable: true },
+            address: { type: 'string', nullable: true },
+            price_book_item_id: { type: 'string', format: 'uuid', nullable: true },
+            service_call_fee: { type: 'number', nullable: true },
+            scheduled_start_time: { type: 'string', format: 'date-time', nullable: true },
+            scheduled_end_time: { type: 'string', format: 'date-time', nullable: true },
+            is_emergency: { type: 'boolean', nullable: true },
+            notes: { type: 'string', nullable: true },
+          },
+        },
+        AIBookingResponse: {
+          type: 'object',
+          properties: {
+            booking_type: { type: 'string', enum: ['Quote', 'Job', 'ServiceCall'] },
+            result: {
+              type: 'object',
+              additionalProperties: true,
+            },
+            automation: {
+              type: 'object',
+              properties: {
+                follow_up: {
+                  type: 'object',
+                  additionalProperties: true,
+                  nullable: true,
+                },
+                team_checkin: {
+                  type: 'object',
+                  additionalProperties: true,
+                  nullable: true,
+                },
+              },
+            },
+          },
+        },
+        BusinessProfile: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            industry: { type: 'string' },
+            business_structure: { type: 'string' },
+            company_email: { type: 'string' },
+            company_type: { type: 'string' },
+            company_phone: { type: 'string' },
+            owner_phone: { type: 'string' },
+            street: { type: 'string' },
+            city: { type: 'string' },
+            postal_code: { type: 'string' },
+            country: { type: 'string' },
+            logo_url: { type: 'string' },
+            timezone: { type: 'string' },
+            business_hours: {
+              type: 'object',
+              additionalProperties: true,
+            },
+            service_area_description: { type: 'string' },
+            home_base_zip: { type: 'string' },
+            service_radius_miles: { type: 'number', nullable: true },
+            cost_per_mile_over_radius: { type: 'number', nullable: true },
+            dedicated_phone_number: { type: 'string' },
+            ai_phone_number: { type: 'string' },
+            ai_phone_country: { type: 'string' },
+            ai_phone_area_code: { type: 'string' },
+            ai_receptionist_name: { type: 'string' },
+            voice_gender: { type: 'string', nullable: true },
+            ai_business_description: { type: 'string' },
+            unknown_service_handling: { type: 'string' },
+            unknown_service_call_fee: { type: 'number', nullable: true },
+          },
+        },
+        BusinessProfileResponse: {
+          type: 'object',
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            profile: { $ref: '#/components/schemas/BusinessProfile' },
+          },
+        },
+        BusinessProfileUpdateInput: {
+          type: 'object',
+          required: ['business_id'],
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            profile: {
+              type: 'object',
+              additionalProperties: true,
+              nullable: true,
+            },
+            name: { type: 'string' },
+            industry: { type: 'string' },
+            business_structure: { type: 'string' },
+            company_email: { type: 'string' },
+            company_phone: { type: 'string' },
+            owner_phone: { type: 'string' },
+            street: { type: 'string' },
+            city: { type: 'string' },
+            postal_code: { type: 'string' },
+            country: { type: 'string' },
+            logo_url: { type: 'string' },
+            timezone: { type: 'string' },
+            business_hours: {
+              type: 'object',
+              additionalProperties: true,
+            },
+            service_area_description: { type: 'string' },
+            home_base_zip: { type: 'string' },
+            service_radius_miles: { type: 'number' },
+            cost_per_mile_over_radius: { type: 'number' },
+            dedicated_phone_number: { type: 'string' },
+            ai_phone_number: { type: 'string' },
+            ai_phone_country: { type: 'string' },
+            ai_phone_area_code: { type: 'string' },
+            ai_receptionist_name: { type: 'string' },
+            voice_gender: { type: 'string' },
+            ai_business_description: { type: 'string' },
+            unknown_service_handling: { type: 'string' },
+            unknown_service_call_fee: { type: 'number' },
+          },
+        },
+        BusinessAlertSettings: {
+          type: 'object',
+          properties: {
+            missed_calls: { type: 'boolean' },
+            inbound_sms: { type: 'boolean' },
+            failed_checkins: { type: 'boolean' },
+            overdue_invoices: { type: 'boolean' },
+            expiring_quotes: { type: 'boolean' },
+          },
+        },
+        BusinessAlertSettingsResponse: {
+          type: 'object',
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            settings: { $ref: '#/components/schemas/BusinessAlertSettings' },
+          },
+        },
+        BusinessAlertSettingsUpdateInput: {
+          type: 'object',
+          required: ['business_id'],
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            settings: { $ref: '#/components/schemas/BusinessAlertSettings' },
+          },
+        },
+        BusinessAutomationSettings: {
+          type: 'object',
+          properties: {
+            team_checkins_enabled: { type: 'boolean' },
+            invoice_reminders_enabled: { type: 'boolean' },
+            quote_follow_ups_enabled: { type: 'boolean' },
+            default_check_in_frequency_hours: { type: 'number' },
+            quote_expiry_days: { type: 'integer' },
+            payment_follow_up_days: {
+              type: 'array',
+              items: { type: 'string' },
+            },
+            payment_interval: { type: 'string' },
+          },
+        },
+        BusinessAutomationSettingsResponse: {
+          type: 'object',
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            settings: { $ref: '#/components/schemas/BusinessAutomationSettings' },
+          },
+        },
+        BusinessAutomationSettingsUpdateInput: {
+          type: 'object',
+          required: ['business_id'],
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            settings: { $ref: '#/components/schemas/BusinessAutomationSettings' },
+            quote_expiry_days: { type: 'integer' },
+            payment_follow_up_days: {
+              type: 'array',
+              items: { type: 'string' },
+            },
+            payment_interval: { type: 'string' },
+          },
+        },
+        BusinessCommunicationSettings: {
+          type: 'object',
+          properties: {
+            send_booking_confirmations: { type: 'boolean' },
+            send_job_updates: { type: 'boolean' },
+            send_invoice_reminders: { type: 'boolean' },
+            missed_call_text_back: { type: 'boolean' },
+            ai_receptionist_name: { type: 'string' },
+            voice_gender: { type: 'string', nullable: true },
+            ai_business_description: { type: 'string' },
+            unknown_service_handling: { type: 'string' },
+            unknown_service_call_fee: { type: 'number', nullable: true },
+          },
+        },
+        BusinessCommunicationSettingsResponse: {
+          type: 'object',
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            settings: { $ref: '#/components/schemas/BusinessCommunicationSettings' },
+          },
+        },
+        BusinessCommunicationSettingsUpdateInput: {
+          type: 'object',
+          required: ['business_id'],
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            settings: { $ref: '#/components/schemas/BusinessCommunicationSettings' },
+            ai_receptionist_name: { type: 'string' },
+            voice_gender: { type: 'string' },
+            ai_business_description: { type: 'string' },
+            unknown_service_handling: { type: 'string' },
+            unknown_service_call_fee: { type: 'number' },
+          },
+        },
+        ConversationCustomerSummary: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+            phone_number: { type: 'string' },
+            email: { type: 'string' },
+          },
+        },
+        ConversationListItem: {
+          type: 'object',
+          properties: {
+            customer_id: { type: 'string', format: 'uuid' },
+            customer: { $ref: '#/components/schemas/ConversationCustomerSummary' },
+            latest_activity_title: { type: 'string' },
+            latest_timestamp: { type: 'string', format: 'date-time' },
+            dominant_channel: { type: 'string', enum: ['call', 'sms'] },
+            total_events: { type: 'integer' },
+          },
+        },
+        ConversationListResponse: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/ConversationListItem' },
+            },
+            total: { type: 'integer' },
+            page: { type: 'integer' },
+            limit: { type: 'integer' },
+            totalPages: { type: 'integer' },
+          },
+        },
+        ConversationEntry: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            channel: { type: 'string', enum: ['call', 'sms'] },
+            event_type: { type: 'string' },
+            title: { type: 'string' },
+            actor: { type: 'string' },
+            timestamp: { type: 'string', format: 'date-time' },
+            error: { type: 'string', nullable: true },
+            details: {
+              type: 'object',
+              additionalProperties: true,
+            },
+          },
+        },
+        ConversationDetailResponse: {
+          type: 'object',
+          properties: {
+            customer: { $ref: '#/components/schemas/ConversationCustomerSummary' },
+            entries: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/ConversationEntry' },
+            },
+          },
+        },
         Error: {
           type: 'object',
           properties: {
@@ -395,6 +855,8 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
       { name: 'Fleet', description: 'Vehicle and fleet management' },
       { name: 'Staff', description: 'Staff, timesheets, and payroll' },
       { name: 'Dashboard', description: 'Analytics and reporting' },
+      { name: 'Business', description: 'Business profile and settings' },
+      { name: 'Conversations', description: 'Customer call and SMS history' },
       { name: 'AI Bridge', description: 'Internal AI service API (x-api-key required; business-scoped routes also require x-business-token)' },
     ],
   },

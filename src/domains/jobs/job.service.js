@@ -19,12 +19,77 @@ function buildJobLabel(job) {
   return job.service_type || job.title || job.type || 'Service Job';
 }
 
-async function getJobs({ business_id, status, type, customer_id, page = 1, limit = 20 }) {
+async function getJobs({
+  business_id,
+  status,
+  type,
+  customer_id,
+  assigned_staff_id,
+  start_date,
+  end_date,
+  search,
+  page = 1,
+  limit = 20,
+}) {
   const where = {};
   if (business_id) where.business_id = business_id;
   if (status) where.status = status;
   if (type) where.type = type;
   if (customer_id) where.customer_id = customer_id;
+  if (assigned_staff_id) where.assigned_staff_id = assigned_staff_id;
+
+  const andClauses = [];
+
+  if (start_date || end_date) {
+    const scheduledRange = {};
+    const fallbackCreatedRange = {};
+
+    if (start_date) {
+      const start = new Date(start_date);
+      scheduledRange.gte = start;
+      fallbackCreatedRange.gte = start;
+    }
+
+    if (end_date) {
+      const end = new Date(end_date);
+      scheduledRange.lte = end;
+      fallbackCreatedRange.lte = end;
+    }
+
+    andClauses.push({
+      OR: [
+        { scheduled_start_time: scheduledRange },
+        {
+          AND: [
+            { scheduled_start_time: null },
+            { createdAt: fallbackCreatedRange },
+          ],
+        },
+      ],
+    });
+  }
+
+  if (search) {
+    andClauses.push({
+      OR: [
+        { title: { contains: search, mode: 'insensitive' } },
+        { service_type: { contains: search, mode: 'insensitive' } },
+        { address: { contains: search, mode: 'insensitive' } },
+        {
+          customer: {
+            OR: [
+              { first_name: { contains: search, mode: 'insensitive' } },
+              { last_name: { contains: search, mode: 'insensitive' } },
+            ],
+          },
+        },
+      ],
+    });
+  }
+
+  if (andClauses.length > 0) {
+    where.AND = andClauses;
+  }
 
   const skip = (page - 1) * limit;
   const [data, total] = await Promise.all([
@@ -68,6 +133,8 @@ async function createJob(data) {
       job_details: data.job_details || null,
       price_book_item_id: data.price_book_item_id || null,
       service_call_fee: data.service_call_fee ?? null,
+      address: data.address || null,
+      service_type: data.service_type || null,
       scheduled_start_time: data.scheduled_start_time ? new Date(data.scheduled_start_time) : null,
       scheduled_end_time: data.scheduled_end_time ? new Date(data.scheduled_end_time) : null,
       is_emergency: data.is_emergency ?? false,
@@ -110,7 +177,7 @@ async function createJob(data) {
 async function updateJob(id, data) {
   const updateData = {};
   const scalarFields = ['assigned_staff_id', 'status', 'title', 'job_details',
-    'price_book_item_id', 'service_call_fee', 'is_emergency', 'photos_urls'];
+    'price_book_item_id', 'service_call_fee', 'is_emergency', 'photos_urls', 'address', 'service_type', 'type'];
   scalarFields.forEach((f) => { if (data[f] !== undefined) updateData[f] = data[f]; });
   if (data.scheduled_start_time) updateData.scheduled_start_time = new Date(data.scheduled_start_time);
   if (data.scheduled_end_time) updateData.scheduled_end_time = new Date(data.scheduled_end_time);

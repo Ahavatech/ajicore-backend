@@ -5,9 +5,29 @@ const quoteService = require('./quote.service');
 
 async function getAll(req, res, next) {
   try {
-    const { business_id, status, customer_id, page = 1, limit = 20 } = req.query;
+    const {
+      business_id,
+      status,
+      customer_id,
+      assigned_staff_id,
+      start_date,
+      end_date,
+      search,
+      page = 1,
+      limit = 20,
+    } = req.query;
     if (!business_id) return res.status(400).json({ error: 'business_id is required' });
-    const result = await quoteService.getQuotes({ business_id, status, customer_id, page: +page, limit: +limit });
+    const result = await quoteService.getQuotes({
+      business_id,
+      status,
+      customer_id,
+      assigned_staff_id,
+      start_date,
+      end_date,
+      search,
+      page: +page,
+      limit: +limit,
+    });
     res.json(result);
   } catch (err) { next(err); }
 }

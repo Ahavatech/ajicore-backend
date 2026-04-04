@@ -5,7 +5,7 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-async function getCheckins({ business_id, job_id, staff_id, status, page = 1, limit = 20 }) {
+async function getCheckins({ business_id, job_id, staff_id, status, start_date, end_date, page = 1, limit = 20 }) {
   const parsedPage = Math.max(1, parseInt(page) || 1);
   const parsedLimit = Math.min(100, Math.max(1, parseInt(limit) || 20));
 
@@ -15,6 +15,11 @@ async function getCheckins({ business_id, job_id, staff_id, status, page = 1, li
   if (job_id) where.job_id = job_id;
   if (staff_id) where.staff_id = staff_id;
   if (status) where.status = status;
+  if (start_date || end_date) {
+    where.scheduled_at = {};
+    if (start_date) where.scheduled_at.gte = new Date(start_date);
+    if (end_date) where.scheduled_at.lte = new Date(end_date);
+  }
 
   const skip = (parsedPage - 1) * parsedLimit;
   const [data, total] = await Promise.all([

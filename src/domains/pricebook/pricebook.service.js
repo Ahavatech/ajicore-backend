@@ -115,16 +115,34 @@ async function deletePriceBookItem(id) {
  * Lookup price book item for AI call flow.
  * Returns pricing info for a given service name.
  */
-async function lookupForAI(businessId, serviceQuery) {
-  const items = await prisma.priceBookItem.findMany({
-    where: {
-      business_id: businessId,
-      is_active: true,
-      name: { contains: serviceQuery, mode: 'insensitive' },
-    },
+async function lookupForAI(businessId, options = {}) {
+  const {
+    query,
+    category_id,
+    can_quote_phone,
+    limit = 20,
+  } = typeof options === 'string' ? { query: options } : options;
+
+  const where = {
+    business_id: businessId,
+    is_active: true,
+  };
+
+  if (category_id) where.category_id = category_id;
+  if (can_quote_phone !== undefined) where.can_quote_phone = can_quote_phone === true || can_quote_phone === 'true';
+  if (query) {
+    where.OR = [
+      { name: { contains: query, mode: 'insensitive' } },
+      { description: { contains: query, mode: 'insensitive' } },
+    ];
+  }
+
+  return prisma.priceBookItem.findMany({
+    where,
+    take: Math.min(100, Math.max(1, parseInt(limit, 10) || 20)),
     include: { category: true },
+    orderBy: { usage_count: 'desc' },
   });
-  return items;
 }
 
 /**

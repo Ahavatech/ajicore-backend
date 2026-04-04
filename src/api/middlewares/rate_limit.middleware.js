@@ -41,6 +41,10 @@ function rateLimit(options = {}) {
   } = options;
 
   return (req, res, next) => {
+    if (process.env.NODE_ENV === 'test') {
+      return next();
+    }
+
     const key = keyGenerator(req);
     const now = Date.now();
 
@@ -203,7 +207,10 @@ function getRateLimitStats() {
 }
 
 // Auto-cleanup every 30 minutes
-setInterval(cleanupRateLimitStore, 30 * 60 * 1000);
+const cleanupInterval = setInterval(cleanupRateLimitStore, 30 * 60 * 1000);
+if (typeof cleanupInterval.unref === 'function') {
+  cleanupInterval.unref();
+}
 
 module.exports = {
   rateLimit,

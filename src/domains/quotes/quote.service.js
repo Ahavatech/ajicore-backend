@@ -14,10 +14,73 @@ function buildCustomerName(customer) {
   return fullName || 'Unknown Customer';
 }
 
-async function getQuotes({ business_id, status, customer_id, page = 1, limit = 20 }) {
+async function getQuotes({
+  business_id,
+  status,
+  customer_id,
+  assigned_staff_id,
+  start_date,
+  end_date,
+  search,
+  page = 1,
+  limit = 20,
+}) {
   const where = { business_id };
   if (status) where.status = status;
   if (customer_id) where.customer_id = customer_id;
+  if (assigned_staff_id) where.assigned_staff_id = assigned_staff_id;
+
+  const andClauses = [];
+
+  if (start_date || end_date) {
+    const scheduledRange = {};
+    const fallbackCreatedRange = {};
+
+    if (start_date) {
+      const start = new Date(start_date);
+      scheduledRange.gte = start;
+      fallbackCreatedRange.gte = start;
+    }
+
+    if (end_date) {
+      const end = new Date(end_date);
+      scheduledRange.lte = end;
+      fallbackCreatedRange.lte = end;
+    }
+
+    andClauses.push({
+      OR: [
+        { scheduled_estimate_date: scheduledRange },
+        {
+          AND: [
+            { scheduled_estimate_date: null },
+            { createdAt: fallbackCreatedRange },
+          ],
+        },
+      ],
+    });
+  }
+
+  if (search) {
+    andClauses.push({
+      OR: [
+        { title: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+        {
+          customer: {
+            OR: [
+              { first_name: { contains: search, mode: 'insensitive' } },
+              { last_name: { contains: search, mode: 'insensitive' } },
+            ],
+          },
+        },
+      ],
+    });
+  }
+
+  if (andClauses.length > 0) {
+    where.AND = andClauses;
+  }
 
   const skip = (page - 1) * limit;
   const [data, total] = await Promise.all([
