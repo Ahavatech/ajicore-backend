@@ -3,13 +3,12 @@
  * Validates API keys and JWT tokens for route protection.
  */
 const crypto = require('crypto');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../../lib/prisma');
 const env = require('../../config/env');
 const logger = require('../../utils/logger');
 const { verifyToken } = require('../../domains/auth/auth.service');
 const { AuthorizationError, NotFoundError, ValidationError } = require('../../utils/errors');
 
-const prisma = new PrismaClient();
 
 const resourceResolvers = {
   customer: (id) => prisma.customer.findUnique({ where: { id }, select: { id: true, business_id: true } }),

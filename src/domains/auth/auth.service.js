@@ -14,8 +14,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { randomUUID } = require('crypto');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../lib/prisma');
 const env = require('../../config/env');
 const logger = require('../../utils/logger');
 const { ValidationError, ConflictError, AuthenticationError, NotFoundError } = require('../../utils/errors');

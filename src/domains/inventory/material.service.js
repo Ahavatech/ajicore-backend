@@ -2,8 +2,7 @@
  * Material Service
  * Business logic for inventory tracking, stock deduction, and low-stock alerts.
  */
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../lib/prisma');
 const logger = require('../../utils/logger');
 
 async function getMaterials({ business_id, lowStock = false, page = 1, limit = 50 }) {

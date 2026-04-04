@@ -15,6 +15,11 @@ const {
   requireInternalResourceAccess,
 } = require('../middlewares/auth.middleware');
 const { requireFields } = require('../middlewares/validate.middleware');
+<<<<<<< HEAD
+=======
+const prisma = require('../../lib/prisma');
+
+>>>>>>> 6d5423ff8eb12b6157f081896d0405cb02652acc
 const jobController = require('../../domains/jobs/job.controller');
 const quoteController = require('../../domains/quotes/quote.controller');
 const materialController = require('../../domains/inventory/material.controller');

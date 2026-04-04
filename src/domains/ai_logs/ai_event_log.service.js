@@ -2,8 +2,7 @@
  * AI Event Log Service
  * Tracks all AI-driven actions for audit, debugging, and analytics.
  */
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../lib/prisma');
 
 async function getLogs({ business_id, event_type, job_id, customer_id, page = 1, limit = 50 }) {
   const parsedPage = Math.max(1, parseInt(page) || 1);

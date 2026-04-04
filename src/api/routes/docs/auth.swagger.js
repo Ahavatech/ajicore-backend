@@ -356,6 +356,9 @@
  *   post:
  *     tags: [Auth]
  *     summary: "Step 3: Provision an AI business phone number"
+ *     description: |
+ *       Matches the "Get Your AI Business Number" onboarding screen.
+ *       On success, the response includes `ai_phone_number` and advances to step 4.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -395,6 +398,9 @@
  *   post:
  *     tags: [Auth]
  *     summary: "Step 4: Service area setup"
+ *     description: |
+ *       Matches the service setup screen where the user provides home ZIP,
+ *       service radius, and per-mile overage pricing.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -422,6 +428,10 @@
  *   post:
  *     tags: [Auth]
  *     summary: "Step 5: Upload business logo (completes onboarding)"
+ *     description: |
+ *       Completes onboarding and returns the final success-state payload.
+ *       If step 3 provisioned an AI number, the response includes `ai_phone_number`;
+ *       otherwise that field is returned as `null`.
  *     security:
  *       - bearerAuth: []
  *     requestBody:

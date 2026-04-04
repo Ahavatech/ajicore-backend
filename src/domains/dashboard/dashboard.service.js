@@ -2,8 +2,7 @@
  * Dashboard Service
  * Builds frontend-ready dashboard responses from business data.
  */
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../../lib/prisma');
 const { ValidationError } = require('../../utils/errors');
 
 const PERIOD_TO_DAYS = {
