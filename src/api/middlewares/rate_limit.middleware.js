@@ -47,11 +47,7 @@ function rateLimit(options = {}) {
   } = options;
 
   return (req, res, next) => {
-<<<<<<< HEAD
-    if (process.env.NODE_ENV === 'test') {
-=======
     if (!isRateLimitingEnabled()) {
->>>>>>> 6d5423ff8eb12b6157f081896d0405cb02652acc
       return next();
     }
 
@@ -216,17 +212,10 @@ function getRateLimitStats() {
   };
 }
 
-<<<<<<< HEAD
-// Auto-cleanup every 30 minutes
-const cleanupInterval = setInterval(cleanupRateLimitStore, 30 * 60 * 1000);
-if (typeof cleanupInterval.unref === 'function') {
-  cleanupInterval.unref();
-=======
 // Auto-cleanup every 30 minutes without keeping the process alive.
 const cleanupTimer = setInterval(cleanupRateLimitStore, 30 * 60 * 1000);
 if (typeof cleanupTimer.unref === 'function') {
   cleanupTimer.unref();
->>>>>>> 6d5423ff8eb12b6157f081896d0405cb02652acc
 }
 
 module.exports = {
