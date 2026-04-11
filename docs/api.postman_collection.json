@@ -50,6 +50,10 @@
       "value": ""
     },
     {
+      "key": "exclude_job_id",
+      "value": ""
+    },
+    {
       "key": "id",
       "value": ""
     },
@@ -2585,6 +2589,12 @@
                   "value": "{{end_time}}",
                   "disabled": false,
                   "description": "Window end"
+                },
+                {
+                  "key": "exclude_job_id",
+                  "value": "{{exclude_job_id}}",
+                  "disabled": true,
+                  "description": "Optional job ID to exclude when editing/rescheduling"
                 }
               ]
             },

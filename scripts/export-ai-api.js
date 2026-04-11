@@ -334,6 +334,7 @@ const aiPaths = {
         queryParam('staff_id', 'Staff identifier', true, 'string', 'uuid'),
         queryParam('start_time', 'Window start', true),
         queryParam('end_time', 'Window end', true),
+        queryParam('exclude_job_id', 'Optional job ID to exclude when editing/rescheduling', false, 'string', 'uuid'),
       ],
       responses: { 200: jsonResponse('Availability result', genericObject) },
     },
