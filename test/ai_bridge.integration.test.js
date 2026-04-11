@@ -409,3 +409,101 @@ test('ai booking and price lookup support richer internal workflows and automati
   assert.equal(jobBooking.body.result.service_type, 'Emergency HVAC');
   assert.equal(jobBooking.body.result.address, '456 Elm St');
 });
+
+test('internal quote endpoints support the full AI bridge lifecycle', async (t) => {
+  const fixture = await createBusinessFixture(t, 'internal-quote-lifecycle');
+  const headers = {
+    'x-api-key': process.env.INTERNAL_API_KEY,
+    'x-business-token': fixture.business.internal_api_token,
+  };
+  const scheduledEstimateDate = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+  const scheduledJobStart = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString();
+
+  const createResponse = await request('/api/internal/ai/quotes', {
+    method: 'POST',
+    headers,
+    body: {
+      business_id: fixture.business.id,
+      customer_id: fixture.customer.id,
+      assigned_staff_id: fixture.staff.id,
+      title: 'Internal Lifecycle Quote',
+      description: 'Created from AI bridge',
+      scheduled_estimate_date: scheduledEstimateDate,
+    },
+  });
+
+  assert.equal(createResponse.status, 201);
+  const quoteId = createResponse.body.id;
+
+  const listResponse = await request(`/api/internal/ai/quotes?business_id=${fixture.business.id}&search=Internal%20Lifecycle`, {
+    headers,
+  });
+
+  assert.equal(listResponse.status, 200);
+  assert.ok(listResponse.body.data.some((quote) => quote.id === quoteId));
+
+  const getResponse = await request(`/api/internal/ai/quotes/${quoteId}`, { headers });
+  assert.equal(getResponse.status, 200);
+  assert.equal(getResponse.body.id, quoteId);
+
+  const updateResponse = await request(`/api/internal/ai/quotes/${quoteId}`, {
+    method: 'PATCH',
+    headers,
+    body: {
+      status: 'Draft',
+      total_amount: 499,
+      notes: 'Prepared for approval',
+    },
+  });
+
+  assert.equal(updateResponse.status, 200);
+  assert.equal(updateResponse.body.status, 'Draft');
+  assert.equal(updateResponse.body.total_amount, 499);
+
+  const sendResponse = await request(`/api/internal/ai/quotes/${quoteId}/send`, {
+    method: 'POST',
+    headers,
+  });
+
+  assert.equal(sendResponse.status, 200);
+  assert.equal(sendResponse.body.status, 'Sent');
+  assert.ok(sendResponse.body.expires_at);
+
+  const approveResponse = await request(`/api/internal/ai/quotes/${quoteId}/approve`, {
+    method: 'POST',
+    headers,
+    body: {
+      assigned_staff_id: fixture.staff.id,
+      title: 'Internal Converted Job',
+      job_details: 'Converted from AI approval',
+      scheduled_start_time: scheduledJobStart,
+    },
+  });
+
+  assert.equal(approveResponse.status, 200);
+  assert.equal(approveResponse.body.quote.status, 'Approved');
+  assert.equal(approveResponse.body.job.title, 'Internal Converted Job');
+
+  const declinedQuote = await request('/api/internal/ai/quotes', {
+    method: 'POST',
+    headers,
+    body: {
+      business_id: fixture.business.id,
+      customer_id: fixture.customer.id,
+      title: 'Internal Decline',
+    },
+  });
+
+  assert.equal(declinedQuote.status, 201);
+
+  const declineResponse = await request(`/api/internal/ai/quotes/${declinedQuote.body.id}/decline`, {
+    method: 'POST',
+    headers,
+    body: {
+      reason: 'Customer declined over phone',
+    },
+  });
+
+  assert.equal(declineResponse.status, 200);
+  assert.equal(declineResponse.body.status, 'Declined');
+});

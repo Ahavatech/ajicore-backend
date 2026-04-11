@@ -558,6 +558,134 @@ test('jobs and quotes list endpoints support team filters, search, and date rang
   assert.ok(quotesResponse.body.data.some((quote) => quote.title === 'Filterable Estimate'));
 });
 
+test('quotes endpoints support the full authenticated lifecycle', async (t) => {
+  const fixture = await createBusinessFixture(t, 'quotes-lifecycle');
+  const seeded = await seedDashboardData(fixture.business, { currentRevenue: 450, previousRevenue: 300 });
+  const authHeaders = { Authorization: `Bearer ${fixture.token}` };
+  const scheduledEstimateDate = new Date(Date.now() + 2 * DAY_MS).toISOString();
+  const scheduledJobStart = new Date(Date.now() + 3 * DAY_MS).toISOString();
+
+  const createResponse = await requestJson('/api/quotes', {
+    method: 'POST',
+    headers: authHeaders,
+    body: {
+      business_id: fixture.business.id,
+      customer_id: seeded.customer.id,
+      assigned_staff_id: seeded.staff.travelingStaff.id,
+      title: 'Lifecycle Estimate',
+      description: 'Initial walkthrough',
+      scheduled_estimate_date: scheduledEstimateDate,
+    },
+  });
+
+  assert.equal(createResponse.status, 201);
+  const createdQuoteId = createResponse.body.id;
+
+  const listResponse = await requestJson(`/api/quotes?business_id=${fixture.business.id}&search=Lifecycle`, {
+    headers: authHeaders,
+  });
+
+  assert.equal(listResponse.status, 200);
+  assert.ok(listResponse.body.data.some((quote) => quote.id === createdQuoteId));
+
+  const getResponse = await requestJson(`/api/quotes/${createdQuoteId}`, {
+    headers: authHeaders,
+  });
+
+  assert.equal(getResponse.status, 200);
+  assert.equal(getResponse.body.id, createdQuoteId);
+
+  const updateResponse = await requestJson(`/api/quotes/${createdQuoteId}`, {
+    method: 'PATCH',
+    headers: authHeaders,
+    body: {
+      status: 'Draft',
+      title: 'Lifecycle Estimate Draft',
+      total_amount: 325,
+      notes: 'Prepared after site visit',
+    },
+  });
+
+  assert.equal(updateResponse.status, 200);
+  assert.equal(updateResponse.body.status, 'Draft');
+  assert.equal(updateResponse.body.total_amount, 325);
+
+  const sendResponse = await requestJson(`/api/quotes/${createdQuoteId}/send`, {
+    method: 'POST',
+    headers: authHeaders,
+  });
+
+  assert.equal(sendResponse.status, 200);
+  assert.equal(sendResponse.body.status, 'Sent');
+  assert.ok(sendResponse.body.sent_at);
+  assert.ok(sendResponse.body.expires_at);
+
+  const approveResponse = await requestJson(`/api/quotes/${createdQuoteId}/approve`, {
+    method: 'POST',
+    headers: authHeaders,
+    body: {
+      assigned_staff_id: seeded.staff.travelingStaff.id,
+      title: 'Lifecycle Converted Job',
+      job_details: 'Approved by customer',
+      scheduled_start_time: scheduledJobStart,
+    },
+  });
+
+  assert.equal(approveResponse.status, 200);
+  assert.equal(approveResponse.body.quote.status, 'Approved');
+  assert.equal(approveResponse.body.job.title, 'Lifecycle Converted Job');
+  assert.equal(approveResponse.body.job.assigned_staff_id, seeded.staff.travelingStaff.id);
+
+  const declinedQuote = await requestJson('/api/quotes', {
+    method: 'POST',
+    headers: authHeaders,
+    body: {
+      business_id: fixture.business.id,
+      customer_id: seeded.secondaryCustomer.id,
+      title: 'Decline Me',
+    },
+  });
+
+  assert.equal(declinedQuote.status, 201);
+
+  const declineResponse = await requestJson(`/api/quotes/${declinedQuote.body.id}/decline`, {
+    method: 'POST',
+    headers: authHeaders,
+    body: {
+      reason: 'Customer chose another option',
+    },
+  });
+
+  assert.equal(declineResponse.status, 200);
+  assert.equal(declineResponse.body.status, 'Declined');
+  assert.match(declineResponse.body.notes, /Customer chose another option/);
+
+  const deletableQuote = await requestJson('/api/quotes', {
+    method: 'POST',
+    headers: authHeaders,
+    body: {
+      business_id: fixture.business.id,
+      customer_id: seeded.secondaryCustomer.id,
+      title: 'Delete Me',
+    },
+  });
+
+  assert.equal(deletableQuote.status, 201);
+
+  const deleteResponse = await requestJson(`/api/quotes/${deletableQuote.body.id}`, {
+    method: 'DELETE',
+    headers: authHeaders,
+  });
+
+  assert.equal(deleteResponse.status, 204);
+
+  const deletedFetchResponse = await requestJson(`/api/quotes/${deletableQuote.body.id}`, {
+    headers: authHeaders,
+  });
+
+  assert.equal(deletedFetchResponse.status, 404);
+});
+
 test('business settings, staff detail, and conversations expose frontend-ready data', async (t) => {
   const fixture = await createBusinessFixture(t, 'settings-convo');
   const seeded = await seedDashboardData(fixture.business, { currentRevenue: 500, previousRevenue: 250 });

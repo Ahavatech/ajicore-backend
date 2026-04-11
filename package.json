@@ -6,8 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "node --test --test-concurrency=1",
-    "export:ai-api": "node scripts/export-ai-api.js",
+    "test": "jest --runInBand",
+    "test:legacy": "node --test --test-concurrency=1",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
@@ -35,6 +35,7 @@
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
+    "jest": "^30.3.0",
     "nodemon": "^3.1.0",
     "prisma": "^6.19.2"
   }
