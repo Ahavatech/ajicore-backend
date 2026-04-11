@@ -1,0 +1,2820 @@
+{
+  "info": {
+    "name": "Ajicore AI Integration API",
+    "description": "AI-focused Postman collection generated from the Ajicore internal AI OpenAPI spec.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "assigned_staff_id",
+      "value": ""
+    },
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "businessToken",
+      "value": ""
+    },
+    {
+      "key": "business_id",
+      "value": ""
+    },
+    {
+      "key": "can_quote_phone",
+      "value": ""
+    },
+    {
+      "key": "category_id",
+      "value": ""
+    },
+    {
+      "key": "channel",
+      "value": ""
+    },
+    {
+      "key": "customer_id",
+      "value": ""
+    },
+    {
+      "key": "end_date",
+      "value": ""
+    },
+    {
+      "key": "end_time",
+      "value": ""
+    },
+    {
+      "key": "event_type",
+      "value": ""
+    },
+    {
+      "key": "id",
+      "value": ""
+    },
+    {
+      "key": "internalApiKey",
+      "value": ""
+    },
+    {
+      "key": "invoiceId",
+      "value": ""
+    },
+    {
+      "key": "job_id",
+      "value": ""
+    },
+    {
+      "key": "limit",
+      "value": ""
+    },
+    {
+      "key": "page",
+      "value": ""
+    },
+    {
+      "key": "period",
+      "value": ""
+    },
+    {
+      "key": "phone",
+      "value": ""
+    },
+    {
+      "key": "search",
+      "value": ""
+    },
+    {
+      "key": "service",
+      "value": ""
+    },
+    {
+      "key": "staff_id",
+      "value": ""
+    },
+    {
+      "key": "start_date",
+      "value": ""
+    },
+    {
+      "key": "start_time",
+      "value": ""
+    },
+    {
+      "key": "status",
+      "value": ""
+    },
+    {
+      "key": "type",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "AI Tools",
+      "item": [
+        {
+          "name": "GET Lookup services for AI quoting logic",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/price-lookup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "price-lookup"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{business_id}}",
+                  "disabled": false,
+                  "description": "Business identifier"
+                },
+                {
+                  "key": "search",
+                  "value": "{{search}}",
+                  "disabled": true,
+                  "description": "Search text"
+                },
+                {
+                  "key": "service",
+                  "value": "{{service}}",
+                  "disabled": true,
+                  "description": "Alternative search text"
+                },
+                {
+                  "key": "category_id",
+                  "value": "{{category_id}}",
+                  "disabled": true,
+                  "description": "Category filter"
+                },
+                {
+                  "key": "can_quote_phone",
+                  "value": "{{can_quote_phone}}",
+                  "disabled": true,
+                  "description": "Filter phone-quotable services"
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true,
+                  "description": "Max items"
+                }
+              ]
+            },
+            "description": "Lookup services for AI quoting logic"
+          }
+        },
+        {
+          "name": "POST Check whether a customer zip is inside service radius",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/radius-check",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "radius-check"
+              ],
+              "query": []
+            },
+            "description": "Check whether a customer zip is inside service radius",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_id\": \"{{uuid}}\",\n  \"customer_zip\": \"75001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST Book a quote, job, or service call from AI",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/book",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "book"
+              ],
+              "query": []
+            },
+            "description": "Book a quote, job, or service call from AI",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_id\": \"{{uuid}}\",\n  \"booking_type\": \"Quote\",\n  \"customer_id\": \"{{uuid}}\",\n  \"customer\": {\n    \"first_name\": \"string\",\n    \"last_name\": \"string\",\n    \"phone_number\": \"string\",\n    \"email\": \"user@example.com\",\n    \"address\": \"string\",\n    \"zip_code\": \"string\",\n    \"notes\": \"string\"\n  },\n  \"assigned_staff_id\": \"{{uuid}}\",\n  \"service_name\": \"string\",\n  \"service_type\": \"string\",\n  \"address\": \"string\",\n  \"price_book_item_id\": \"{{uuid}}\",\n  \"service_call_fee\": 1,\n  \"scheduled_start_time\": \"2026-04-07T10:00:00.000Z\",\n  \"scheduled_end_time\": \"2026-04-07T10:00:00.000Z\",\n  \"is_emergency\": true,\n  \"notes\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET Get full AI business operating config",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/business-config",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "business-config"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{business_id}}",
+                  "disabled": false,
+                  "description": "Business identifier"
+                }
+              ]
+            },
+            "description": "Get full AI business operating config"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Business Settings",
+      "item": [
+        {
+          "name": "GET Get business profile for AI",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/business/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "business",
+                "profile"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{business_id}}",
+                  "disabled": false,
+                  "description": "Business identifier"
+                }
+              ]
+            },
+            "description": "Get business profile for AI"
+          }
+        },
+        {
+          "name": "GET Get alert settings for AI",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/business/alerts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "business",
+                "alerts"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{business_id}}",
+                  "disabled": false,
+                  "description": "Business identifier"
+                }
+              ]
+            },
+            "description": "Get alert settings for AI"
+          }
+        },
+        {
+          "name": "GET Get automation settings for AI",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/business/automation",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "business",
+                "automation"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{business_id}}",
+                  "disabled": false,
+                  "description": "Business identifier"
+                }
+              ]
+            },
+            "description": "Get automation settings for AI"
+          }
+        },
+        {
+          "name": "GET Get communication settings for AI",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/business/communication",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "business",
+                "communication"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{business_id}}",
+                  "disabled": false,
+                  "description": "Business identifier"
+                }
+              ]
+            },
+            "description": "Get communication settings for AI"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Calls",
+      "item": [
+        {
+          "name": "POST Receive inbound call from provider webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/calls/incoming",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "calls",
+                "incoming"
+              ],
+              "query": []
+            },
+            "description": "Receive inbound call from provider webhook",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from\": \"+15550101010\",\n  \"to\": \"+15551234567\",\n  \"call_sid\": \"CA123\",\n  \"status\": \"ringing\",\n  \"intent\": \"schedule_service\",\n  \"transcript\": \"string\",\n  \"recording_url\": \"string\",\n  \"duration_seconds\": 1,\n  \"outcome\": \"string\",\n  \"From\": \"+15550101010\",\n  \"To\": \"+15551234567\",\n  \"CallSid\": \"CA123\",\n  \"CallStatus\": \"ringing\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST Receive inbound call status update",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/calls/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "calls",
+                "status"
+              ],
+              "query": []
+            },
+            "description": "Receive inbound call status update",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from\": \"+15550101010\",\n  \"to\": \"+15551234567\",\n  \"call_sid\": \"CA123\",\n  \"status\": \"ringing\",\n  \"intent\": \"schedule_service\",\n  \"transcript\": \"string\",\n  \"recording_url\": \"string\",\n  \"duration_seconds\": 1,\n  \"outcome\": \"string\",\n  \"From\": \"+15550101010\",\n  \"To\": \"+15551234567\",\n  \"CallSid\": \"CA123\",\n  \"CallStatus\": \"ringing\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Conversations",
+      "item": [
+        {
+          "name": "GET List grouped customer conversations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/conversations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "conversations"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{business_id}}",
+                  "disabled": false,
+                  "description": "Business identifier"
+                },
+                {
+                  "key": "channel",
+                  "value": "{{channel}}",
+                  "disabled": true,
+                  "description": "Filter by channel"
+                },
+                {
+                  "key": "search",
+                  "value": "{{search}}",
+                  "disabled": true,
+                  "description": "Search customer or latest activity"
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true,
+                  "description": "Page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true,
+                  "description": "Page size"
+                }
+              ]
+            },
+            "description": "List grouped customer conversations"
+          }
+        },
+        {
+          "name": "GET Get conversation detail for one customer",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/conversations/{{customer_id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "conversations",
+                "{{customer_id}}"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{business_id}}",
+                  "disabled": false,
+                  "description": "Business identifier"
+                }
+              ]
+            },
+            "description": "Get conversation detail for one customer"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Customers",
+      "item": [
+        {
+          "name": "GET List customers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "customers"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{business_id}}",
+                  "disabled": false,
+                  "description": "Business identifier"
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true,
+                  "description": "Page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true,
+                  "description": "Page size"
+                },
+                {
+                  "key": "search",
+                  "value": "{{search}}",
+                  "disabled": true,
+                  "description": "Search query"
+                }
+              ]
+            },
+            "description": "List customers"
+          }
+        },
+        {
+          "name": "POST Create a customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "customers"
+              ],
+              "query": []
+            },
+            "description": "Create a customer",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_id\": \"{{uuid}}\",\n  \"first_name\": \"Sarah\",\n  \"last_name\": \"Johnson\",\n  \"phone_number\": \"+15550101010\",\n  \"email\": \"user@example.com\",\n  \"address\": \"string\",\n  \"zip_code\": \"string\",\n  \"notes\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET Look up customer by phone number",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/customers/lookup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "customers",
+                "lookup"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{business_id}}",
+                  "disabled": false,
+                  "description": "Business identifier"
+                },
+                {
+                  "key": "phone",
+                  "value": "{{phone}}",
+                  "disabled": false,
+                  "description": "Customer phone number"
+                }
+              ]
+            },
+            "description": "Look up customer by phone number"
+          }
+        },
+        {
+          "name": "GET Get one customer",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/customers/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "customers",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "Get one customer"
+          }
+        },
+        {
+          "name": "GET Get customer history",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/customers/{{id}}/history",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "customers",
+                "{{id}}",
+                "history"
+              ],
+              "query": []
+            },
+            "description": "Get customer history"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "GET Get AI-side dashboard summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/dashboard/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "dashboard",
+                "summary"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{business_id}}",
+                  "disabled": false,
+                  "description": "Business identifier"
+                },
+                {
+                  "key": "period",
+                  "value": "{{period}}",
+                  "disabled": true,
+                  "description": "Dashboard period"
+                }
+              ]
+            },
+            "description": "Get AI-side dashboard summary"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Events",
+      "item": [
+        {
+          "name": "GET List activity events",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "events"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{business_id}}",
+                  "disabled": false,
+                  "description": "Business identifier"
+                },
+                {
+                  "key": "event_type",
+                  "value": "{{event_type}}",
+                  "disabled": true,
+                  "description": "Filter by event type"
+                },
+                {
+                  "key": "customer_id",
+                  "value": "{{customer_id}}",
+                  "disabled": true,
+                  "description": "Filter by customer"
+                },
+                {
+                  "key": "job_id",
+                  "value": "{{job_id}}",
+                  "disabled": true,
+                  "description": "Filter by job"
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true,
+                  "description": "Page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true,
+                  "description": "Page size"
+                }
+              ]
+            },
+            "description": "List activity events"
+          }
+        },
+        {
+          "name": "POST Create an activity event",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "events"
+              ],
+              "query": []
+            },
+            "description": "Create an activity event",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_id\": \"{{uuid}}\",\n  \"event_type\": \"call.missed\",\n  \"title\": \"Missed call from Sarah Johnson\",\n  \"message\": \"Customer did not answer callback attempt.\",\n  \"actor\": \"ai-receptionist\",\n  \"timestamp\": \"2026-04-07T10:00:00.000Z\",\n  \"job_id\": \"{{uuid}}\",\n  \"customer_id\": \"{{uuid}}\",\n  \"error\": \"string\",\n  \"details\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET List distinct event types",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/events/event-types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "events",
+                "event-types"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{business_id}}",
+                  "disabled": false,
+                  "description": "Business identifier"
+                }
+              ]
+            },
+            "description": "List distinct event types"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Follow-Ups",
+      "item": [
+        {
+          "name": "GET List follow-ups",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/follow-ups",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "follow-ups"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{business_id}}",
+                  "disabled": false,
+                  "description": "Business identifier"
+                },
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "disabled": true,
+                  "description": "Filter by status"
+                },
+                {
+                  "key": "customer_id",
+                  "value": "{{customer_id}}",
+                  "disabled": true,
+                  "description": "Filter by customer"
+                }
+              ]
+            },
+            "description": "List follow-ups"
+          }
+        },
+        {
+          "name": "POST Create a follow-up",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/follow-ups",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "follow-ups"
+              ],
+              "query": []
+            },
+            "description": "Create a follow-up",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_id\": \"{{uuid}}\",\n  \"type\": \"Quote\",\n  \"reference_id\": \"{{uuid}}\",\n  \"customer_id\": \"{{uuid}}\",\n  \"scheduled_for\": \"2026-04-07T10:00:00.000Z\",\n  \"channel\": \"SMS\",\n  \"status\": \"Scheduled\",\n  \"notes\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "PATCH Update a follow-up",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/follow-ups/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "follow-ups",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "Update a follow-up",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_id\": \"{{uuid}}\",\n  \"type\": \"Quote\",\n  \"reference_id\": \"{{uuid}}\",\n  \"customer_id\": \"{{uuid}}\",\n  \"scheduled_for\": \"2026-04-07T10:00:00.000Z\",\n  \"channel\": \"SMS\",\n  \"status\": \"Scheduled\",\n  \"notes\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST Mark follow-up as sent",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/follow-ups/{{id}}/sent",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "follow-ups",
+                "{{id}}",
+                "sent"
+              ],
+              "query": []
+            },
+            "description": "Mark follow-up as sent"
+          }
+        },
+        {
+          "name": "POST Cancel follow-up",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/follow-ups/{{id}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "follow-ups",
+                "{{id}}",
+                "cancel"
+              ],
+              "query": []
+            },
+            "description": "Cancel follow-up"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Inventory",
+      "item": [
+        {
+          "name": "GET List inventory materials",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/inventory",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "inventory"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{business_id}}",
+                  "disabled": false,
+                  "description": "Business identifier"
+                }
+              ]
+            },
+            "description": "List inventory materials"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Invoices",
+      "item": [
+        {
+          "name": "GET List invoices",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/invoices",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "invoices"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{business_id}}",
+                  "disabled": false,
+                  "description": "Business identifier"
+                },
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "disabled": true,
+                  "description": "Filter by invoice status"
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true,
+                  "description": "Page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true,
+                  "description": "Page size"
+                }
+              ]
+            },
+            "description": "List invoices"
+          }
+        },
+        {
+          "name": "POST Create an invoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/invoices",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "invoices"
+              ],
+              "query": []
+            },
+            "description": "Create an invoice",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_id\": \"{{uuid}}\",\n  \"job_id\": \"{{uuid}}\",\n  \"due_date\": \"2026-04-07T10:00:00.000Z\",\n  \"notes\": \"string\",\n  \"internal_notes\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET Get one invoice",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/invoices/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "invoices",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "Get one invoice"
+          }
+        },
+        {
+          "name": "PATCH Update one invoice",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/invoices/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "invoices",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "Update one invoice",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"due_date\": \"2026-04-07T10:00:00.000Z\",\n  \"notes\": \"string\",\n  \"internal_notes\": \"string\",\n  \"status\": \"Draft\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET Get invoice totals",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/invoices/{{id}}/total",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "invoices",
+                "{{id}}",
+                "total"
+              ],
+              "query": []
+            },
+            "description": "Get invoice totals"
+          }
+        },
+        {
+          "name": "POST Send invoice to customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/invoices/{{id}}/send",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "invoices",
+                "{{id}}",
+                "send"
+              ],
+              "query": []
+            },
+            "description": "Send invoice to customer"
+          }
+        },
+        {
+          "name": "POST Void invoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/invoices/{{id}}/void",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "invoices",
+                "{{id}}",
+                "void"
+              ],
+              "query": []
+            },
+            "description": "Void invoice"
+          }
+        },
+        {
+          "name": "POST Refund invoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/invoices/{{id}}/refund",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "invoices",
+                "{{id}}",
+                "refund"
+              ],
+              "query": []
+            },
+            "description": "Refund invoice"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Jobs",
+      "item": [
+        {
+          "name": "GET List jobs for AI workflows",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/jobs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "jobs"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{business_id}}",
+                  "disabled": false,
+                  "description": "Business identifier"
+                },
+                {
+                  "key": "assigned_staff_id",
+                  "value": "{{assigned_staff_id}}",
+                  "disabled": true,
+                  "description": "Filter by assigned staff"
+                },
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "disabled": true,
+                  "description": "Filter by status"
+                },
+                {
+                  "key": "type",
+                  "value": "{{type}}",
+                  "disabled": true,
+                  "description": "Filter by job type"
+                },
+                {
+                  "key": "customer_id",
+                  "value": "{{customer_id}}",
+                  "disabled": true,
+                  "description": "Filter by customer"
+                },
+                {
+                  "key": "start_date",
+                  "value": "{{start_date}}",
+                  "disabled": true,
+                  "description": "Scheduled start lower bound"
+                },
+                {
+                  "key": "end_date",
+                  "value": "{{end_date}}",
+                  "disabled": true,
+                  "description": "Scheduled end upper bound"
+                },
+                {
+                  "key": "search",
+                  "value": "{{search}}",
+                  "disabled": true,
+                  "description": "Search title, service type, customer, address"
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true,
+                  "description": "Page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true,
+                  "description": "Page size"
+                }
+              ]
+            },
+            "description": "List jobs for AI workflows"
+          }
+        },
+        {
+          "name": "POST Create a job through the AI bridge",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/jobs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "jobs"
+              ],
+              "query": []
+            },
+            "description": "Create a job through the AI bridge",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_id\": \"{{uuid}}\",\n  \"customer_id\": \"{{uuid}}\",\n  \"assigned_staff_id\": \"{{uuid}}\",\n  \"type\": \"Job\",\n  \"title\": \"Emergency HVAC Visit\",\n  \"job_details\": \"Customer reports no cooling\",\n  \"service_type\": \"HVAC Repair\",\n  \"address\": \"123 Main St, Dallas TX\",\n  \"scheduled_start_time\": \"2026-04-07T10:00:00.000Z\",\n  \"scheduled_end_time\": \"2026-04-07T10:00:00.000Z\",\n  \"service_call_fee\": 99,\n  \"is_emergency\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET Get one job",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/jobs/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "jobs",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "Get one job"
+          }
+        },
+        {
+          "name": "PATCH Update one job",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/jobs/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "jobs",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "Update one job",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_id\": \"{{uuid}}\",\n  \"customer_id\": \"{{uuid}}\",\n  \"assigned_staff_id\": \"{{uuid}}\",\n  \"type\": \"Job\",\n  \"title\": \"Emergency HVAC Visit\",\n  \"job_details\": \"Customer reports no cooling\",\n  \"service_type\": \"HVAC Repair\",\n  \"address\": \"123 Main St, Dallas TX\",\n  \"scheduled_start_time\": \"2026-04-07T10:00:00.000Z\",\n  \"scheduled_end_time\": \"2026-04-07T10:00:00.000Z\",\n  \"service_call_fee\": 99,\n  \"is_emergency\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST Start a job",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/jobs/{{id}}/start",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "jobs",
+                "{{id}}",
+                "start"
+              ],
+              "query": []
+            },
+            "description": "Start a job"
+          }
+        },
+        {
+          "name": "POST Complete a job",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/jobs/{{id}}/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "jobs",
+                "{{id}}",
+                "complete"
+              ],
+              "query": []
+            },
+            "description": "Complete a job"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "POST Record payment for invoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/payments/{{invoiceId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "payments",
+                "{{invoiceId}}"
+              ],
+              "query": []
+            },
+            "description": "Record payment for invoice",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 250,\n  \"payment_method\": \"manual\",\n  \"paid_at\": \"2026-04-07T10:00:00.000Z\",\n  \"reference\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Price Book",
+      "item": [
+        {
+          "name": "GET List price book items",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/price-book",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "price-book"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{business_id}}",
+                  "disabled": false,
+                  "description": "Business identifier"
+                },
+                {
+                  "key": "category_id",
+                  "value": "{{category_id}}",
+                  "disabled": true,
+                  "description": "Optional category filter"
+                },
+                {
+                  "key": "search",
+                  "value": "{{search}}",
+                  "disabled": true,
+                  "description": "Search term"
+                },
+                {
+                  "key": "can_quote_phone",
+                  "value": "{{can_quote_phone}}",
+                  "disabled": true,
+                  "description": "Filter phone-quotable services"
+                }
+              ]
+            },
+            "description": "List price book items"
+          }
+        },
+        {
+          "name": "GET Get one price book item",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/price-book/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "price-book",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "Get one price book item"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Quotes",
+      "item": [
+        {
+          "name": "GET List quotes for AI workflows",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/quotes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "quotes"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{business_id}}",
+                  "disabled": false,
+                  "description": "Business identifier"
+                },
+                {
+                  "key": "assigned_staff_id",
+                  "value": "{{assigned_staff_id}}",
+                  "disabled": true,
+                  "description": "Filter by assigned staff"
+                },
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "disabled": true,
+                  "description": "Filter by status"
+                },
+                {
+                  "key": "customer_id",
+                  "value": "{{customer_id}}",
+                  "disabled": true,
+                  "description": "Filter by customer"
+                },
+                {
+                  "key": "start_date",
+                  "value": "{{start_date}}",
+                  "disabled": true,
+                  "description": "Date lower bound"
+                },
+                {
+                  "key": "end_date",
+                  "value": "{{end_date}}",
+                  "disabled": true,
+                  "description": "Date upper bound"
+                },
+                {
+                  "key": "search",
+                  "value": "{{search}}",
+                  "disabled": true,
+                  "description": "Search title, description, customer"
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true,
+                  "description": "Page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true,
+                  "description": "Page size"
+                }
+              ]
+            },
+            "description": "List quotes for AI workflows"
+          }
+        },
+        {
+          "name": "POST Create a quote through the AI bridge",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/quotes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "quotes"
+              ],
+              "query": []
+            },
+            "description": "Create a quote through the AI bridge",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_id\": \"{{uuid}}\",\n  \"customer_id\": \"{{uuid}}\",\n  \"assigned_staff_id\": \"{{uuid}}\",\n  \"title\": \"Water Heater Estimate\",\n  \"description\": \"Estimate for replacement and install\",\n  \"scheduled_estimate_date\": \"2026-04-07T10:00:00.000Z\",\n  \"price_book_item_id\": \"{{uuid}}\",\n  \"is_emergency\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET Get one quote",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/quotes/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "quotes",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "Get one quote"
+          }
+        },
+        {
+          "name": "PATCH Update one quote",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/quotes/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "quotes",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "Update one quote",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assigned_staff_id\": \"{{uuid}}\",\n  \"title\": \"string\",\n  \"description\": \"string\",\n  \"scheduled_estimate_date\": \"2026-04-07T10:00:00.000Z\",\n  \"status\": \"EstimateScheduled\",\n  \"total_amount\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST Send a quote",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/quotes/{{id}}/send",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "quotes",
+                "{{id}}",
+                "send"
+              ],
+              "query": []
+            },
+            "description": "Send a quote"
+          }
+        },
+        {
+          "name": "POST Approve a quote",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/quotes/{{id}}/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "quotes",
+                "{{id}}",
+                "approve"
+              ],
+              "query": []
+            },
+            "description": "Approve a quote"
+          }
+        },
+        {
+          "name": "POST Decline a quote",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/quotes/{{id}}/decline",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "quotes",
+                "{{id}}",
+                "decline"
+              ],
+              "query": []
+            },
+            "description": "Decline a quote"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Schedule",
+      "item": [
+        {
+          "name": "GET List scheduled jobs for AI dispatch",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/schedule",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "schedule"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{business_id}}",
+                  "disabled": false,
+                  "description": "Business identifier"
+                },
+                {
+                  "key": "start_date",
+                  "value": "{{start_date}}",
+                  "disabled": true,
+                  "description": "Schedule start datetime"
+                },
+                {
+                  "key": "end_date",
+                  "value": "{{end_date}}",
+                  "disabled": true,
+                  "description": "Schedule end datetime"
+                }
+              ]
+            },
+            "description": "List scheduled jobs for AI dispatch"
+          }
+        }
+      ]
+    },
+    {
+      "name": "SMS",
+      "item": [
+        {
+          "name": "POST Receive inbound SMS from provider webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/sms/incoming",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "sms",
+                "incoming"
+              ],
+              "query": []
+            },
+            "description": "Receive inbound SMS from provider webhook",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from\": \"+15550101010\",\n  \"to\": \"+15551234567\",\n  \"message\": \"Need help with my AC\",\n  \"From\": \"+15550101010\",\n  \"To\": \"+15551234567\",\n  \"Body\": \"Need help with my AC\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST Send outbound SMS through AI bridge",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/sms/send",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "sms",
+                "send"
+              ],
+              "query": []
+            },
+            "description": "Send outbound SMS through AI bridge",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_id\": \"{{uuid}}\",\n  \"to\": \"+15550101010\",\n  \"message\": \"Your technician is on the way.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Staff",
+      "item": [
+        {
+          "name": "GET List staff members for scheduling and dispatch",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/staff",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "staff"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{business_id}}",
+                  "disabled": false,
+                  "description": "Business identifier"
+                }
+              ]
+            },
+            "description": "List staff members for scheduling and dispatch"
+          }
+        },
+        {
+          "name": "GET Get one staff member",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/staff/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "staff",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "Get one staff member"
+          }
+        },
+        {
+          "name": "GET Check staff availability for a time window",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/staff/availability",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "staff",
+                "availability"
+              ],
+              "query": [
+                {
+                  "key": "staff_id",
+                  "value": "{{staff_id}}",
+                  "disabled": false,
+                  "description": "Staff identifier"
+                },
+                {
+                  "key": "start_time",
+                  "value": "{{start_time}}",
+                  "disabled": false,
+                  "description": "Window start"
+                },
+                {
+                  "key": "end_time",
+                  "value": "{{end_time}}",
+                  "disabled": false,
+                  "description": "Window end"
+                }
+              ]
+            },
+            "description": "Check staff availability for a time window"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Team Check-Ins",
+      "item": [
+        {
+          "name": "GET List team check-ins",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/team-checkins",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "team-checkins"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{business_id}}",
+                  "disabled": false,
+                  "description": "Business identifier"
+                },
+                {
+                  "key": "staff_id",
+                  "value": "{{staff_id}}",
+                  "disabled": true,
+                  "description": "Filter by staff"
+                },
+                {
+                  "key": "job_id",
+                  "value": "{{job_id}}",
+                  "disabled": true,
+                  "description": "Filter by job"
+                },
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "disabled": true,
+                  "description": "Filter by status"
+                },
+                {
+                  "key": "start_date",
+                  "value": "{{start_date}}",
+                  "disabled": true,
+                  "description": "Date lower bound"
+                },
+                {
+                  "key": "end_date",
+                  "value": "{{end_date}}",
+                  "disabled": true,
+                  "description": "Date upper bound"
+                }
+              ]
+            },
+            "description": "List team check-ins"
+          }
+        },
+        {
+          "name": "POST Create a team check-in",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/team-checkins",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "team-checkins"
+              ],
+              "query": []
+            },
+            "description": "Create a team check-in",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"staff_id\": \"{{uuid}}\",\n  \"job_id\": \"{{uuid}}\",\n  \"scheduled_at\": \"2026-04-07T10:00:00.000Z\",\n  \"status\": \"Pending\",\n  \"notes\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "PATCH Update a team check-in",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/team-checkins/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "team-checkins",
+                "{{id}}"
+              ],
+              "query": []
+            },
+            "description": "Update a team check-in",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"staff_id\": \"{{uuid}}\",\n  \"job_id\": \"{{uuid}}\",\n  \"scheduled_at\": \"2026-04-07T10:00:00.000Z\",\n  \"status\": \"Pending\",\n  \"notes\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST Mark team check-in received",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/team-checkins/{{id}}/receive",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "team-checkins",
+                "{{id}}",
+                "receive"
+              ],
+              "query": []
+            },
+            "description": "Mark team check-in received"
+          }
+        },
+        {
+          "name": "POST Escalate missed team check-in",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              },
+              {
+                "key": "x-business-token",
+                "value": "{{businessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/team-checkins/{{id}}/escalate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "team-checkins",
+                "{{id}}",
+                "escalate"
+              ],
+              "query": []
+            },
+            "description": "Escalate missed team check-in"
+          }
+        }
+      ]
+    }
+  ]
+}

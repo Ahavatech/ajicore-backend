@@ -1,0 +1,5158 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Ajicore AI Integration API",
+    "version": "2.0.0",
+    "description": "AI-only OpenAPI export for the canonical internal AI bridge.\n\nAuthentication:\n- Protected AI routes require both `x-api-key` and `x-business-token`.\n- Provider webhook routes under `/api/internal/ai/sms/incoming` and `/api/internal/ai/calls/*` do not require those headers.\n\nBusiness owners can retrieve `x-business-token` from `GET /api/auth/internal-api-token?business_id=...` in the main API."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Development"
+    }
+  ],
+  "tags": [
+    {
+      "name": "AI Bridge",
+      "description": "Internal AI service API (x-api-key required; business-scoped routes also require x-business-token)"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT token from /api/auth/signin or /api/auth/signup"
+      },
+      "apiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key",
+        "description": "Internal API key for AI service endpoints"
+      },
+      "businessTokenAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-business-token",
+        "description": "Per-business internal bridge token, retrievable by the business owner from /api/auth/internal-api-token"
+      }
+    },
+    "schemas": {
+      "Business": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "industry": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "business_structure": {
+            "type": "string",
+            "nullable": true
+          },
+          "company_email": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "company_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "company_phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "ai_phone_number": {
+            "type": "string",
+            "nullable": true
+          },
+          "home_base_zip": {
+            "type": "string",
+            "nullable": true
+          },
+          "service_radius_miles": {
+            "type": "number",
+            "nullable": true
+          },
+          "cost_per_mile_over_radius": {
+            "type": "number",
+            "nullable": true
+          },
+          "quote_expiry_days": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "InternalApiTokenResponse": {
+        "type": "object",
+        "properties": {
+          "business_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "internal_api_token": {
+            "type": "string"
+          }
+        }
+      },
+      "AuthForgotPasswordInput": {
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          }
+        }
+      },
+      "AuthForgotPasswordResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "dev_reset_code": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "AuthVerifyResetCodeInput": {
+        "type": "object",
+        "required": [
+          "email",
+          "code"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "code": {
+            "type": "string"
+          }
+        }
+      },
+      "AuthVerifyResetCodeResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "valid": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AuthResetPasswordInput": {
+        "type": "object",
+        "required": [
+          "email",
+          "code",
+          "new_password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "code": {
+            "type": "string"
+          },
+          "new_password": {
+            "type": "string",
+            "minLength": 8
+          }
+        }
+      },
+      "AuthResetPasswordResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "Customer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "business_id": {
+            "type": "string"
+          },
+          "first_name": {
+            "type": "string"
+          },
+          "last_name": {
+            "type": "string"
+          },
+          "phone_number": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "zip_code": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Job": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "business_id": {
+            "type": "string"
+          },
+          "customer_id": {
+            "type": "string"
+          },
+          "assigned_staff_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "Job",
+              "ServiceCall"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Scheduled",
+              "InProgress",
+              "Completed",
+              "Invoiced",
+              "Cancelled"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "job_details": {
+            "type": "string"
+          },
+          "service_call_fee": {
+            "type": "number",
+            "nullable": true
+          },
+          "scheduled_start_time": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "actual_start_time": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "actual_end_time": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "is_emergency": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "AI",
+              "Manual",
+              "SMS"
+            ]
+          }
+        }
+      },
+      "Quote": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "business_id": {
+            "type": "string"
+          },
+          "customer_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "EstimateScheduled",
+              "Draft",
+              "Sent",
+              "Approved",
+              "Declined",
+              "Expired"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "total_amount": {
+            "type": "number",
+            "nullable": true,
+            "description": "null = TBD until approved"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "converted_to_job_id": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "Invoice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "job_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Draft",
+              "Sent",
+              "PartiallyPaid",
+              "Paid",
+              "Overdue",
+              "Refunded",
+              "Voided",
+              "Cancelled"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          },
+          "internal_notes": {
+            "type": "string"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "line_items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoiceLine"
+            }
+          }
+        }
+      },
+      "InvoiceLine": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unit_price": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          },
+          "is_credit": {
+            "type": "boolean",
+            "description": "true = deduction (e.g., service call credit)"
+          }
+        }
+      },
+      "Payment": {
+        "type": "object",
+        "properties": {
+          "invoice_id": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "method": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "Expense": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "business_id": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "category": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "job_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PriceBookItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "can_quote_phone": {
+            "type": "boolean"
+          },
+          "price_type": {
+            "type": "string",
+            "enum": [
+              "Fixed",
+              "Range",
+              "NeedsOnsite"
+            ]
+          },
+          "price": {
+            "type": "number",
+            "nullable": true
+          },
+          "price_min": {
+            "type": "number",
+            "nullable": true
+          },
+          "price_max": {
+            "type": "number",
+            "nullable": true
+          },
+          "visit_type": {
+            "type": "string",
+            "enum": [
+              "FreeEstimate",
+              "PaidServiceCall"
+            ]
+          },
+          "service_call_fee": {
+            "type": "number",
+            "nullable": true
+          }
+        }
+      },
+      "DashboardChartPoint": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Mon"
+          },
+          "value": {
+            "type": "number",
+            "example": 1200
+          }
+        }
+      },
+      "DashboardTodayJob": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "time": {
+            "type": "string",
+            "example": "09:00 AM"
+          },
+          "technician": {
+            "type": "string",
+            "example": "Mike Davis"
+          },
+          "jobType": {
+            "type": "string",
+            "example": "Plumbing Repair"
+          },
+          "status": {
+            "type": "string",
+            "example": "In Progress"
+          }
+        }
+      },
+      "DashboardPendingQuote": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "customerName": {
+            "type": "string",
+            "example": "Sarah Johnson"
+          },
+          "jobType": {
+            "type": "string",
+            "example": "HVAC Installation"
+          },
+          "quoteId": {
+            "type": "string",
+            "example": "EST-1001ABCD"
+          }
+        }
+      },
+      "DashboardRecentActivity": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "call",
+              "job",
+              "sms",
+              "invoice",
+              "schedule"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "example": "Missed call from Sarah Johnson"
+          },
+          "time": {
+            "type": "string",
+            "example": "10 mins ago"
+          }
+        }
+      },
+      "DashboardActiveTeamMember": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "example": "Chris Brown"
+          },
+          "role": {
+            "type": "string",
+            "example": "Technician"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "On Job",
+              "Traveling",
+              "On Break"
+            ]
+          },
+          "location": {
+            "type": "string",
+            "example": "123 Main St, Dallas TX"
+          }
+        }
+      },
+      "DashboardSummary": {
+        "type": "object",
+        "properties": {
+          "revenue": {
+            "type": "number",
+            "example": 14250
+          },
+          "active_jobs": {
+            "type": "integer",
+            "example": 12
+          },
+          "jobs_trend": {
+            "type": "number",
+            "example": 8.5
+          },
+          "pending_invoices": {
+            "type": "integer",
+            "example": 5
+          },
+          "overdue_invoices": {
+            "type": "integer",
+            "example": 2
+          },
+          "calls_handled": {
+            "type": "integer",
+            "example": 47
+          },
+          "todays_jobs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardTodayJob"
+            }
+          },
+          "pending_quotes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardPendingQuote"
+            }
+          },
+          "recent_activity": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardRecentActivity"
+            }
+          },
+          "active_team": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardActiveTeamMember"
+            }
+          }
+        }
+      },
+      "DashboardRevenue": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "example": 14250
+          },
+          "trend": {
+            "type": "number",
+            "example": 15.2
+          },
+          "chart_data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardChartPoint"
+            }
+          }
+        }
+      },
+      "DashboardJobsAnalytics": {
+        "type": "object",
+        "properties": {
+          "period": {
+            "type": "string",
+            "enum": [
+              "7d",
+              "30d",
+              "90d"
+            ],
+            "example": "7d"
+          },
+          "total": {
+            "type": "integer",
+            "example": 18
+          },
+          "by_status": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "example": "Completed"
+                },
+                "count": {
+                  "type": "integer",
+                  "example": 8
+                }
+              }
+            }
+          },
+          "by_type": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "example": "Job"
+                },
+                "count": {
+                  "type": "integer",
+                  "example": 12
+                }
+              }
+            }
+          },
+          "chart_data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardChartPoint"
+            }
+          }
+        }
+      },
+      "InternalActivityEventInput": {
+        "type": "object",
+        "required": [
+          "business_id",
+          "event_type"
+        ],
+        "properties": {
+          "business_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "event_type": {
+            "type": "string",
+            "example": "call.missed",
+            "description": "Must start with call., sms., job., invoice., schedule., or quote."
+          },
+          "title": {
+            "type": "string",
+            "example": "Missed call from Sarah Johnson"
+          },
+          "message": {
+            "type": "string",
+            "example": "Customer did not answer callback attempt."
+          },
+          "actor": {
+            "type": "string",
+            "example": "ai-receptionist"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "customer_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "InternalActivityEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "business_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "event_type": {
+            "type": "string",
+            "example": "call.missed"
+          },
+          "actor": {
+            "type": "string",
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "customer_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "InternalEventTypeListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "AIBridgeWebhookResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "business_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "customer_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "reply": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "call_sid": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          }
+        }
+      },
+      "AIBridgeInboundSmsInput": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "+15550101010"
+          },
+          "to": {
+            "type": "string",
+            "example": "+15551234567"
+          },
+          "message": {
+            "type": "string",
+            "example": "Need help with my AC"
+          },
+          "From": {
+            "type": "string",
+            "example": "+15550101010"
+          },
+          "To": {
+            "type": "string",
+            "example": "+15551234567"
+          },
+          "Body": {
+            "type": "string",
+            "example": "Need help with my AC"
+          }
+        }
+      },
+      "AIBridgeInboundCallInput": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "+15550101010"
+          },
+          "to": {
+            "type": "string",
+            "example": "+15551234567"
+          },
+          "call_sid": {
+            "type": "string",
+            "example": "CA123"
+          },
+          "status": {
+            "type": "string",
+            "example": "ringing"
+          },
+          "intent": {
+            "type": "string",
+            "example": "schedule_service"
+          },
+          "transcript": {
+            "type": "string",
+            "nullable": true
+          },
+          "recording_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "duration_seconds": {
+            "type": "integer",
+            "nullable": true
+          },
+          "outcome": {
+            "type": "string",
+            "nullable": true
+          },
+          "From": {
+            "type": "string",
+            "example": "+15550101010"
+          },
+          "To": {
+            "type": "string",
+            "example": "+15551234567"
+          },
+          "CallSid": {
+            "type": "string",
+            "example": "CA123"
+          },
+          "CallStatus": {
+            "type": "string",
+            "example": "ringing"
+          }
+        }
+      },
+      "AIBridgeCallStatusInput": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AIBridgeInboundCallInput"
+          }
+        ]
+      },
+      "AIBusinessConfigResponse": {
+        "type": "object",
+        "properties": {
+          "business": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "industry": {
+                "type": "string",
+                "nullable": true
+              },
+              "business_hours": {
+                "type": "object",
+                "additionalProperties": true,
+                "nullable": true
+              },
+              "timezone": {
+                "type": "string",
+                "nullable": true
+              },
+              "company_phone": {
+                "type": "string",
+                "nullable": true
+              },
+              "owner_phone": {
+                "type": "string",
+                "nullable": true
+              },
+              "dedicated_phone_number": {
+                "type": "string",
+                "nullable": true
+              },
+              "ai_phone_number": {
+                "type": "string",
+                "nullable": true
+              },
+              "ai_receptionist_name": {
+                "type": "string",
+                "nullable": true
+              },
+              "voice_gender": {
+                "type": "string",
+                "nullable": true
+              },
+              "ai_business_description": {
+                "type": "string",
+                "nullable": true
+              },
+              "home_base_zip": {
+                "type": "string",
+                "nullable": true
+              },
+              "service_radius_miles": {
+                "type": "number",
+                "nullable": true
+              },
+              "cost_per_mile_over_radius": {
+                "type": "number",
+                "nullable": true
+              },
+              "service_area_description": {
+                "type": "string",
+                "nullable": true
+              },
+              "unknown_service_handling": {
+                "type": "string",
+                "nullable": true
+              },
+              "unknown_service_call_fee": {
+                "type": "number",
+                "nullable": true
+              },
+              "quote_expiry_days": {
+                "type": "integer",
+                "nullable": true
+              },
+              "payment_follow_up_days": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "payment_interval": {
+                "type": "string",
+                "nullable": true
+              },
+              "alert_settings": {
+                "$ref": "#/components/schemas/BusinessAlertSettings"
+              },
+              "automation_settings": {
+                "$ref": "#/components/schemas/BusinessAutomationSettings"
+              },
+              "communication_settings": {
+                "$ref": "#/components/schemas/BusinessCommunicationSettings"
+              }
+            }
+          },
+          "service_categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "price_book": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceBookItem"
+            }
+          }
+        }
+      },
+      "AIPriceLookupResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceBookItem"
+            }
+          },
+          "unknown_service_handling": {
+            "type": "string",
+            "nullable": true
+          },
+          "unknown_service_call_fee": {
+            "type": "number",
+            "nullable": true
+          }
+        }
+      },
+      "AIBookCustomerInput": {
+        "type": "object",
+        "properties": {
+          "first_name": {
+            "type": "string"
+          },
+          "last_name": {
+            "type": "string"
+          },
+          "phone_number": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "zip_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "AIBookingInput": {
+        "type": "object",
+        "required": [
+          "business_id",
+          "booking_type"
+        ],
+        "properties": {
+          "business_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "booking_type": {
+            "type": "string",
+            "enum": [
+              "Quote",
+              "Job",
+              "ServiceCall"
+            ]
+          },
+          "customer_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "customer": {
+            "$ref": "#/components/schemas/AIBookCustomerInput"
+          },
+          "assigned_staff_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "service_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "service_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "price_book_item_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "service_call_fee": {
+            "type": "number",
+            "nullable": true
+          },
+          "scheduled_start_time": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "scheduled_end_time": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "is_emergency": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "AIBookingResponse": {
+        "type": "object",
+        "properties": {
+          "booking_type": {
+            "type": "string",
+            "enum": [
+              "Quote",
+              "Job",
+              "ServiceCall"
+            ]
+          },
+          "result": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "automation": {
+            "type": "object",
+            "properties": {
+              "follow_up": {
+                "type": "object",
+                "additionalProperties": true,
+                "nullable": true
+              },
+              "team_checkin": {
+                "type": "object",
+                "additionalProperties": true,
+                "nullable": true
+              }
+            }
+          }
+        }
+      },
+      "BusinessProfile": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "industry": {
+            "type": "string"
+          },
+          "business_structure": {
+            "type": "string"
+          },
+          "company_email": {
+            "type": "string"
+          },
+          "company_type": {
+            "type": "string"
+          },
+          "company_phone": {
+            "type": "string"
+          },
+          "owner_phone": {
+            "type": "string"
+          },
+          "street": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "postal_code": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string"
+          },
+          "logo_url": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "business_hours": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "service_area_description": {
+            "type": "string"
+          },
+          "home_base_zip": {
+            "type": "string"
+          },
+          "service_radius_miles": {
+            "type": "number",
+            "nullable": true
+          },
+          "cost_per_mile_over_radius": {
+            "type": "number",
+            "nullable": true
+          },
+          "dedicated_phone_number": {
+            "type": "string"
+          },
+          "ai_phone_number": {
+            "type": "string"
+          },
+          "ai_phone_country": {
+            "type": "string"
+          },
+          "ai_phone_area_code": {
+            "type": "string"
+          },
+          "ai_receptionist_name": {
+            "type": "string"
+          },
+          "voice_gender": {
+            "type": "string",
+            "nullable": true
+          },
+          "ai_business_description": {
+            "type": "string"
+          },
+          "unknown_service_handling": {
+            "type": "string"
+          },
+          "unknown_service_call_fee": {
+            "type": "number",
+            "nullable": true
+          }
+        }
+      },
+      "BusinessProfileResponse": {
+        "type": "object",
+        "properties": {
+          "business_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/BusinessProfile"
+          }
+        }
+      },
+      "BusinessProfileUpdateInput": {
+        "type": "object",
+        "required": [
+          "business_id"
+        ],
+        "properties": {
+          "business_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "profile": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "industry": {
+            "type": "string"
+          },
+          "business_structure": {
+            "type": "string"
+          },
+          "company_email": {
+            "type": "string"
+          },
+          "company_phone": {
+            "type": "string"
+          },
+          "owner_phone": {
+            "type": "string"
+          },
+          "street": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "postal_code": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string"
+          },
+          "logo_url": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "business_hours": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "service_area_description": {
+            "type": "string"
+          },
+          "home_base_zip": {
+            "type": "string"
+          },
+          "service_radius_miles": {
+            "type": "number"
+          },
+          "cost_per_mile_over_radius": {
+            "type": "number"
+          },
+          "dedicated_phone_number": {
+            "type": "string"
+          },
+          "ai_phone_number": {
+            "type": "string"
+          },
+          "ai_phone_country": {
+            "type": "string"
+          },
+          "ai_phone_area_code": {
+            "type": "string"
+          },
+          "ai_receptionist_name": {
+            "type": "string"
+          },
+          "voice_gender": {
+            "type": "string"
+          },
+          "ai_business_description": {
+            "type": "string"
+          },
+          "unknown_service_handling": {
+            "type": "string"
+          },
+          "unknown_service_call_fee": {
+            "type": "number"
+          }
+        }
+      },
+      "BusinessAlertSettings": {
+        "type": "object",
+        "properties": {
+          "missed_calls": {
+            "type": "boolean"
+          },
+          "inbound_sms": {
+            "type": "boolean"
+          },
+          "failed_checkins": {
+            "type": "boolean"
+          },
+          "overdue_invoices": {
+            "type": "boolean"
+          },
+          "expiring_quotes": {
+            "type": "boolean"
+          }
+        }
+      },
+      "BusinessAlertSettingsResponse": {
+        "type": "object",
+        "properties": {
+          "business_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/BusinessAlertSettings"
+          }
+        }
+      },
+      "BusinessAlertSettingsUpdateInput": {
+        "type": "object",
+        "required": [
+          "business_id"
+        ],
+        "properties": {
+          "business_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/BusinessAlertSettings"
+          }
+        }
+      },
+      "BusinessAutomationSettings": {
+        "type": "object",
+        "properties": {
+          "team_checkins_enabled": {
+            "type": "boolean"
+          },
+          "invoice_reminders_enabled": {
+            "type": "boolean"
+          },
+          "quote_follow_ups_enabled": {
+            "type": "boolean"
+          },
+          "default_check_in_frequency_hours": {
+            "type": "number"
+          },
+          "quote_expiry_days": {
+            "type": "integer"
+          },
+          "payment_follow_up_days": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "payment_interval": {
+            "type": "string"
+          }
+        }
+      },
+      "BusinessAutomationSettingsResponse": {
+        "type": "object",
+        "properties": {
+          "business_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/BusinessAutomationSettings"
+          }
+        }
+      },
+      "BusinessAutomationSettingsUpdateInput": {
+        "type": "object",
+        "required": [
+          "business_id"
+        ],
+        "properties": {
+          "business_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/BusinessAutomationSettings"
+          },
+          "quote_expiry_days": {
+            "type": "integer"
+          },
+          "payment_follow_up_days": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "payment_interval": {
+            "type": "string"
+          }
+        }
+      },
+      "BusinessCommunicationSettings": {
+        "type": "object",
+        "properties": {
+          "send_booking_confirmations": {
+            "type": "boolean"
+          },
+          "send_job_updates": {
+            "type": "boolean"
+          },
+          "send_invoice_reminders": {
+            "type": "boolean"
+          },
+          "missed_call_text_back": {
+            "type": "boolean"
+          },
+          "ai_receptionist_name": {
+            "type": "string"
+          },
+          "voice_gender": {
+            "type": "string",
+            "nullable": true
+          },
+          "ai_business_description": {
+            "type": "string"
+          },
+          "unknown_service_handling": {
+            "type": "string"
+          },
+          "unknown_service_call_fee": {
+            "type": "number",
+            "nullable": true
+          }
+        }
+      },
+      "BusinessCommunicationSettingsResponse": {
+        "type": "object",
+        "properties": {
+          "business_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/BusinessCommunicationSettings"
+          }
+        }
+      },
+      "BusinessCommunicationSettingsUpdateInput": {
+        "type": "object",
+        "required": [
+          "business_id"
+        ],
+        "properties": {
+          "business_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/BusinessCommunicationSettings"
+          },
+          "ai_receptionist_name": {
+            "type": "string"
+          },
+          "voice_gender": {
+            "type": "string"
+          },
+          "ai_business_description": {
+            "type": "string"
+          },
+          "unknown_service_handling": {
+            "type": "string"
+          },
+          "unknown_service_call_fee": {
+            "type": "number"
+          }
+        }
+      },
+      "ConversationCustomerSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone_number": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          }
+        }
+      },
+      "ConversationListItem": {
+        "type": "object",
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/ConversationCustomerSummary"
+          },
+          "latest_activity_title": {
+            "type": "string"
+          },
+          "latest_timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "dominant_channel": {
+            "type": "string",
+            "enum": [
+              "call",
+              "sms"
+            ]
+          },
+          "total_events": {
+            "type": "integer"
+          }
+        }
+      },
+      "ConversationListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConversationListItem"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "totalPages": {
+            "type": "integer"
+          }
+        }
+      },
+      "ConversationEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "call",
+              "sms"
+            ]
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "ConversationDetailResponse": {
+        "type": "object",
+        "properties": {
+          "customer": {
+            "$ref": "#/components/schemas/ConversationCustomerSummary"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConversationEntry"
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {}
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "totalPages": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/internal/ai/sms/incoming": {
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Receive inbound SMS from provider webhook",
+        "requestBody": {
+          "required": true,
+          "description": "Request payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIBridgeInboundSmsInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Inbound SMS accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIBridgeWebhookResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/calls/incoming": {
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Receive inbound call from provider webhook",
+        "requestBody": {
+          "required": true,
+          "description": "Request payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIBridgeInboundCallInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Inbound call accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIBridgeWebhookResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/calls/status": {
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Receive inbound call status update",
+        "requestBody": {
+          "required": true,
+          "description": "Request payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIBridgeCallStatusInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Call status accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIBridgeWebhookResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/schedule": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "List scheduled jobs for AI dispatch",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "business_id",
+            "required": true,
+            "description": "Business identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start_date",
+            "required": false,
+            "description": "Schedule start datetime",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end_date",
+            "required": false,
+            "description": "Schedule end datetime",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Schedule list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagination"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/jobs": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "List jobs for AI workflows",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "business_id",
+            "required": true,
+            "description": "Business identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "assigned_staff_id",
+            "required": false,
+            "description": "Filter by assigned staff",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "description": "Filter by status",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "description": "Filter by job type",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "customer_id",
+            "required": false,
+            "description": "Filter by customer",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start_date",
+            "required": false,
+            "description": "Scheduled start lower bound",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end_date",
+            "required": false,
+            "description": "Scheduled end upper bound",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "description": "Search title, service type, customer, address",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "description": "Page number",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "description": "Page size",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagination"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Create a job through the AI bridge",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Request payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "business_id",
+                  "customer_id"
+                ],
+                "properties": {
+                  "business_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "customer_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "assigned_staff_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "nullable": true
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "Job",
+                      "ServiceCall"
+                    ],
+                    "example": "Job"
+                  },
+                  "title": {
+                    "type": "string",
+                    "example": "Emergency HVAC Visit"
+                  },
+                  "job_details": {
+                    "type": "string",
+                    "example": "Customer reports no cooling"
+                  },
+                  "service_type": {
+                    "type": "string",
+                    "example": "HVAC Repair"
+                  },
+                  "address": {
+                    "type": "string",
+                    "example": "123 Main St, Dallas TX"
+                  },
+                  "scheduled_start_time": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "scheduled_end_time": {
+                    "type": "string",
+                    "format": "date-time",
+                    "nullable": true
+                  },
+                  "service_call_fee": {
+                    "type": "number",
+                    "nullable": true,
+                    "example": 99
+                  },
+                  "is_emergency": {
+                    "type": "boolean",
+                    "example": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Job created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/jobs/{id}": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Get one job",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Job identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Update one job",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Job identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Request payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "business_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "customer_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "assigned_staff_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "nullable": true
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "Job",
+                      "ServiceCall"
+                    ],
+                    "example": "Job"
+                  },
+                  "title": {
+                    "type": "string",
+                    "example": "Emergency HVAC Visit"
+                  },
+                  "job_details": {
+                    "type": "string",
+                    "example": "Customer reports no cooling"
+                  },
+                  "service_type": {
+                    "type": "string",
+                    "example": "HVAC Repair"
+                  },
+                  "address": {
+                    "type": "string",
+                    "example": "123 Main St, Dallas TX"
+                  },
+                  "scheduled_start_time": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "scheduled_end_time": {
+                    "type": "string",
+                    "format": "date-time",
+                    "nullable": true
+                  },
+                  "service_call_fee": {
+                    "type": "number",
+                    "nullable": true,
+                    "example": 99
+                  },
+                  "is_emergency": {
+                    "type": "boolean",
+                    "example": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Job updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/jobs/{id}/start": {
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Start a job",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Job identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/jobs/{id}/complete": {
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Complete a job",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Job identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/staff": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "List staff members for scheduling and dispatch",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "business_id",
+            "required": true,
+            "description": "Business identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Staff list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/staff/{id}": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Get one staff member",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Staff identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Staff detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/staff/availability": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Check staff availability for a time window",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "staff_id",
+            "required": true,
+            "description": "Staff identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start_time",
+            "required": true,
+            "description": "Window start",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end_time",
+            "required": true,
+            "description": "Window end",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Availability result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/quotes": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "List quotes for AI workflows",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "business_id",
+            "required": true,
+            "description": "Business identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "assigned_staff_id",
+            "required": false,
+            "description": "Filter by assigned staff",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "description": "Filter by status",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "customer_id",
+            "required": false,
+            "description": "Filter by customer",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start_date",
+            "required": false,
+            "description": "Date lower bound",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end_date",
+            "required": false,
+            "description": "Date upper bound",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "description": "Search title, description, customer",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "description": "Page number",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "description": "Page size",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quote list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagination"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Create a quote through the AI bridge",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Request payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "business_id",
+                  "customer_id"
+                ],
+                "properties": {
+                  "business_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "customer_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "assigned_staff_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "nullable": true
+                  },
+                  "title": {
+                    "type": "string",
+                    "example": "Water Heater Estimate"
+                  },
+                  "description": {
+                    "type": "string",
+                    "example": "Estimate for replacement and install"
+                  },
+                  "scheduled_estimate_date": {
+                    "type": "string",
+                    "format": "date-time",
+                    "nullable": true
+                  },
+                  "price_book_item_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "nullable": true
+                  },
+                  "is_emergency": {
+                    "type": "boolean",
+                    "example": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Quote created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quote"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/quotes/{id}": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Get one quote",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Quote identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quote detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quote"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Update one quote",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Quote identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Request payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "assigned_staff_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "nullable": true
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "scheduled_estimate_date": {
+                    "type": "string",
+                    "format": "date-time",
+                    "nullable": true
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "EstimateScheduled",
+                      "Draft",
+                      "Sent",
+                      "Approved",
+                      "Declined",
+                      "Expired"
+                    ]
+                  },
+                  "total_amount": {
+                    "type": "number",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Quote updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quote"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/quotes/{id}/send": {
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Send a quote",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Quote identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quote sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quote"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/quotes/{id}/approve": {
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Approve a quote",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Quote identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quote approved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/quotes/{id}/decline": {
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Decline a quote",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Quote identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quote declined",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/customers": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "List customers",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "business_id",
+            "required": true,
+            "description": "Business identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "description": "Page number",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "description": "Page size",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "description": "Search query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Customer list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagination"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Create a customer",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Request payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "business_id",
+                  "first_name",
+                  "last_name"
+                ],
+                "properties": {
+                  "business_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "first_name": {
+                    "type": "string",
+                    "example": "Sarah"
+                  },
+                  "last_name": {
+                    "type": "string",
+                    "example": "Johnson"
+                  },
+                  "phone_number": {
+                    "type": "string",
+                    "example": "+15550101010"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "nullable": true
+                  },
+                  "address": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "zip_code": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "notes": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Customer created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Customer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/customers/lookup": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Look up customer by phone number",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "business_id",
+            "required": true,
+            "description": "Business identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "phone",
+            "required": true,
+            "description": "Customer phone number",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Customer lookup result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/customers/{id}": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Get one customer",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Customer identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Customer detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Customer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/customers/{id}/history": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Get customer history",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Customer identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Customer history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/inventory": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "List inventory materials",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "business_id",
+            "required": true,
+            "description": "Business identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inventory list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagination"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/price-book": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "List price book items",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "business_id",
+            "required": true,
+            "description": "Business identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category_id",
+            "required": false,
+            "description": "Optional category filter",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "description": "Search term",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "can_quote_phone",
+            "required": false,
+            "description": "Filter phone-quotable services",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Price book items",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagination"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/price-book/{id}": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Get one price book item",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Price book item identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Price book item",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceBookItem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/invoices": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "List invoices",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "business_id",
+            "required": true,
+            "description": "Business identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "description": "Filter by invoice status",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "description": "Page number",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "description": "Page size",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invoice list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagination"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Create an invoice",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Request payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "business_id",
+                  "job_id"
+                ],
+                "properties": {
+                  "business_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "job_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "due_date": {
+                    "type": "string",
+                    "format": "date-time",
+                    "nullable": true
+                  },
+                  "notes": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "internal_notes": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Invoice created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invoice"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/invoices/{id}": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Get one invoice",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Invoice identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invoice detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invoice"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Update one invoice",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Invoice identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Request payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "due_date": {
+                    "type": "string",
+                    "format": "date-time",
+                    "nullable": true
+                  },
+                  "notes": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "internal_notes": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "Draft",
+                      "Sent",
+                      "PartiallyPaid",
+                      "Paid",
+                      "Overdue",
+                      "Refunded",
+                      "Voided",
+                      "Cancelled"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Invoice updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invoice"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/invoices/{id}/total": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Get invoice totals",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Invoice identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invoice totals",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/invoices/{id}/send": {
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Send invoice to customer",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Invoice identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invoice sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invoice"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/invoices/{id}/void": {
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Void invoice",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Invoice identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invoice voided",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invoice"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/invoices/{id}/refund": {
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Refund invoice",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Invoice identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invoice refunded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invoice"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/payments/{invoiceId}": {
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Record payment for invoice",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invoiceId",
+            "required": true,
+            "description": "Invoice identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Request payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "amount"
+                ],
+                "properties": {
+                  "amount": {
+                    "type": "number",
+                    "example": 250
+                  },
+                  "payment_method": {
+                    "type": "string",
+                    "example": "manual"
+                  },
+                  "paid_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "nullable": true
+                  },
+                  "reference": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Payment recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Payment"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/follow-ups": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "List follow-ups",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "business_id",
+            "required": true,
+            "description": "Business identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "description": "Filter by status",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "customer_id",
+            "required": false,
+            "description": "Filter by customer",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Follow-up list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagination"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Create a follow-up",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Request payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "business_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "Quote",
+                      "Invoice",
+                      "Job"
+                    ],
+                    "example": "Quote"
+                  },
+                  "reference_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "customer_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "scheduled_for": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "channel": {
+                    "type": "string",
+                    "example": "SMS"
+                  },
+                  "status": {
+                    "type": "string",
+                    "example": "Scheduled"
+                  },
+                  "notes": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Follow-up created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/follow-ups/{id}": {
+      "patch": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Update a follow-up",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Follow-up identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Request payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "business_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "Quote",
+                      "Invoice",
+                      "Job"
+                    ],
+                    "example": "Quote"
+                  },
+                  "reference_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "customer_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "scheduled_for": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "channel": {
+                    "type": "string",
+                    "example": "SMS"
+                  },
+                  "status": {
+                    "type": "string",
+                    "example": "Scheduled"
+                  },
+                  "notes": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Follow-up updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/follow-ups/{id}/sent": {
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Mark follow-up as sent",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Follow-up identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Follow-up marked sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/follow-ups/{id}/cancel": {
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Cancel follow-up",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Follow-up identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Follow-up cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/team-checkins": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "List team check-ins",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "business_id",
+            "required": true,
+            "description": "Business identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "staff_id",
+            "required": false,
+            "description": "Filter by staff",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "job_id",
+            "required": false,
+            "description": "Filter by job",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "description": "Filter by status",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start_date",
+            "required": false,
+            "description": "Date lower bound",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end_date",
+            "required": false,
+            "description": "Date upper bound",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Team check-in list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagination"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Create a team check-in",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Request payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "staff_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "job_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "nullable": true
+                  },
+                  "scheduled_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "status": {
+                    "type": "string",
+                    "example": "Pending"
+                  },
+                  "notes": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Team check-in created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/team-checkins/{id}": {
+      "patch": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Update a team check-in",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Team check-in identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Request payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "staff_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "job_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "nullable": true
+                  },
+                  "scheduled_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "status": {
+                    "type": "string",
+                    "example": "Pending"
+                  },
+                  "notes": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Team check-in updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/team-checkins/{id}/receive": {
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Mark team check-in received",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Team check-in identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Team check-in received",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/team-checkins/{id}/escalate": {
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Escalate missed team check-in",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Team check-in identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Team check-in escalated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/dashboard/summary": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Get AI-side dashboard summary",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "business_id",
+            "required": true,
+            "description": "Business identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "period",
+            "required": false,
+            "description": "Dashboard period",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dashboard summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/events": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "List activity events",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "business_id",
+            "required": true,
+            "description": "Business identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "event_type",
+            "required": false,
+            "description": "Filter by event type",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "customer_id",
+            "required": false,
+            "description": "Filter by customer",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "job_id",
+            "required": false,
+            "description": "Filter by job",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "description": "Page number",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "description": "Page size",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagination"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Create an activity event",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Request payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InternalActivityEventInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Event created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalActivityEvent"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/events/event-types": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "List distinct event types",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "business_id",
+            "required": true,
+            "description": "Business identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event types",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalEventTypeListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/conversations": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "List grouped customer conversations",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "business_id",
+            "required": true,
+            "description": "Business identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "channel",
+            "required": false,
+            "description": "Filter by channel",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "description": "Search customer or latest activity",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "description": "Page number",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "description": "Page size",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conversation list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/conversations/{customer_id}": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Get conversation detail for one customer",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customer_id",
+            "required": true,
+            "description": "Customer identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "business_id",
+            "required": true,
+            "description": "Business identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conversation detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/price-lookup": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Lookup services for AI quoting logic",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "business_id",
+            "required": true,
+            "description": "Business identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "description": "Search text",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "service",
+            "required": false,
+            "description": "Alternative search text",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category_id",
+            "required": false,
+            "description": "Category filter",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "can_quote_phone",
+            "required": false,
+            "description": "Filter phone-quotable services",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "description": "Max items",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Price lookup result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIPriceLookupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/radius-check": {
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Check whether a customer zip is inside service radius",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Request payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "business_id",
+                  "customer_zip"
+                ],
+                "properties": {
+                  "business_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "customer_zip": {
+                    "type": "string",
+                    "example": "75001"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Radius check result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/book": {
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Book a quote, job, or service call from AI",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Request payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIBookingInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Booking result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIBookingResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/business-config": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Get full AI business operating config",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "business_id",
+            "required": true,
+            "description": "Business identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "AI business config",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIBusinessConfigResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/business/profile": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Get business profile for AI",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "business_id",
+            "required": true,
+            "description": "Business identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Business profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessProfileResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/business/alerts": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Get alert settings for AI",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "business_id",
+            "required": true,
+            "description": "Business identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Alert settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessAlertSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/business/automation": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Get automation settings for AI",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "business_id",
+            "required": true,
+            "description": "Business identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Automation settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessAutomationSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/business/communication": {
+      "get": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Get communication settings for AI",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "business_id",
+            "required": true,
+            "description": "Business identifier",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Communication settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BusinessCommunicationSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/internal/ai/sms/send": {
+      "post": {
+        "tags": [
+          "AI Bridge"
+        ],
+        "summary": "Send outbound SMS through AI bridge",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "businessTokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Request payload",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "business_id",
+                  "to",
+                  "message"
+                ],
+                "properties": {
+                  "business_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "to": {
+                    "type": "string",
+                    "example": "+15550101010"
+                  },
+                  "message": {
+                    "type": "string",
+                    "example": "Your technician is on the way."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SMS send result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
