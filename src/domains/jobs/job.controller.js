@@ -102,8 +102,10 @@ async function getSchedule(req, res, next) {
 
 async function checkAvailability(req, res, next) {
   try {
-    const { staff_id, start_time, end_time } = req.query;
-    const result = await scheduleService.checkStaffAvailability(staff_id, start_time, end_time);
+    const { staff_id, start_time, end_time, exclude_job_id } = req.query;
+    const result = await scheduleService.checkStaffAvailability(staff_id, start_time, end_time, {
+      exclude_job_id,
+    });
     res.json(result);
   } catch (err) { next(err); }
 }

@@ -8,6 +8,7 @@
     "dev": "nodemon src/server.js",
     "test": "jest --runInBand",
     "test:legacy": "node --test --test-concurrency=1",
+    "export:ai-api": "node scripts/export-ai-api.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",

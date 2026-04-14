@@ -80,6 +80,42 @@ router.get('/schedule', requireFields(['business_id'], 'query'), requireBusiness
  *     tags: [Schedule]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: staff_id
+ *         required: true
+ *         description: Staff member to check for conflicts
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: query
+ *         name: start_time
+ *         required: true
+ *         description: Proposed booking start time in ISO date-time format
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *       - in: query
+ *         name: end_time
+ *         required: true
+ *         description: Proposed booking end time in ISO date-time format
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *       - in: query
+ *         name: exclude_job_id
+ *         required: false
+ *         description: Optional job ID to exclude when editing/rescheduling an existing job
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Availability result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/JobAvailabilityResponse'
  */
 router.get(
   '/availability',

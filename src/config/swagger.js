@@ -183,6 +183,54 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             source: { type: 'string', enum: ['AI', 'Manual', 'SMS'] },
           },
         },
+        JobAvailabilityConflict: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            title: { type: 'string', nullable: true },
+            service_type: { type: 'string', nullable: true },
+            status: { type: 'string', example: 'Scheduled' },
+            address: { type: 'string', nullable: true },
+            scheduled_start_time: { type: 'string', format: 'date-time', nullable: true },
+            scheduled_end_time: { type: 'string', format: 'date-time', nullable: true },
+            customer: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                first_name: { type: 'string', nullable: true },
+                last_name: { type: 'string', nullable: true },
+              },
+            },
+            assigned_staff: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                name: { type: 'string', nullable: true },
+                role: { type: 'string', nullable: true },
+              },
+            },
+          },
+        },
+        JobAvailabilityResponse: {
+          type: 'object',
+          properties: {
+            available: { type: 'boolean', example: false },
+            staff_id: { type: 'string', format: 'uuid' },
+            requested_window: {
+              type: 'object',
+              properties: {
+                start_time: { type: 'string', format: 'date-time' },
+                end_time: { type: 'string', format: 'date-time' },
+              },
+            },
+            conflicts: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/JobAvailabilityConflict' },
+            },
+          },
+        },
         Quote: {
           type: 'object',
           properties: {
