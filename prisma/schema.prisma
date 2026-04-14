@@ -184,6 +184,8 @@ model Business {
   ai_phone_number           String?
   ai_phone_country          String?
   ai_phone_area_code        String?
+  twilio_phone_sid          String?                @unique
+  twilio_phone_friendly_name String?
   ai_receptionist_name      String?
   voice_gender              VoiceGender?
 

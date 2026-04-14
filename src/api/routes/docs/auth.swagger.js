@@ -18,7 +18,14 @@
  * @swagger
  * tags:
  *   name: Auth
- *   description: Authentication, account management, and onboarding
+ *   description: Authentication and account management
+ */
+
+/**
+ * @swagger
+ * tags:
+ *   name: Onboarding
+ *   description: Onboarding setup flow and AI number provisioning
  */
 
 /**
@@ -188,7 +195,7 @@
  * @swagger
  * /api/auth/onboarding/step2:
  *   post:
- *     tags: [Auth]
+ *     tags: [Onboarding]
  *     summary: "Step 2: Organization contact info"
  *     description: |
  *       Sets the user's name and business details.
@@ -227,7 +234,7 @@
  * @swagger
  * /api/auth/onboarding/send-otp:
  *   post:
- *     tags: [Auth]
+ *     tags: [Onboarding]
  *     summary: "OTP: Send SMS verification code to phone number"
  *     description: |
  *       Generates a 5-digit OTP valid for 10 minutes, saves the phone number
@@ -273,7 +280,7 @@
  * @swagger
  * /api/auth/onboarding/verify-otp:
  *   post:
- *     tags: [Auth]
+ *     tags: [Onboarding]
  *     summary: "OTP: Verify the SMS code and advance to step 3"
  *     security:
  *       - bearerAuth: []
@@ -312,7 +319,7 @@
  * @swagger
  * /api/auth/onboarding/skip-otp:
  *   post:
- *     tags: [Auth]
+ *     tags: [Onboarding]
  *     summary: "OTP: Skip phone verification and advance to step 3"
  *     description: |
  *       The user can skip phone verification. Advances onboarding_step to 3.
@@ -327,7 +334,7 @@
  * @swagger
  * /api/auth/onboarding/available-numbers:
  *   get:
- *     tags: [Auth]
+ *     tags: [Onboarding]
  *     summary: "Step 3 prep: Search available AI phone numbers"
  *     security:
  *       - bearerAuth: []
@@ -354,7 +361,7 @@
  * @swagger
  * /api/auth/onboarding/step3:
  *   post:
- *     tags: [Auth]
+ *     tags: [Onboarding]
  *     summary: "Step 3: Provision an AI business phone number"
  *     description: |
  *       Matches the "Get Your AI Business Number" onboarding screen.
@@ -383,7 +390,7 @@
  * @swagger
  * /api/auth/onboarding/skip3:
  *   post:
- *     tags: [Auth]
+ *     tags: [Onboarding]
  *     summary: "Step 3: Skip AI number setup"
  *     security:
  *       - bearerAuth: []
@@ -396,7 +403,7 @@
  * @swagger
  * /api/auth/onboarding/step4:
  *   post:
- *     tags: [Auth]
+ *     tags: [Onboarding]
  *     summary: "Step 4: Service area setup"
  *     description: |
  *       Matches the service setup screen where the user provides home ZIP,
@@ -426,7 +433,7 @@
  * @swagger
  * /api/auth/onboarding/step5:
  *   post:
- *     tags: [Auth]
+ *     tags: [Onboarding]
  *     summary: "Step 5: Upload business logo (completes onboarding)"
  *     description: |
  *       Completes onboarding and returns the final success-state payload.

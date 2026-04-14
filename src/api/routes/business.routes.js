@@ -1,8 +1,26 @@
 /**
  * @swagger
  * tags:
- *   name: Business
- *   description: Business profile and settings
+ *   name: Business Profile
+ *   description: Company profile and general business settings
+ */
+/**
+ * @swagger
+ * tags:
+ *   name: Alerts
+ *   description: Alert preference settings
+ */
+/**
+ * @swagger
+ * tags:
+ *   name: Automation
+ *   description: Reminder and operational automation settings
+ */
+/**
+ * @swagger
+ * tags:
+ *   name: Communication
+ *   description: Communication and AI receptionist settings
  */
 const { Router } = require('express');
 const businessController = require('../../domains/business/business.controller');
@@ -17,7 +35,7 @@ router.use(requireAuth);
  * /api/business/profile:
  *   get:
  *     summary: Get business profile
- *     tags: [Business]
+ *     tags: [Business Profile]
  *     security: [{bearerAuth: []}]
  *     parameters:
  *       - in: query
@@ -39,7 +57,7 @@ router.get('/profile', requireFields(['business_id'], 'query'), requireBusinessA
  * /api/business/profile:
  *   patch:
  *     summary: Update business profile
- *     tags: [Business]
+ *     tags: [Business Profile]
  *     security: [{bearerAuth: []}]
  *     requestBody:
  *       required: true
@@ -62,7 +80,7 @@ router.patch('/profile', requireFields(['business_id']), requireBusinessAccess('
  * /api/business/alerts:
  *   get:
  *     summary: Get alert settings
- *     tags: [Business]
+ *     tags: [Alerts]
  *     security: [{bearerAuth: []}]
  *     parameters:
  *       - in: query
@@ -84,7 +102,7 @@ router.get('/alerts', requireFields(['business_id'], 'query'), requireBusinessAc
  * /api/business/alerts:
  *   patch:
  *     summary: Update alert settings
- *     tags: [Business]
+ *     tags: [Alerts]
  *     security: [{bearerAuth: []}]
  *     requestBody:
  *       required: true
@@ -107,7 +125,7 @@ router.patch('/alerts', requireFields(['business_id']), requireBusinessAccess('b
  * /api/business/automation:
  *   get:
  *     summary: Get automation settings
- *     tags: [Business]
+ *     tags: [Automation]
  *     security: [{bearerAuth: []}]
  *     parameters:
  *       - in: query
@@ -129,7 +147,7 @@ router.get('/automation', requireFields(['business_id'], 'query'), requireBusine
  * /api/business/automation:
  *   patch:
  *     summary: Update automation settings
- *     tags: [Business]
+ *     tags: [Automation]
  *     security: [{bearerAuth: []}]
  *     requestBody:
  *       required: true
@@ -152,7 +170,7 @@ router.patch('/automation', requireFields(['business_id']), requireBusinessAcces
  * /api/business/communication:
  *   get:
  *     summary: Get communication settings
- *     tags: [Business]
+ *     tags: [Communication]
  *     security: [{bearerAuth: []}]
  *     parameters:
  *       - in: query
@@ -174,7 +192,7 @@ router.get('/communication', requireFields(['business_id'], 'query'), requireBus
  * /api/business/communication:
  *   patch:
  *     summary: Update communication settings
- *     tags: [Business]
+ *     tags: [Communication]
  *     security: [{bearerAuth: []}]
  *     requestBody:
  *       required: true

@@ -66,7 +66,7 @@ router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('
  * /api/jobs/schedule:
  *   get:
  *     summary: Get job schedule
- *     tags: [Jobs]
+ *     tags: [Schedule]
  *     security:
  *       - bearerAuth: []
  */
@@ -77,7 +77,7 @@ router.get('/schedule', requireFields(['business_id'], 'query'), requireBusiness
  * /api/jobs/availability:
  *   get:
  *     summary: Check staff/job availability
- *     tags: [Jobs]
+ *     tags: [Schedule]
  *     security:
  *       - bearerAuth: []
  */

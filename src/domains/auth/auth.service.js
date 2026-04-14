@@ -22,6 +22,7 @@ const { ValidationError, ConflictError, AuthenticationError, NotFoundError } = r
 const SALT_ROUNDS = 12;
 const OTP_EXPIRY_MINUTES = 10;
 const RESET_CODE_EXPIRY_MINUTES = 10;
+const TWILIO_AVAILABLE_NUMBER_LIMIT = 5;
 
 // ============================================
 // Step 1: Account Creation
@@ -192,8 +193,7 @@ async function onboardingStep2(userId, data) {
 // ============================================
 
 /**
- * Return a list of available placeholder phone numbers based on search type.
- * In production this would call Twilio's available numbers API.
+ * Return a list of available Twilio phone numbers based on search type.
  *
  * @param {string} type - 'city' | 'area_code' | 'toll_free'
  * @param {string} [city] - city name (used when type=city)
@@ -205,60 +205,52 @@ async function getAvailableNumbers({ type, city, area_code }) {
     throw new ValidationError(`type must be one of: ${validTypes.join(', ')}`);
   }
 
-  // Generate realistic-looking placeholder numbers based on search type
-  const numbers = [];
+  const client = getTwilioClient();
+  const countryCode = normalizeTwilioCountryCode(env.TWILIO_NUMBER_COUNTRY_CODE);
+  const searchParams = { limit: TWILIO_AVAILABLE_NUMBER_LIMIT };
 
-  if (type === 'toll_free') {
-    const tollFreePrefixes = ['800', '888', '877', '866', '855'];
-    for (let i = 0; i < 5; i++) {
-      const prefix = tollFreePrefixes[i % tollFreePrefixes.length];
-      const digits = Math.floor(1000000 + Math.random() * 9000000).toString();
-      numbers.push({
-        phone_number: `+1${prefix}${digits}`,
-        friendly_name: `(${prefix}) ${digits.slice(0, 3)}-${digits.slice(3)}`,
-        type: 'toll_free',
-      });
-    }
-  } else if (type === 'area_code') {
-    if (!area_code) throw new ValidationError('area_code is required when type is area_code.');
-    const cleaned = area_code.replace(/\D/g, '').slice(0, 3);
+  if (type === 'area_code') {
+    const cleaned = String(area_code || '').replace(/\D/g, '').slice(0, 3);
     if (cleaned.length < 3) throw new ValidationError('area_code must be a 3-digit code.');
-    for (let i = 0; i < 5; i++) {
-      const digits = Math.floor(1000000 + Math.random() * 9000000).toString();
-      numbers.push({
-        phone_number: `+1${cleaned}${digits}`,
-        friendly_name: `(${cleaned}) ${digits.slice(0, 3)}-${digits.slice(3)}`,
-        type: 'local',
-        area_code: cleaned,
-      });
-    }
-  } else {
-    // city
-    if (!city) throw new ValidationError('city is required when type is city.');
-    // Map a few cities to area codes; fall back to a generic local number
-    const cityAreaCodes = {
-      'new york': '212', 'los angeles': '213', 'chicago': '312',
-      'houston': '713', 'phoenix': '602', 'philadelphia': '215',
-      'san antonio': '210', 'san diego': '619', 'dallas': '214',
-      'san jose': '408', 'austin': '512', 'jacksonville': '904',
-      'lagos': '234', 'london': '44', 'toronto': '416',
-    };
-    const key = city.toLowerCase().trim();
-    const areaCode = cityAreaCodes[key] || '555';
-    for (let i = 0; i < 5; i++) {
-      const digits = Math.floor(1000000 + Math.random() * 9000000).toString();
-      numbers.push({
-        phone_number: `+1${areaCode}${digits}`,
-        friendly_name: `(${areaCode}) ${digits.slice(0, 3)}-${digits.slice(3)}`,
-        type: 'local',
-        city,
-        area_code: areaCode,
-      });
-    }
+    searchParams.areaCode = Number(cleaned);
   }
+
+  if (type === 'city') {
+    const normalizedCity = String(city || '').trim();
+    if (!normalizedCity) throw new ValidationError('city is required when type is city.');
+    searchParams.inRegion = normalizedCity;
+  }
+
+  let incomingNumbers;
+  try {
+    const availablePhoneNumbers = client.availablePhoneNumbers(countryCode);
+    incomingNumbers = type === 'toll_free'
+      ? await availablePhoneNumbers.tollFree.list(searchParams)
+      : await availablePhoneNumbers.local.list(searchParams);
+  } catch (err) {
+    logger.error(`Twilio available number lookup failed: ${err.message}`);
+    throw new ValidationError('Unable to fetch available Twilio phone numbers right now.');
+  }
+
+  const numbers = incomingNumbers.map((record) => ({
+    phone_number: record.phoneNumber,
+    friendly_name: record.friendlyName || record.phoneNumber,
+    locality: record.locality || null,
+    region: record.region || null,
+    postal_code: record.postalCode || null,
+    country: record.isoCountry || countryCode,
+    capabilities: {
+      voice: Boolean(record.capabilities?.voice),
+      sms: Boolean(record.capabilities?.sms),
+      mms: Boolean(record.capabilities?.mms),
+    },
+    type: type === 'toll_free' ? 'toll_free' : 'local',
+    area_code: extractAreaCode(record.phoneNumber),
+  }));
 
   return {
     type,
+    country: countryCode,
     numbers,
     count: numbers.length,
   };
@@ -280,6 +272,32 @@ async function onboardingStep3(userId, data) {
     throw new ValidationError('No business found. Please complete step 2 first.');
   }
 
+  if (business.twilio_phone_sid && business.ai_phone_number && business.ai_phone_number !== phone_number) {
+    throw new ValidationError('This business already has a provisioned Twilio number.');
+  }
+
+  const client = getTwilioClient();
+  const normalizedPhoneNumber = normalizeE164Number(phone_number);
+  const friendlyName = buildBusinessPhoneFriendlyName(business.name, normalizedPhoneNumber);
+
+  let provisionedNumber;
+  try {
+    provisionedNumber = await client.incomingPhoneNumbers.create(buildIncomingPhoneNumberPayload({
+      phoneNumber: normalizedPhoneNumber,
+      friendlyName,
+    }));
+
+    if (env.TWILIO_MESSAGING_SERVICE_SID) {
+      await client.messaging.v1
+        .services(env.TWILIO_MESSAGING_SERVICE_SID)
+        .phoneNumbers
+        .create({ phoneNumberSid: provisionedNumber.sid });
+    }
+  } catch (err) {
+    logger.error(`Twilio phone number provisioning failed for business ${business.id}: ${err.message}`);
+    throw new ValidationError('Unable to provision the selected Twilio phone number.');
+  }
+
   const [user, updatedBusiness] = await Promise.all([
     prisma.user.update({
       where: { id: userId },
@@ -288,21 +306,24 @@ async function onboardingStep3(userId, data) {
     prisma.business.update({
       where: { id: business.id },
       data: {
-        ai_phone_number: phone_number,
-        dedicated_phone_number: phone_number,
-        ai_phone_country: data.country || null,
-        ai_phone_area_code: data.area_code || null,
+        ai_phone_number: provisionedNumber.phoneNumber,
+        dedicated_phone_number: provisionedNumber.phoneNumber,
+        ai_phone_country: provisionedNumber.isoCountry || data.country || null,
+        ai_phone_area_code: data.area_code || extractAreaCode(provisionedNumber.phoneNumber),
+        twilio_phone_sid: provisionedNumber.sid,
+        twilio_phone_friendly_name: provisionedNumber.friendlyName || friendlyName,
       },
     }),
   ]);
 
-  logger.info(`Onboarding step 3 completed for user: ${user.email}, AI number: ${phone_number}`);
+  logger.info(`Onboarding step 3 completed for user: ${user.email}, AI number: ${provisionedNumber.phoneNumber}`);
 
   return {
     message: 'AI business number provisioned.',
     user: sanitizeUser(user),
     business: sanitizeBusiness(updatedBusiness),
-    ai_phone_number: phone_number,
+    ai_phone_number: provisionedNumber.phoneNumber,
+    twilio_phone_sid: provisionedNumber.sid,
     onboarding_step: 4,
   };
 }
@@ -653,18 +674,26 @@ async function sendOtp(userId, { phone_number }) {
   ]);
 
   // Send SMS via Twilio if credentials are available, otherwise log
-  const hasTwilio = env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_PHONE_NUMBER;
+  const hasTwilio = env.TWILIO_ACCOUNT_SID
+    && env.TWILIO_AUTH_TOKEN
+    && (env.TWILIO_MESSAGING_SERVICE_SID || env.TWILIO_PHONE_NUMBER);
   let otpForDev = null;
 
   if (hasTwilio) {
     try {
-      const twilio = require('twilio');
-      const client = twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
-      await client.messages.create({
+      const client = getTwilioClient();
+      const messagePayload = {
         body: `Your Ajicore verification code is: ${otp}. It expires in ${OTP_EXPIRY_MINUTES} minutes.`,
-        from: env.TWILIO_PHONE_NUMBER,
         to: phone_number,
-      });
+      };
+
+      if (env.TWILIO_MESSAGING_SERVICE_SID) {
+        messagePayload.messagingServiceSid = env.TWILIO_MESSAGING_SERVICE_SID;
+      } else {
+        messagePayload.from = env.TWILIO_PHONE_NUMBER;
+      }
+
+      await client.messages.create(messagePayload);
       logger.info(`OTP sent via SMS to ${phone_number} for user: ${user.email}`);
     } catch (err) {
       logger.warn(`Twilio SDK unavailable or SMS send failed for ${user.email}: ${err.message}`);
@@ -762,6 +791,67 @@ function sanitizeBusiness(business) {
   if (!business) return business;
   const { internal_api_token, ...safe } = business;
   return safe;
+}
+
+function getTwilioClient() {
+  if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN) {
+    throw new ValidationError('Twilio credentials are not configured.');
+  }
+
+  try {
+    const twilio = require('twilio');
+    return twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
+  } catch (_err) {
+    throw new ValidationError('Twilio SDK is not installed. Run npm install to add the twilio package.');
+  }
+}
+
+function normalizeTwilioCountryCode(countryCode) {
+  return String(countryCode || 'US').trim().toUpperCase();
+}
+
+function normalizeE164Number(phoneNumber) {
+  const normalized = String(phoneNumber || '').trim();
+  if (!/^\+\d{8,15}$/.test(normalized)) {
+    throw new ValidationError('phone_number must be a valid E.164 phone number.');
+  }
+  return normalized;
+}
+
+function buildBusinessPhoneFriendlyName(businessName, phoneNumber) {
+  const baseName = String(businessName || 'Ajicore Business').trim();
+  return `${baseName} - ${phoneNumber}`.slice(0, 64);
+}
+
+function buildIncomingPhoneNumberPayload({ phoneNumber, friendlyName }) {
+  const payload = {
+    phoneNumber,
+    friendlyName,
+  };
+
+  if (env.TWILIO_SMS_WEBHOOK_URL) {
+    payload.smsUrl = env.TWILIO_SMS_WEBHOOK_URL;
+    payload.smsMethod = 'POST';
+  }
+
+  if (env.TWILIO_VOICE_WEBHOOK_URL) {
+    payload.voiceUrl = env.TWILIO_VOICE_WEBHOOK_URL;
+    payload.voiceMethod = 'POST';
+  }
+
+  if (env.TWILIO_STATUS_CALLBACK_URL) {
+    payload.statusCallback = env.TWILIO_STATUS_CALLBACK_URL;
+    payload.statusCallbackMethod = 'POST';
+  }
+
+  return payload;
+}
+
+function extractAreaCode(phoneNumber) {
+  const digits = String(phoneNumber || '').replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) return digits.slice(1, 4);
+  if (digits.length >= 10) return digits.slice(0, 3);
+  return null;
 }
 
 function validateStoredResetCode(user, code) {

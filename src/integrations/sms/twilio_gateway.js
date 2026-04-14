@@ -32,11 +32,16 @@ async function sendMessage(to, body) {
     throw new Error('Twilio is not configured. Install twilio package and set credentials.');
   }
 
-  const message = await client.messages.create({
-    body,
-    from: env.TWILIO_PHONE_NUMBER,
-    to,
-  });
+  const payload = { body, to };
+  if (env.TWILIO_MESSAGING_SERVICE_SID) {
+    payload.messagingServiceSid = env.TWILIO_MESSAGING_SERVICE_SID;
+  } else if (env.TWILIO_PHONE_NUMBER) {
+    payload.from = env.TWILIO_PHONE_NUMBER;
+  } else {
+    throw new Error('Twilio outbound sender is not configured. Set TWILIO_MESSAGING_SERVICE_SID or TWILIO_PHONE_NUMBER.');
+  }
+
+  const message = await client.messages.create(payload);
 
   logger.info(`SMS sent to ${to}: ${message.sid}`);
   return { sid: message.sid, status: message.status };

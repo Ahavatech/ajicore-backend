@@ -5,8 +5,8 @@
 /**
  * @swagger
  * tags:
- *   name: Staff
- *   description: Staff management, timesheets, and payroll
+ *   name: Team
+ *   description: Team members, timesheets, payroll, and clock events
  */
 
 const { Router } = require('express');
@@ -22,7 +22,7 @@ router.use(requireAuth);
  * /api/staff:
  *   get:
  *     summary: Get all staff members
- *     tags: [Staff]
+ *     tags: [Team]
  *     security:
  *       - bearerAuth: []
  */
@@ -33,7 +33,7 @@ router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('
  * /api/staff/payroll:
  *   get:
  *     summary: Calculate payroll for staff
- *     tags: [Staff]
+ *     tags: [Team]
  *     security:
  *       - bearerAuth: []
  */
@@ -44,7 +44,7 @@ router.get('/payroll', requireFields(['business_id'], 'query'), requireBusinessA
  * /api/staff/timesheets:
  *   get:
  *     summary: Get staff timesheets
- *     tags: [Staff]
+ *     tags: [Team]
  *     security:
  *       - bearerAuth: []
  */
@@ -55,7 +55,7 @@ router.get('/timesheets', requireFields(['business_id'], 'query'), requireBusine
  * /api/staff/{id}:
  *   get:
  *     summary: Get a staff member by ID
- *     tags: [Staff]
+ *     tags: [Team]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -72,7 +72,7 @@ router.get('/:id', validateUUID('id'), requireResourceAccess('staff'), staffCont
  * /api/staff:
  *   post:
  *     summary: Create a new staff member
- *     tags: [Staff]
+ *     tags: [Team]
  *     security:
  *       - bearerAuth: []
  */
@@ -83,7 +83,7 @@ router.post('/', requireFields(['business_id', 'name', 'hourly_rate']), requireB
  * /api/staff/{id}:
  *   patch:
  *     summary: Update a staff member
- *     tags: [Staff]
+ *     tags: [Team]
  *     security:
  *       - bearerAuth: []
  */
@@ -94,7 +94,7 @@ router.patch('/:id', validateUUID('id'), requireResourceAccess('staff'), staffCo
  * /api/staff/{id}:
  *   delete:
  *     summary: Delete a staff member
- *     tags: [Staff]
+ *     tags: [Team]
  *     security:
  *       - bearerAuth: []
  */
@@ -105,7 +105,7 @@ router.delete('/:id', validateUUID('id'), requireResourceAccess('staff'), staffC
  * /api/staff/{id}/clock-in:
  *   post:
  *     summary: Clock in a staff member
- *     tags: [Staff]
+ *     tags: [Team]
  *     security:
  *       - bearerAuth: []
  */
@@ -116,7 +116,7 @@ router.post('/:id/clock-in', validateUUID('id'), requireResourceAccess('staff'),
  * /api/staff/{id}/clock-out:
  *   post:
  *     summary: Clock out a staff member
- *     tags: [Staff]
+ *     tags: [Team]
  *     security:
  *       - bearerAuth: []
  */

@@ -5,9 +5,9 @@
  *     description: Bank transaction tracking and categorization rules
  *   - name: AI Logs
  *     description: AI event and activity log inspection
- *   - name: FollowUps
+ *   - name: Follow-Ups
  *     description: Automated quote, invoice, and reminder follow-ups
- *   - name: TeamCheckins
+ *   - name: Team Check-Ins
  *     description: Staff safety and progress check-ins
  */
 
@@ -489,7 +489,7 @@
  * /api/follow-ups:
  *   get:
  *     summary: List follow-ups
- *     tags: [FollowUps]
+ *     tags: [Follow-Ups]
  *     security: [{bearerAuth: []}]
  *     parameters:
  *       - in: query
@@ -513,7 +513,7 @@
  *         description: Follow-ups returned successfully
  *   post:
  *     summary: Create a follow-up
- *     tags: [FollowUps]
+ *     tags: [Follow-Ups]
  *     security: [{bearerAuth: []}]
  *     requestBody:
  *       required: true
@@ -539,7 +539,7 @@
  * /api/follow-ups/{id}:
  *   get:
  *     summary: Get a follow-up by ID
- *     tags: [FollowUps]
+ *     tags: [Follow-Ups]
  *     security: [{bearerAuth: []}]
  *     parameters:
  *       - in: path
@@ -551,7 +551,7 @@
  *         description: Follow-up returned successfully
  *   patch:
  *     summary: Update a follow-up
- *     tags: [FollowUps]
+ *     tags: [Follow-Ups]
  *     security: [{bearerAuth: []}]
  *     parameters:
  *       - in: path
@@ -576,7 +576,7 @@
  *         description: Follow-up updated successfully
  *   delete:
  *     summary: Delete a follow-up
- *     tags: [FollowUps]
+ *     tags: [Follow-Ups]
  *     security: [{bearerAuth: []}]
  *     parameters:
  *       - in: path
@@ -590,7 +590,7 @@
  * /api/follow-ups/{id}/sent:
  *   post:
  *     summary: Mark a follow-up as sent
- *     tags: [FollowUps]
+ *     tags: [Follow-Ups]
  *     security: [{bearerAuth: []}]
  *     parameters:
  *       - in: path
@@ -604,7 +604,7 @@
  * /api/follow-ups/{id}/cancel:
  *   post:
  *     summary: Cancel a follow-up
- *     tags: [FollowUps]
+ *     tags: [Follow-Ups]
  *     security: [{bearerAuth: []}]
  *     parameters:
  *       - in: path
@@ -621,7 +621,7 @@
  * /api/team-checkins:
  *   get:
  *     summary: List team check-ins
- *     tags: [TeamCheckins]
+ *     tags: [Team Check-Ins]
  *     security: [{bearerAuth: []}]
  *     parameters:
  *       - in: query
@@ -648,7 +648,7 @@
  *         description: Check-ins returned successfully
  *   post:
  *     summary: Schedule a team check-in
- *     tags: [TeamCheckins]
+ *     tags: [Team Check-Ins]
  *     security: [{bearerAuth: []}]
  *     requestBody:
  *       required: true
@@ -669,7 +669,7 @@
  * /api/team-checkins/{id}:
  *   get:
  *     summary: Get a team check-in by ID
- *     tags: [TeamCheckins]
+ *     tags: [Team Check-Ins]
  *     security: [{bearerAuth: []}]
  *     parameters:
  *       - in: path
@@ -681,7 +681,7 @@
  *         description: Check-in returned successfully
  *   patch:
  *     summary: Update a team check-in
- *     tags: [TeamCheckins]
+ *     tags: [Team Check-Ins]
  *     security: [{bearerAuth: []}]
  *     parameters:
  *       - in: path
@@ -705,7 +705,7 @@
  *         description: Check-in updated successfully
  *   delete:
  *     summary: Delete a team check-in
- *     tags: [TeamCheckins]
+ *     tags: [Team Check-Ins]
  *     security: [{bearerAuth: []}]
  *     parameters:
  *       - in: path
@@ -719,7 +719,7 @@
  * /api/team-checkins/{id}/receive:
  *   post:
  *     summary: Mark a team check-in as received
- *     tags: [TeamCheckins]
+ *     tags: [Team Check-Ins]
  *     security: [{bearerAuth: []}]
  *     parameters:
  *       - in: path
@@ -740,7 +740,7 @@
  * /api/team-checkins/{id}/escalate:
  *   post:
  *     summary: Escalate a team check-in
- *     tags: [TeamCheckins]
+ *     tags: [Team Check-Ins]
  *     security: [{bearerAuth: []}]
  *     parameters:
  *       - in: path

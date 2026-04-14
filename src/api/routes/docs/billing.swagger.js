@@ -247,7 +247,7 @@
  * /api/billing/payments/{invoiceId}:
  *   post:
  *     summary: Process payment for an invoice
- *     tags: [Billing]
+ *     tags: [Payments]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -278,7 +278,7 @@
  * /api/billing/expenses:
  *   get:
  *     summary: Get all expenses
- *     tags: [Billing]
+ *     tags: [Expenses]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -297,7 +297,7 @@
  * /api/billing/expenses:
  *   post:
  *     summary: Create a new expense
- *     tags: [Billing]
+ *     tags: [Expenses]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -320,7 +320,7 @@
  * /api/billing/expenses/{id}:
  *   patch:
  *     summary: Update an expense
- *     tags: [Billing]
+ *     tags: [Expenses]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -348,7 +348,7 @@
  * /api/billing/expenses/{id}:
  *   delete:
  *     summary: Delete an expense
- *     tags: [Billing]
+ *     tags: [Expenses]
  *     security:
  *       - bearerAuth: []
  *     responses:
