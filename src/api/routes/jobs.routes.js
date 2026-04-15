@@ -58,6 +58,20 @@ router.use(requireAuth);
  *       - in: query
  *         name: limit
  *         schema: { type: integer, default: 20 }
+ *     responses:
+ *       200:
+ *         description: Job list retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Pagination'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Job'
  */
 router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), jobController.getAllJobs);
 
@@ -69,6 +83,26 @@ router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('
  *     tags: [Schedule]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: business_id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *       - in: query
+ *         name: start_date
+ *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: end_date
+ *         schema: { type: string, format: date-time }
+ *     responses:
+ *       200:
+ *         description: Schedule entries retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Job'
  */
 router.get('/schedule', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), jobController.getSchedule);
 
@@ -138,6 +172,14 @@ router.get(
  *         required: true
  *         schema:
  *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Job retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Job'
  */
 router.get('/:id', validateUUID('id'), requireResourceAccess('job'), jobController.getJobById);
 
@@ -169,6 +211,13 @@ router.get('/:id', validateUUID('id'), requireResourceAccess('job'), jobControll
  *               service_call_fee: { type: number }
  *               is_emergency: { type: boolean }
  *               status: { type: string }
+ *     responses:
+ *       201:
+ *         description: Job created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Job'
  */
 router.post('/', requireFields(['business_id', 'customer_id']), requireBusinessAccess('body'), jobController.createJob);
 
@@ -197,6 +246,13 @@ router.post('/', requireFields(['business_id', 'customer_id']), requireBusinessA
  *               service_call_fee: { type: number }
  *               is_emergency: { type: boolean }
  *               status: { type: string }
+ *     responses:
+ *       200:
+ *         description: Job updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Job'
  */
 router.patch('/:id', validateUUID('id'), requireResourceAccess('job'), jobController.updateJob);
 
@@ -208,6 +264,18 @@ router.patch('/:id', validateUUID('id'), requireResourceAccess('job'), jobContro
  *     tags: [Jobs]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Job started successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Job'
  */
 router.post('/:id/start', validateUUID('id'), requireResourceAccess('job'), jobController.startJob);
 
@@ -219,6 +287,18 @@ router.post('/:id/start', validateUUID('id'), requireResourceAccess('job'), jobC
  *     tags: [Jobs]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Job completed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Job'
  */
 router.post('/:id/complete', validateUUID('id'), requireResourceAccess('job'), jobController.completeJob);
 
@@ -230,6 +310,24 @@ router.post('/:id/complete', validateUUID('id'), requireResourceAccess('job'), j
  *     tags: [Jobs]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/InventoryDeductionInput'
+ *     responses:
+ *       200:
+ *         description: Job materials added successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Job'
  */
 router.post('/:id/materials', validateUUID('id'), requireResourceAccess('job'), requireFields(['materials']), jobController.addMaterials);
 
@@ -241,6 +339,31 @@ router.post('/:id/materials', validateUUID('id'), requireResourceAccess('job'), 
  *     tags: [Jobs]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [photo_urls]
+ *             properties:
+ *               photo_urls:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: uri
+ *     responses:
+ *       200:
+ *         description: Job photos added successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Job'
  */
 router.post('/:id/photos', validateUUID('id'), requireResourceAccess('job'), requireFields(['photo_urls']), jobController.addPhotos);
 
@@ -252,6 +375,14 @@ router.post('/:id/photos', validateUUID('id'), requireResourceAccess('job'), req
  *     tags: [Jobs]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Job deleted successfully
  */
 router.delete('/:id', validateUUID('id'), requireResourceAccess('job'), jobController.deleteJob);
 

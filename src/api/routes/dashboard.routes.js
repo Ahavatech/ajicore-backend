@@ -56,6 +56,13 @@ router.get('/summary', requireFields(['business_id'], 'query'), requireBusinessA
  *       - in: query
  *         name: end_date
  *         schema: {type: string, format: date}
+ *     responses:
+ *       200:
+ *         description: Weekly report payload
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/WeeklyReportResponse'
  */
 router.get('/weekly-report', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), dashboardController.getWeeklyReport);
 

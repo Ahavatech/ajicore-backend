@@ -122,6 +122,10 @@
  *     responses:
  *       200:
  *         description: User profile object
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserProfile'
  *       401:
  *         description: Unauthorized
  */

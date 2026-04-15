@@ -49,6 +49,20 @@ router.use(requireAuth);
  *       - in: query
  *         name: limit
  *         schema: { type: integer, default: 20 }
+ *     responses:
+ *       200:
+ *         description: Quote list retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Pagination'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Quote'
  */
 router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), quoteController.getAll);
 /**
@@ -59,6 +73,18 @@ router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('
  *     tags: [Quotes]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Quote retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Quote'
  */
 router.get('/:id', validateUUID('id'), requireResourceAccess('quote'), quoteController.getById);
 
@@ -70,6 +96,19 @@ router.get('/:id', validateUUID('id'), requireResourceAccess('quote'), quoteCont
  *     tags: [Quotes]
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/QuoteInput'
+ *     responses:
+ *       201:
+ *         description: Quote created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Quote'
  */
 router.post('/', requireFields(['business_id', 'customer_id']), requireBusinessAccess('body'), quoteController.create);
 /**
@@ -80,6 +119,24 @@ router.post('/', requireFields(['business_id', 'customer_id']), requireBusinessA
  *     tags: [Quotes]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/QuoteUpdateInput'
+ *     responses:
+ *       200:
+ *         description: Quote updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Quote'
  */
 router.patch('/:id', validateUUID('id'), requireResourceAccess('quote'), quoteController.update);
 
@@ -91,6 +148,18 @@ router.patch('/:id', validateUUID('id'), requireResourceAccess('quote'), quoteCo
  *     tags: [Quotes]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Quote sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Quote'
  */
 router.post('/:id/send', validateUUID('id'), requireResourceAccess('quote'), quoteController.sendQuote);
 
@@ -102,6 +171,20 @@ router.post('/:id/send', validateUUID('id'), requireResourceAccess('quote'), quo
  *     tags: [Quotes]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Quote approved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               oneOf:
+ *                 - $ref: '#/components/schemas/Quote'
+ *                 - $ref: '#/components/schemas/Job'
  */
 router.post('/:id/approve', validateUUID('id'), requireResourceAccess('quote'), quoteController.approve);
 
@@ -113,8 +196,44 @@ router.post('/:id/approve', validateUUID('id'), requireResourceAccess('quote'), 
  *     tags: [Quotes]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason: { type: string }
+ *     responses:
+ *       200:
+ *         description: Quote declined successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Quote'
  */
 router.post('/:id/decline', validateUUID('id'), requireResourceAccess('quote'), quoteController.decline);
+/**
+ * @swagger
+ * /api/quotes/{id}:
+ *   delete:
+ *     summary: Delete a quote
+ *     tags: [Quotes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Quote deleted successfully
+ */
 router.delete('/:id', validateUUID('id'), requireResourceAccess('quote'), quoteController.remove);
 
 module.exports = router;

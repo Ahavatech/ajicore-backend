@@ -25,6 +25,26 @@ router.use(requireAuth);
  *     tags: [Inventory]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: business_id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *       - in: query
+ *         name: low_stock
+ *         schema: { type: boolean }
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Material list retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Material'
  */
 router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), materialController.getAllMaterials);
 
@@ -42,6 +62,14 @@ router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('
  *         required: true
  *         schema:
  *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Material retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Material'
  */
 router.get('/:id', validateUUID('id'), requireResourceAccess('material'), materialController.getMaterialById);
 
@@ -53,6 +81,19 @@ router.get('/:id', validateUUID('id'), requireResourceAccess('material'), materi
  *     tags: [Inventory]
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/MaterialInput'
+ *     responses:
+ *       201:
+ *         description: Material created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Material'
  */
 router.post('/', requireFields(['business_id', 'name']), requireBusinessAccess('body'), materialController.createMaterial);
 
@@ -64,6 +105,24 @@ router.post('/', requireFields(['business_id', 'name']), requireBusinessAccess('
  *     tags: [Inventory]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/MaterialUpdateInput'
+ *     responses:
+ *       200:
+ *         description: Material updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Material'
  */
 router.patch('/:id', validateUUID('id'), requireResourceAccess('material'), materialController.updateMaterial);
 
@@ -75,6 +134,24 @@ router.patch('/:id', validateUUID('id'), requireResourceAccess('material'), mate
  *     tags: [Inventory]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/MaterialRestockInput'
+ *     responses:
+ *       200:
+ *         description: Material restocked successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Material'
  */
 router.post('/:id/restock', validateUUID('id'), requireResourceAccess('material'), requireFields(['quantity']), materialController.restockMaterial);
 
@@ -86,6 +163,14 @@ router.post('/:id/restock', validateUUID('id'), requireResourceAccess('material'
  *     tags: [Inventory]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Material deleted successfully
  */
 router.delete('/:id', validateUUID('id'), requireResourceAccess('material'), materialController.removeMaterial);
 
@@ -103,6 +188,26 @@ router.delete('/:id', validateUUID('id'), requireResourceAccess('material'), mat
  *         required: true
  *         schema:
  *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/InventoryDeductionInput'
+ *     responses:
+ *       200:
+ *         description: Inventory deducted successfully for job usage
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 job_id: { type: string, format: uuid }
+ *                 materials:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/JobMaterialUsageInput'
  */
 router.post('/deduct/:jobId', validateUUID('jobId'), requireResourceAccess('job', { field: 'jobId' }), requireFields(['materials']), materialController.deductMaterials);
 

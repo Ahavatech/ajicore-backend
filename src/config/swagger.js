@@ -21,6 +21,28 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
 
 - **AI / Internal routes**: Use both \`x-api-key: <internal_api_key>\` and \`x-business-token: <business_internal_api_token>\`
 
+## Page Guide
+
+- **Auth**: sign in, sign up, password reset, current user, internal token
+- **Onboarding**: business info, OTP verification, AI number setup, service area, finish setup
+- **Dashboard**: summary, revenue, jobs analytics, weekly report
+- **Jobs**: jobs list, job detail, lifecycle actions, materials, photos
+- **Schedule**: schedule/calendar reads and availability checks
+- **Quotes**: estimates, approvals, declines, and sending
+- **Customers**: customer list, lookup, detail, and history
+- **Conversations**: recent calls and SMS history
+- **Team**: staff list, detail, payroll, timesheets, and clock-in/out
+- **Team Check-Ins**: field check-ins and escalations
+- **Follow-Ups**: reminder and follow-up records
+- **Business Profile / Alerts / Automation / Communication**: settings pages
+- **Billing / Payments / Expenses**: invoices, payments, and expense tracking
+- **PriceBook**: service categories and quoteable items
+- **Inventory**: materials, restocks, and deductions
+- **Fleet**: vehicles and maintenance alerts
+- **Bookkeeping**: transactions and categorization rules
+- **AI Logs**: event log inspection
+- **AI Bridge**: internal AI/receptionist integration surface
+
 ## Key Flows
 
 ### Quote → Job Conversion
@@ -288,6 +310,232 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             job_id: { type: 'string', nullable: true },
             createdAt: { type: 'string', format: 'date-time' }
           }
+        },
+        Material: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            business_id: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+            unit: { type: 'string', nullable: true },
+            quantity_on_hand: { type: 'integer' },
+            restock_threshold: { type: 'integer' },
+            unit_cost: { type: 'number', nullable: true },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        MaterialInput: {
+          type: 'object',
+          required: ['business_id', 'name'],
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+            unit: { type: 'string' },
+            quantity_on_hand: { type: 'integer' },
+            restock_threshold: { type: 'integer' },
+            unit_cost: { type: 'number' },
+          },
+        },
+        MaterialUpdateInput: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            unit: { type: 'string' },
+            quantity_on_hand: { type: 'integer' },
+            restock_threshold: { type: 'integer' },
+            unit_cost: { type: 'number' },
+          },
+        },
+        MaterialRestockInput: {
+          type: 'object',
+          required: ['quantity'],
+          properties: {
+            quantity: { type: 'integer', minimum: 1 },
+          },
+        },
+        JobMaterialUsageInput: {
+          type: 'object',
+          required: ['material_id', 'quantity'],
+          properties: {
+            material_id: { type: 'string', format: 'uuid' },
+            quantity: { type: 'integer', minimum: 1 },
+            unit_cost: { type: 'number', nullable: true },
+          },
+        },
+        InventoryDeductionInput: {
+          type: 'object',
+          required: ['materials'],
+          properties: {
+            materials: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/JobMaterialUsageInput' },
+            },
+          },
+        },
+        Vehicle: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            business_id: { type: 'string', format: 'uuid' },
+            name: { type: 'string', nullable: true },
+            make_model: { type: 'string' },
+            year: { type: 'integer', nullable: true },
+            license_plate: { type: 'string', nullable: true },
+            mileage: { type: 'integer' },
+            insurance_expiry: { type: 'string', format: 'date-time', nullable: true },
+            registration_renewal: { type: 'string', format: 'date-time', nullable: true },
+            maintenance_cycle_miles: { type: 'integer' },
+            last_maintenance_mileage: { type: 'integer' },
+            notes: { type: 'string', nullable: true },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        VehicleInput: {
+          type: 'object',
+          required: ['business_id', 'make_model'],
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+            make_model: { type: 'string' },
+            year: { type: 'integer' },
+            license_plate: { type: 'string' },
+            mileage: { type: 'integer' },
+            insurance_expiry: { type: 'string', format: 'date-time' },
+            registration_renewal: { type: 'string', format: 'date-time' },
+            maintenance_cycle_miles: { type: 'integer' },
+            last_maintenance_mileage: { type: 'integer' },
+            notes: { type: 'string' },
+          },
+        },
+        VehicleUpdateInput: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            make_model: { type: 'string' },
+            year: { type: 'integer' },
+            license_plate: { type: 'string' },
+            mileage: { type: 'integer' },
+            insurance_expiry: { type: 'string', format: 'date-time' },
+            registration_renewal: { type: 'string', format: 'date-time' },
+            maintenance_cycle_miles: { type: 'integer' },
+            last_maintenance_mileage: { type: 'integer' },
+            notes: { type: 'string' },
+          },
+        },
+        VehicleMileageUpdateInput: {
+          type: 'object',
+          required: ['mileage'],
+          properties: {
+            mileage: { type: 'integer', minimum: 0 },
+          },
+        },
+        VehicleMaintenanceAlert: {
+          type: 'object',
+          properties: {
+            vehicle_id: { type: 'string', format: 'uuid' },
+            make_model: { type: 'string' },
+            license_plate: { type: 'string', nullable: true },
+            reason: { type: 'string' },
+            due_date: { type: 'string', format: 'date-time', nullable: true },
+            due_mileage: { type: 'integer', nullable: true },
+          },
+        },
+        StaffMember: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            business_id: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+            role: { type: 'string', enum: ['Owner', 'Manager', 'Technician', 'Apprentice', 'Admin'] },
+            hourly_rate: { type: 'number' },
+            email: { type: 'string', format: 'email', nullable: true },
+            phone: { type: 'string', nullable: true },
+            check_in_frequency_hours: { type: 'number', nullable: true },
+            active_job_id: { type: 'string', format: 'uuid', nullable: true },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        StaffInput: {
+          type: 'object',
+          required: ['business_id', 'name', 'hourly_rate'],
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+            role: { type: 'string', enum: ['Owner', 'Manager', 'Technician', 'Apprentice', 'Admin'] },
+            hourly_rate: { type: 'number' },
+            email: { type: 'string', format: 'email' },
+            phone: { type: 'string' },
+            check_in_frequency_hours: { type: 'number' },
+          },
+        },
+        StaffUpdateInput: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            role: { type: 'string', enum: ['Owner', 'Manager', 'Technician', 'Apprentice', 'Admin'] },
+            hourly_rate: { type: 'number' },
+            email: { type: 'string', format: 'email' },
+            phone: { type: 'string' },
+            check_in_frequency_hours: { type: 'number' },
+            active_job_id: { type: 'string', format: 'uuid', nullable: true },
+          },
+        },
+        Timesheet: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            staff_id: { type: 'string', format: 'uuid' },
+            job_id: { type: 'string', format: 'uuid', nullable: true },
+            clock_in: { type: 'string', format: 'date-time' },
+            clock_out: { type: 'string', format: 'date-time', nullable: true },
+            total_hours: { type: 'number', nullable: true },
+            notes: { type: 'string', nullable: true },
+          },
+        },
+        PayrollSummary: {
+          type: 'object',
+          properties: {
+            staff_id: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+            regular_hours: { type: 'number' },
+            overtime_hours: { type: 'number', nullable: true },
+            total_pay: { type: 'number' },
+          },
+        },
+        QuoteInput: {
+          type: 'object',
+          required: ['business_id', 'customer_id'],
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            customer_id: { type: 'string', format: 'uuid' },
+            assigned_staff_id: { type: 'string', format: 'uuid', nullable: true },
+            title: { type: 'string' },
+            description: { type: 'string' },
+            price_book_item_id: { type: 'string', format: 'uuid', nullable: true },
+            scheduled_estimate_date: { type: 'string', format: 'date-time', nullable: true },
+            total_amount: { type: 'number', nullable: true },
+            notes: { type: 'string', nullable: true },
+            is_emergency: { type: 'boolean' },
+            status: { type: 'string', enum: ['EstimateScheduled', 'Draft', 'Sent', 'Approved', 'Declined', 'Expired'] },
+          },
+        },
+        QuoteUpdateInput: {
+          type: 'object',
+          properties: {
+            assigned_staff_id: { type: 'string', format: 'uuid', nullable: true },
+            title: { type: 'string' },
+            description: { type: 'string' },
+            price_book_item_id: { type: 'string', format: 'uuid', nullable: true },
+            scheduled_estimate_date: { type: 'string', format: 'date-time', nullable: true },
+            total_amount: { type: 'number', nullable: true },
+            notes: { type: 'string', nullable: true },
+            is_emergency: { type: 'boolean' },
+            status: { type: 'string', enum: ['EstimateScheduled', 'Draft', 'Sent', 'Approved', 'Declined', 'Expired'] },
+            expires_at: { type: 'string', format: 'date-time', nullable: true },
+          },
         },
         PriceBookItem: {
           type: 'object',
@@ -871,6 +1119,80 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
               type: 'array',
               items: { $ref: '#/components/schemas/ConversationEntry' },
             },
+          },
+        },
+        UserProfile: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            email: { type: 'string', format: 'email' },
+            first_name: { type: 'string', nullable: true },
+            last_name: { type: 'string', nullable: true },
+            auth_provider: { type: 'string', enum: ['Email', 'Google'] },
+            onboarding_step: { type: 'integer' },
+            onboarding_completed: { type: 'boolean' },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        TwilioAvailableNumber: {
+          type: 'object',
+          properties: {
+            phone_number: { type: 'string' },
+            friendly_name: { type: 'string' },
+            locality: { type: 'string', nullable: true },
+            region: { type: 'string', nullable: true },
+            postal_code: { type: 'string', nullable: true },
+            country: { type: 'string' },
+            capabilities: {
+              type: 'object',
+              properties: {
+                voice: { type: 'boolean' },
+                sms: { type: 'boolean' },
+                mms: { type: 'boolean' },
+              },
+            },
+            type: { type: 'string' },
+            area_code: { type: 'string', nullable: true },
+          },
+        },
+        AvailableNumbersResponse: {
+          type: 'object',
+          properties: {
+            type: { type: 'string', enum: ['city', 'area_code', 'toll_free'] },
+            country: { type: 'string' },
+            count: { type: 'integer' },
+            numbers: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/TwilioAvailableNumber' },
+            },
+          },
+        },
+        WeeklyReportResponse: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            summary: { type: 'object', additionalProperties: true },
+            report: { type: 'object', additionalProperties: true },
+          },
+        },
+        SimpleMessageResponse: {
+          type: 'object',
+          properties: {
+            message: { type: 'string' },
+          },
+        },
+        JobAvailabilityResponse: {
+          type: 'object',
+          properties: {
+            available: { type: 'boolean' },
+            conflicts: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/Job' },
+            },
+            staff_id: { type: 'string', format: 'uuid' },
+            start_time: { type: 'string', format: 'date-time' },
+            end_time: { type: 'string', format: 'date-time' },
           },
         },
         Error: {

@@ -25,6 +25,20 @@ router.use(requireAuth);
  *     tags: [Fleet]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: business_id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Vehicle list retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Vehicle'
  */
 router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), vehicleController.getAllVehicles);
 
@@ -36,6 +50,20 @@ router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('
  *     tags: [Fleet]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: business_id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Vehicle maintenance alerts retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/VehicleMaintenanceAlert'
  */
 router.get('/maintenance-alerts', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), vehicleController.getMaintenanceAlerts);
 
@@ -53,6 +81,14 @@ router.get('/maintenance-alerts', requireFields(['business_id'], 'query'), requi
  *         required: true
  *         schema:
  *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Vehicle retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Vehicle'
  */
 router.get('/:id', validateUUID('id'), requireResourceAccess('vehicle'), vehicleController.getVehicleById);
 
@@ -64,6 +100,19 @@ router.get('/:id', validateUUID('id'), requireResourceAccess('vehicle'), vehicle
  *     tags: [Fleet]
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/VehicleInput'
+ *     responses:
+ *       201:
+ *         description: Vehicle created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Vehicle'
  */
 router.post('/', requireFields(['business_id', 'make_model']), requireBusinessAccess('body'), vehicleController.createVehicle);
 
@@ -75,6 +124,24 @@ router.post('/', requireFields(['business_id', 'make_model']), requireBusinessAc
  *     tags: [Fleet]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/VehicleUpdateInput'
+ *     responses:
+ *       200:
+ *         description: Vehicle updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Vehicle'
  */
 router.patch('/:id', validateUUID('id'), requireResourceAccess('vehicle'), vehicleController.updateVehicle);
 
@@ -86,6 +153,24 @@ router.patch('/:id', validateUUID('id'), requireResourceAccess('vehicle'), vehic
  *     tags: [Fleet]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/VehicleMileageUpdateInput'
+ *     responses:
+ *       200:
+ *         description: Vehicle mileage updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Vehicle'
  */
 router.patch('/:id/mileage', validateUUID('id'), requireResourceAccess('vehicle'), requireFields(['mileage']), vehicleController.updateMileage);
 
@@ -97,6 +182,14 @@ router.patch('/:id/mileage', validateUUID('id'), requireResourceAccess('vehicle'
  *     tags: [Fleet]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Vehicle deleted successfully
  */
 router.delete('/:id', validateUUID('id'), requireResourceAccess('vehicle'), vehicleController.deleteVehicle);
 

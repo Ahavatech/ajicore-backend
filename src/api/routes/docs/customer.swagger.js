@@ -208,6 +208,10 @@
  *         schema:
  *           type: string
  *     responses:
- *       204:
+ *       200:
  *         description: Customer deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SimpleMessageResponse'
  */
