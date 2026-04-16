@@ -193,4 +193,89 @@ router.patch('/:id/mileage', validateUUID('id'), requireResourceAccess('vehicle'
  */
 router.delete('/:id', validateUUID('id'), requireResourceAccess('vehicle'), vehicleController.deleteVehicle);
 
+/**
+ * @swagger
+ * /api/fleet/{id}/repairs:
+ *   post:
+ *     summary: Log a repair or maintenance event for a vehicle
+ *     tags: [Fleet]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/FleetRepairInput'
+ *     responses:
+ *       201:
+ *         description: Repair logged successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/FleetRepair'
+ */
+router.post('/:id/repairs', validateUUID('id'), requireResourceAccess('vehicle'), requireFields(['repair_type', 'description', 'completion_date']), vehicleController.logRepair);
+
+/**
+ * @swagger
+ * /api/fleet/{id}/repairs:
+ *   get:
+ *     summary: Get repair history for a vehicle
+ *     tags: [Fleet]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Repair history retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/FleetRepair'
+ */
+router.get('/:id/repairs', validateUUID('id'), requireResourceAccess('vehicle'), vehicleController.getRepairHistory);
+
+/**
+ * @swagger
+ * /api/fleet/repairs:
+ *   get:
+ *     summary: Get all repairs for a business
+ *     tags: [Fleet]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: business_id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *       - in: query
+ *         name: vehicle_id
+ *         schema: { type: string, format: uuid }
+ *       - in: query
+ *         name: repair_type
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Repairs retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/FleetRepair'
+ */
+router.get('/repairs', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), vehicleController.getAllRepairs);
+
 module.exports = router;

@@ -55,4 +55,26 @@ async function deleteVehicle(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { getAllVehicles, getVehicleById, createVehicle, updateVehicle, updateMileage, getMaintenanceAlerts, deleteVehicle };
+async function logRepair(req, res, next) {
+  try {
+    const repair = await fleetService.logRepair(req.params.id, req.body, req.user.id);
+    res.status(201).json(repair);
+  } catch (err) { next(err); }
+}
+
+async function getRepairHistory(req, res, next) {
+  try {
+    const repairs = await fleetService.getRepairHistory(req.params.id);
+    res.json(repairs);
+  } catch (err) { next(err); }
+}
+
+async function getAllRepairs(req, res, next) {
+  try {
+    const { business_id, vehicle_id, repair_type } = req.query;
+    const repairs = await fleetService.getAllRepairs(business_id, { vehicle_id, repair_type });
+    res.json(repairs);
+  } catch (err) { next(err); }
+}
+
+module.exports = { getAllVehicles, getVehicleById, createVehicle, updateVehicle, updateMileage, getMaintenanceAlerts, deleteVehicle, logRepair, getRepairHistory, getAllRepairs };

@@ -86,4 +86,42 @@ async function remove(id) {
   return prisma.vehicle.delete({ where: { id } });
 }
 
-module.exports = { getVehicles, getById, create, update, updateMileage, getMaintenanceAlerts, remove };
+async function logRepair(vehicleId, data, userId) {
+  const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
+  if (!vehicle) throw new NotFoundError('Vehicle not found.');
+
+  return prisma.fleetRepair.create({
+    data: {
+      vehicle_id: vehicleId,
+      business_id: vehicle.business_id,
+      repair_type: data.repair_type,
+      description: data.description,
+      cost: data.cost || null,
+      completion_date: new Date(data.completion_date),
+      miles_at_service: data.miles_at_service || null,
+      notes: data.notes || null,
+      created_by: userId,
+    },
+  });
+}
+
+async function getRepairHistory(vehicleId) {
+  return prisma.fleetRepair.findMany({
+    where: { vehicle_id: vehicleId },
+    orderBy: { completion_date: 'desc' },
+  });
+}
+
+async function getAllRepairs(businessId, filters = {}) {
+  const where = { business_id: businessId };
+  if (filters.vehicle_id) where.vehicle_id = filters.vehicle_id;
+  if (filters.repair_type) where.repair_type = filters.repair_type;
+
+  return prisma.fleetRepair.findMany({
+    where,
+    include: { vehicle: { select: { id: true, make_model: true } } },
+    orderBy: { completion_date: 'desc' },
+  });
+}
+
+module.exports = { getVehicles, getById, create, update, updateMileage, getMaintenanceAlerts, remove, logRepair, getRepairHistory, getAllRepairs };

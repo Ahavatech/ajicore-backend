@@ -222,6 +222,7 @@ model Business {
   expenses             Expense[]
   materials            Material[]
   vehicles             Vehicle[]
+  fleetRepairs         FleetRepair[]
   price_book_items     PriceBookItem[]
   service_categories   ServiceCategory[]
   follow_ups           FollowUp[]
@@ -545,13 +546,36 @@ model Vehicle {
   registration_renewal     DateTime?
   maintenance_cycle_miles  Int       @default(5000)
   last_maintenance_mileage Int       @default(0)
+  last_maintenance_date    DateTime?
+  next_scheduled_maintenance DateTime?
   notes                    String?
   createdAt                DateTime  @default(now())
   updatedAt                DateTime  @updatedAt
 
   business Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  repairs  FleetRepair[]
 
   @@map("vehicles")
+}
+
+model FleetRepair {
+  id                String    @id @default(uuid())
+  vehicle_id        String
+  business_id       String
+  repair_type       String    // "maintenance", "insurance_claim", "emergency_repair"
+  description       String
+  cost              Float?
+  completion_date   DateTime
+  miles_at_service  Int?
+  notes             String?
+  created_by        String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  vehicle   Vehicle   @relation(fields: [vehicle_id], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
+
+  @@map("fleet_repairs")
 }
 
 // ============================================

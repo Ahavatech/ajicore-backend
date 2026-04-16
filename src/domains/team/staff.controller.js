@@ -54,18 +54,24 @@ async function getAllStaff(req, res, next) {
 
 async function getAvailableStaff(req, res, next) {
   try {
-    const { business_id, start_time, end_time, exclude_job_id } = req.query;
+    const { business_id, start_time, end_time, exclude_job_id, include_future } = req.query;
     if ((start_time && !end_time) || (!start_time && end_time)) {
       return res.status(400).json({ error: 'start_time and end_time must be provided together.' });
     }
+
+    // Allow future scheduling if start_time is in future and flag is set
+    const isFutureScheduling = start_time && new Date(start_time) > new Date() && include_future === 'true';
 
     const staff = await prisma.staff.findMany({
       where: {
         business_id,
         active_job_id: null,
-        timesheets: {
-          some: { clock_out: null },
-        },
+        // Only require clocked-in for immediate assignments
+        ...(isFutureScheduling ? {} : {
+          timesheets: {
+            some: { clock_out: null },
+          },
+        }),
       },
       orderBy: { name: 'asc' },
       include: {

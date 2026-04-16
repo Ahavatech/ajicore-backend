@@ -39,6 +39,10 @@ router.use(requireAuth);
  *       - in: query
  *         name: exclude_job_id
  *         schema: { type: string, format: uuid }
+ *       - in: query
+ *         name: include_future
+ *         schema: { type: boolean }
+ *         description: Include staff not currently clocked in for future job scheduling
  *     responses:
  *       200:
  *         description: Available staff members retrieved successfully
