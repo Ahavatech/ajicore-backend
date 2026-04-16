@@ -19,6 +19,40 @@ router.use(requireAuth);
 
 /**
  * @swagger
+ * /api/staff/available:
+ *   get:
+ *     summary: Get available staff members for assignment
+ *     tags: [Team]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: business_id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *       - in: query
+ *         name: start_time
+ *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: end_time
+ *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: exclude_job_id
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Available staff members retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/StaffMember'
+ */
+router.get('/available', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), staffController.getAvailableStaff);
+
+/**
+ * @swagger
  * /api/staff:
  *   get:
  *     summary: Get all staff members

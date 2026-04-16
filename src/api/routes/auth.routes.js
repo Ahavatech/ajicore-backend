@@ -187,8 +187,6 @@ router.get('/me', requireAuth, authController.getMe);
 router.get(
   '/internal-api-token',
   requireAuth,
-  requireFields(['business_id'], 'query'),
-  requireBusinessAccess('query'),
   authController.getInternalApiToken
 );
 

@@ -139,12 +139,15 @@
  *     description: |
  *       Returns the `x-business-token` value required together with `x-api-key`
  *       for `/api/internal/*` routes.
+ *
+ *       `business_id` is optional. If omitted, the API returns the first business
+ *       owned by the authenticated user, which avoids a circular lookup during app bootstrap.
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: business_id
- *         required: true
+ *         required: false
  *         schema:
  *           type: string
  *           format: uuid

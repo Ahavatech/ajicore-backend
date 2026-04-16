@@ -4,6 +4,7 @@
  */
 const prisma = require('../../lib/prisma');
 const payrollService = require('./payroll.service');
+const scheduleService = require('../jobs/schedule.service');
 
 function buildStaffResponse(staff) {
   const activeJob = staff.active_job || null;
@@ -48,6 +49,55 @@ async function getAllStaff(req, res, next) {
       },
     });
     res.json(staff.map(buildStaffResponse));
+  } catch (err) { next(err); }
+}
+
+async function getAvailableStaff(req, res, next) {
+  try {
+    const { business_id, start_time, end_time, exclude_job_id } = req.query;
+    if ((start_time && !end_time) || (!start_time && end_time)) {
+      return res.status(400).json({ error: 'start_time and end_time must be provided together.' });
+    }
+
+    const staff = await prisma.staff.findMany({
+      where: {
+        business_id,
+        active_job_id: null,
+        timesheets: {
+          some: { clock_out: null },
+        },
+      },
+      orderBy: { name: 'asc' },
+      include: {
+        active_job: {
+          include: {
+            customer: { select: { id: true, first_name: true, last_name: true } },
+          },
+        },
+        timesheets: {
+          where: { clock_out: null },
+          orderBy: { clock_in: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    if (!start_time || !end_time) {
+      return res.json(staff.map(buildStaffResponse));
+    }
+
+    const availabilityChecks = await Promise.all(
+      staff.map(async (member) => {
+        const availability = await scheduleService.checkStaffAvailability(member.id, start_time, end_time, { exclude_job_id });
+        return { member, availability };
+      })
+    );
+
+    const availableStaff = availabilityChecks
+      .filter(({ availability }) => availability.available)
+      .map(({ member }) => buildStaffResponse(member));
+
+    res.json(availableStaff);
   } catch (err) { next(err); }
 }
 
@@ -164,4 +214,4 @@ async function calculatePayroll(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { getAllStaff, getStaffById, createStaff, updateStaff, deleteStaff, clockIn, clockOut, getTimesheets, calculatePayroll };
+module.exports = { getAllStaff, getAvailableStaff, getStaffById, createStaff, updateStaff, deleteStaff, clockIn, clockOut, getTimesheets, calculatePayroll };

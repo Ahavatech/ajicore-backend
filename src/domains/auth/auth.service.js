@@ -610,8 +610,13 @@ async function changePassword(userId, currentPassword, newPassword) {
 }
 
 async function getInternalApiToken(userId, businessId) {
+  const where = businessId
+    ? { id: businessId, owner_id: userId }
+    : { owner_id: userId };
+
   const business = await prisma.business.findFirst({
-    where: { id: businessId, owner_id: userId },
+    where,
+    orderBy: { createdAt: 'asc' },
     select: { id: true, internal_api_token: true },
   });
 
