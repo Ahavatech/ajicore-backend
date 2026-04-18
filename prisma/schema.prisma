@@ -181,7 +181,7 @@ model Business {
 
   // AI Phone / Dedicated Number
   dedicated_phone_number    String?
-  ai_phone_number           String?
+  ai_phone_number           String?                @unique
   ai_phone_country          String?
   ai_phone_area_code        String?
   twilio_phone_sid          String?                @unique

@@ -267,6 +267,29 @@ test('provider-facing inbound SMS and call routes resolve tenant and log events 
   assert.ok(eventTypes.includes('call.status_updated'));
 });
 
+test('business discovery routes resolve tenants with x-api-key only', async (t) => {
+  const fixture = await createBusinessFixture(t, 'business-discovery');
+  const headers = {
+    'x-api-key': process.env.INTERNAL_API_KEY,
+  };
+
+  const resolverResponse = await request(
+    `/api/internal/ai/business-by-phone?phone=${encodeURIComponent(fixture.business.ai_phone_number)}`,
+    { headers }
+  );
+
+  assert.equal(resolverResponse.status, 200);
+  assert.equal(resolverResponse.body.business_id, fixture.business.id);
+  assert.equal(resolverResponse.body.internal_api_token, fixture.business.internal_api_token);
+
+  const activeBusinesses = await request('/api/internal/ai/businesses/active', { headers });
+  assert.equal(activeBusinesses.status, 200);
+  assert.ok(activeBusinesses.body.some((entry) => entry.business_id === fixture.business.id));
+
+  const notFound = await request('/api/internal/ai/business-by-phone?phone=%2B19999999999', { headers });
+  assert.equal(notFound.status, 404);
+});
+
 test('internal AI bridge wrappers expose business, customer, billing, follow-up, and conversation context', async (t) => {
   const fixture = await createBusinessFixture(t, 'internal-wrappers');
   const headers = {

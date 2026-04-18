@@ -6,7 +6,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const swaggerUi = require('swagger-ui-express');
-const swaggerSpec = require('./config/swagger');
+const { getOpenApiSpec, renderScalarHtml } = require('./config/openapi');
 const logger = require('./utils/logger');
 
 // Route imports
@@ -33,6 +33,7 @@ const { errorHandler, notFoundHandler } = require('./api/middlewares/error.middl
 const { rateLimiters } = require('./api/middlewares/rate_limit.middleware');
 
 const app = express();
+const openApiSpec = getOpenApiSpec();
 
 // ============================================
 // Global Middleware
@@ -43,9 +44,11 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
+      scriptSrc: ["'self'", 'https://cdn.jsdelivr.net'],
       imgSrc: ["'self'", 'data:', 'https:'],
+      fontSrc: ["'self'", 'data:', 'https:'],
+      connectSrc: ["'self'"],
     },
   },
   hsts: {
@@ -94,7 +97,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Business-Token'],
   maxAge: 3600,  // Cache preflight for 1 hour
 }));
 
@@ -148,6 +151,7 @@ app.get('/api/health', (_req, res) => {
 // API docs - lenient rate limiting
 app.use('/api/docs', rateLimiters.docs);
 app.use('/api/docs.json', rateLimiters.docs);
+app.use('/api/reference', rateLimiters.docs);
 
 // Auth routes - strict rate limiting
 app.use('/api/auth', rateLimiters.auth);
@@ -158,15 +162,20 @@ app.use('/api', rateLimiters.standard);
 // ============================================
 // Swagger API Documentation
 // ============================================
-app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec, {
   customSiteTitle: 'Ajicore API Docs',
   customCss: '.swagger-ui .topbar { display: none }',
 }));
 
+app.get('/api/reference', (_req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(renderScalarHtml('/api/docs.json'));
+});
+
 // Serve raw swagger JSON for Postman import
 app.get('/api/docs.json', (_req, res) => {
   res.setHeader('Content-Type', 'application/json');
-  res.send(swaggerSpec);
+  res.send(openApiSpec);
 });
 
 // ============================================

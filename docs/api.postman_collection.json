@@ -311,6 +311,71 @@
       ]
     },
     {
+      "name": "Business Discovery",
+      "item": [
+        {
+          "name": "GET Resolve a business from a provisioned AI phone number",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/business-by-phone",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "business-by-phone"
+              ],
+              "query": [
+                {
+                  "key": "phone",
+                  "value": "{{phone}}",
+                  "disabled": false,
+                  "description": "Business AI phone number in E.164 format"
+                }
+              ]
+            },
+            "description": "Resolve a business from a provisioned AI phone number"
+          }
+        },
+        {
+          "name": "GET List active businesses for AI scheduler polling",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{internalApiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/internal/ai/businesses/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "businesses",
+                "active"
+              ],
+              "query": []
+            },
+            "description": "List active businesses for AI scheduler polling"
+          }
+        }
+      ]
+    },
+    {
       "name": "Business Settings",
       "item": [
         {

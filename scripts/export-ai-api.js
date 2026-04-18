@@ -6,6 +6,7 @@ const OUTPUT_OPENAPI = path.resolve(__dirname, '..', 'docs', 'api.json');
 const OUTPUT_POSTMAN = path.resolve(__dirname, '..', 'docs', 'api.postman_collection.json');
 
 const secured = [{ apiKeyAuth: [], businessTokenAuth: [] }];
+const apiKeyOnly = [{ apiKeyAuth: [] }];
 
 function ref(name) {
   return { $ref: `#/components/schemas/${name}` };
@@ -207,7 +208,59 @@ const radiusCheckSchema = {
   },
 };
 
+const extraSchemas = {
+  AIBusinessLookupResponse: {
+    type: 'object',
+    properties: {
+      business_id: { type: 'string', format: 'uuid' },
+      ai_phone_number: { type: 'string', example: '+13186678255' },
+      name: { type: 'string', example: "Joe's Plumbing" },
+      internal_api_token: { type: 'string', example: 'internal-token-123' },
+    },
+  },
+  AIActiveBusiness: {
+    type: 'object',
+    properties: {
+      business_id: { type: 'string', format: 'uuid' },
+      ai_phone_number: { type: 'string', example: '+13186678255' },
+      internal_api_token: { type: 'string', example: 'internal-token-123' },
+    },
+  },
+};
+
 const aiPaths = {
+  '/api/internal/ai/business-by-phone': {
+    get: {
+      tags: ['AI Bridge'],
+      summary: 'Resolve a business from a provisioned AI phone number',
+      security: apiKeyOnly,
+      parameters: [
+        queryParam('phone', 'Business AI phone number in E.164 format', true),
+      ],
+      responses: {
+        200: jsonResponse('Resolved business', ref('AIBusinessLookupResponse')),
+        404: jsonResponse('No business owns this phone number', {
+          type: 'object',
+          properties: {
+            error: { type: 'string', example: 'no business owns this number' },
+          },
+        }),
+      },
+    },
+  },
+  '/api/internal/ai/businesses/active': {
+    get: {
+      tags: ['AI Bridge'],
+      summary: 'List active businesses for AI scheduler polling',
+      security: apiKeyOnly,
+      responses: {
+        200: jsonResponse('Active businesses', {
+          type: 'array',
+          items: ref('AIActiveBusiness'),
+        }),
+      },
+    },
+  },
   '/api/internal/ai/sms/incoming': {
     post: {
       tags: ['AI Bridge'],
@@ -907,6 +960,8 @@ function routeGroup(route) {
   const stripped = route.replace('/api/internal/ai/', '');
   const segment = stripped.split('/')[0];
   const labels = {
+    'business-by-phone': 'Business Discovery',
+    businesses: 'Business Discovery',
     sms: 'SMS',
     calls: 'Calls',
     schedule: 'Schedule',
@@ -943,13 +998,17 @@ function buildRequestName(method, route, summary) {
 function buildPostmanItem(route, method, operation, components) {
   const headers = [];
   const hasBody = Boolean(operation.requestBody);
+  const requiresApiKey = (operation.security || []).some((scheme) => Object.prototype.hasOwnProperty.call(scheme, 'apiKeyAuth'));
+  const requiresBusinessToken = (operation.security || []).some((scheme) => Object.prototype.hasOwnProperty.call(scheme, 'businessTokenAuth'));
 
   if (hasBody) {
     headers.push({ key: 'Content-Type', value: 'application/json' });
   }
 
-  if (operation.security && operation.security.length) {
+  if (requiresApiKey) {
     headers.push({ key: 'x-api-key', value: '{{internalApiKey}}' });
+  }
+  if (requiresBusinessToken) {
     headers.push({ key: 'x-business-token', value: '{{businessToken}}' });
   }
 
@@ -1029,6 +1088,7 @@ function buildPostmanCollection(openApiSpec) {
 }
 
 function buildAiOpenApiSpec() {
+  const aiTags = (swaggerSpec.tags || []).filter((tag) => tag.name === 'AI Bridge');
   return {
     openapi: '3.0.0',
     info: {
@@ -1038,6 +1098,7 @@ function buildAiOpenApiSpec() {
         'AI-only OpenAPI export for the canonical internal AI bridge.',
         '',
         'Authentication:',
+        '- Discovery routes `GET /api/internal/ai/business-by-phone` and `GET /api/internal/ai/businesses/active` require `x-api-key` only.',
         '- Protected AI routes require both `x-api-key` and `x-business-token`.',
         '- Provider webhook routes under `/api/internal/ai/sms/incoming` and `/api/internal/ai/calls/*` do not require those headers.',
         '',
@@ -1045,19 +1106,41 @@ function buildAiOpenApiSpec() {
       ].join('\n'),
     },
     servers: swaggerSpec.servers || [{ url: 'http://localhost:3000', description: 'Development' }],
-    tags: (swaggerSpec.tags || []).filter((tag) => tag.name === 'AI Bridge'),
-    components: swaggerSpec.components,
+    tags: aiTags.length
+      ? aiTags
+      : [{ name: 'AI Bridge', description: 'Internal AI service endpoints and inbound provider webhooks' }],
+    components: {
+      ...swaggerSpec.components,
+      schemas: {
+        ...(swaggerSpec.components?.schemas || {}),
+        ...extraSchemas,
+      },
+    },
     paths: aiPaths,
   };
 }
 
-fs.mkdirSync(path.dirname(OUTPUT_OPENAPI), { recursive: true });
+function writeArtifacts() {
+  fs.mkdirSync(path.dirname(OUTPUT_OPENAPI), { recursive: true });
 
-const aiOpenApiSpec = buildAiOpenApiSpec();
-const postmanCollection = buildPostmanCollection(aiOpenApiSpec);
+  const aiOpenApiSpec = buildAiOpenApiSpec();
+  const postmanCollection = buildPostmanCollection(aiOpenApiSpec);
 
-fs.writeFileSync(OUTPUT_OPENAPI, `${JSON.stringify(aiOpenApiSpec, null, 2)}\n`);
-fs.writeFileSync(OUTPUT_POSTMAN, `${JSON.stringify(postmanCollection, null, 2)}\n`);
+  fs.writeFileSync(OUTPUT_OPENAPI, `${JSON.stringify(aiOpenApiSpec, null, 2)}\n`);
+  fs.writeFileSync(OUTPUT_POSTMAN, `${JSON.stringify(postmanCollection, null, 2)}\n`);
 
-console.log(`Wrote ${OUTPUT_OPENAPI}`);
-console.log(`Wrote ${OUTPUT_POSTMAN}`);
+  console.log(`Wrote ${OUTPUT_OPENAPI}`);
+  console.log(`Wrote ${OUTPUT_POSTMAN}`);
+}
+
+if (require.main === module) {
+  writeArtifacts();
+}
+
+module.exports = {
+  aiPaths,
+  extraSchemas,
+  buildAiOpenApiSpec,
+  buildPostmanCollection,
+  writeArtifacts,
+};

@@ -59,6 +59,25 @@ function withInternalBusinessIdInQuery(handler) {
   };
 }
 
+function normalizeLookupPhone(phone) {
+  const raw = String(phone || '').trim();
+  const digits = raw.replace(/\D/g, '');
+
+  if (!digits) {
+    return null;
+  }
+
+  if (raw.startsWith('+')) {
+    return `+${digits}`;
+  }
+
+  if (digits.startsWith('00') && digits.length > 2) {
+    return `+${digits.slice(2)}`;
+  }
+
+  return `+${digits}`;
+}
+
 async function createAiAutomationArtifacts({
   businessId,
   business,
@@ -243,6 +262,69 @@ router.post(withAiAlias('/ai/calls/status', '/calls/status'), async (req, res, n
 // Protected Internal AI Routes
 // ============================================
 router.use(requireInternalApiKey);
+
+router.get('/ai/business-by-phone', async (req, res, next) => {
+  try {
+    const normalizedPhone = normalizeLookupPhone(req.query.phone);
+
+    if (!normalizedPhone || !/^\+\d{8,15}$/.test(normalizedPhone)) {
+      return res.status(400).json({ error: 'phone must be a valid E.164 number' });
+    }
+
+    const business = await prisma.business.findFirst({
+      where: {
+        OR: [
+          { ai_phone_number: normalizedPhone },
+          { dedicated_phone_number: normalizedPhone },
+        ],
+      },
+      select: {
+        id: true,
+        name: true,
+        ai_phone_number: true,
+        internal_api_token: true,
+      },
+    });
+
+    if (!business) {
+      return res.status(404).json({ error: 'no business owns this number' });
+    }
+
+    res.json({
+      business_id: business.id,
+      ai_phone_number: business.ai_phone_number || normalizedPhone,
+      name: business.name,
+      internal_api_token: business.internal_api_token,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/ai/businesses/active', async (_req, res, next) => {
+  try {
+    const businesses = await prisma.business.findMany({
+      where: {
+        ai_phone_number: { not: null },
+        internal_api_token: { not: '' },
+      },
+      select: {
+        id: true,
+        ai_phone_number: true,
+        internal_api_token: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    res.json(businesses.map((business) => ({
+      business_id: business.id,
+      ai_phone_number: business.ai_phone_number,
+      internal_api_token: business.internal_api_token,
+    })));
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ============================================
 // Schedule, Jobs, Staff

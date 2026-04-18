@@ -142,7 +142,7 @@ const standardModules = [
     name: 'fleet.routes',
     routeModulePath: 'src/api/routes/fleet.routes.js',
     basePath: '/api/fleet',
-    controllerModules: [{ modulePath: 'src/domains/fleet/vehicle.controller.js', handlers: ['getAllVehicles', 'getMaintenanceAlerts', 'getVehicleById', 'createVehicle', 'updateVehicle', 'updateMileage', 'deleteVehicle'] }],
+    controllerModules: [{ modulePath: 'src/domains/fleet/vehicle.controller.js', handlers: ['getAllVehicles', 'getMaintenanceAlerts', 'getVehicleById', 'createVehicle', 'updateVehicle', 'updateMileage', 'deleteVehicle', 'logRepair', 'getRepairHistory', 'getAllRepairs'] }],
     routes: [
       { method: 'get', path: '/', handler: 'getAllVehicles', query: { business_id: BUSINESS_ID }, invalidQuery: {}, failureAuth: 'requireAuth' },
       { method: 'get', path: '/maintenance-alerts', handler: 'getMaintenanceAlerts', query: { business_id: BUSINESS_ID }, invalidQuery: {}, failureAuth: 'requireAuth' },
@@ -388,6 +388,16 @@ describe('app-level endpoints', () => {
 
     expect(response.status).toBe(200);
     expect(payload.paths['/api/auth/signin']).toBeDefined();
+    expect(payload.paths['/api/internal/ai/business-by-phone']).toBeDefined();
+  });
+
+  test('GET /api/reference returns Scalar HTML', async () => {
+    const response = await fetch(`${baseUrl}/api/reference`);
+    const payload = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(payload).toContain('@scalar/api-reference');
+    expect(payload).toContain('/api/docs.json');
   });
 
   test('unknown route returns not found payload', async () => {

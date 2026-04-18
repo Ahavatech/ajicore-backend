@@ -294,27 +294,39 @@ async function onboardingStep3(userId, data) {
         .create({ phoneNumberSid: provisionedNumber.sid });
     }
   } catch (err) {
-    logger.error(`Twilio phone number provisioning failed for business ${business.id}: ${err.message}`);
-    throw new ValidationError('Unable to provision the selected Twilio phone number.');
+      logger.error(`Twilio phone number provisioning failed for business ${business.id}: ${err.message}`);
+      throw new ValidationError('Unable to provision the selected Twilio phone number.');
   }
 
-  const [user, updatedBusiness] = await Promise.all([
-    prisma.user.update({
-      where: { id: userId },
-      data: { onboarding_step: 4 },
-    }),
-    prisma.business.update({
-      where: { id: business.id },
-      data: {
-        ai_phone_number: provisionedNumber.phoneNumber,
-        dedicated_phone_number: provisionedNumber.phoneNumber,
-        ai_phone_country: provisionedNumber.isoCountry || data.country || null,
-        ai_phone_area_code: data.area_code || extractAreaCode(provisionedNumber.phoneNumber),
-        twilio_phone_sid: provisionedNumber.sid,
-        twilio_phone_friendly_name: provisionedNumber.friendlyName || friendlyName,
-      },
-    }),
-  ]);
+  let transactionResult;
+  try {
+    transactionResult = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.update({
+        where: { id: userId },
+        data: { onboarding_step: 4 },
+      });
+
+      const updatedBusiness = await tx.business.update({
+        where: { id: business.id },
+        data: {
+          ai_phone_number: provisionedNumber.phoneNumber,
+          dedicated_phone_number: provisionedNumber.phoneNumber,
+          ai_phone_country: provisionedNumber.isoCountry || data.country || null,
+          ai_phone_area_code: data.area_code || extractAreaCode(provisionedNumber.phoneNumber),
+          twilio_phone_sid: provisionedNumber.sid,
+          twilio_phone_friendly_name: provisionedNumber.friendlyName || friendlyName,
+        },
+      });
+
+      return { user, updatedBusiness };
+    });
+  } catch (err) {
+    await releaseIncomingPhoneNumber(client, provisionedNumber.sid);
+    logger.error(`Twilio number persistence failed for business ${business.id}: ${err.message}`);
+    throw err;
+  }
+
+  const { user, updatedBusiness } = transactionResult;
 
   logger.info(`Onboarding step 3 completed for user: ${user.email}, AI number: ${provisionedNumber.phoneNumber}`);
 
@@ -852,6 +864,57 @@ function buildIncomingPhoneNumberPayload({ phoneNumber, friendlyName }) {
   return payload;
 }
 
+async function releaseIncomingPhoneNumber(client, phoneSid) {
+  if (!client || !phoneSid) return false;
+
+  try {
+    await client.incomingPhoneNumbers(phoneSid).remove();
+    return true;
+  } catch (err) {
+    logger.error(`Failed to release provisioned Twilio number ${phoneSid}: ${err.message}`);
+    return false;
+  }
+}
+
+async function deprovisionAiPhoneNumber(businessId) {
+  if (!businessId) {
+    throw new ValidationError('businessId is required.');
+  }
+
+  const business = await prisma.business.findUnique({ where: { id: businessId } });
+  if (!business) {
+    throw new NotFoundError('Business');
+  }
+
+  let releasedTwilioNumber = false;
+
+  if (business.twilio_phone_sid && env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN) {
+    try {
+      const client = getTwilioClient();
+      releasedTwilioNumber = await releaseIncomingPhoneNumber(client, business.twilio_phone_sid);
+    } catch (err) {
+      logger.error(`Unable to initialize Twilio deprovisioning for business ${business.id}: ${err.message}`);
+    }
+  }
+
+  const updatedBusiness = await prisma.business.update({
+    where: { id: business.id },
+    data: {
+      ai_phone_number: null,
+      dedicated_phone_number: null,
+      ai_phone_country: null,
+      ai_phone_area_code: null,
+      twilio_phone_sid: null,
+      twilio_phone_friendly_name: null,
+    },
+  });
+
+  return {
+    business: sanitizeBusiness(updatedBusiness),
+    released_twilio_number: releasedTwilioNumber,
+  };
+}
+
 function extractAreaCode(phoneNumber) {
   const digits = String(phoneNumber || '').replace(/\D/g, '');
   if (digits.length === 11 && digits.startsWith('1')) return digits.slice(1, 4);
@@ -906,4 +969,5 @@ module.exports = {
   sendOtp,
   verifyOtp,
   skipOtp,
+  deprovisionAiPhoneNumber,
 };

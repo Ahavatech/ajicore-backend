@@ -28,7 +28,7 @@ const dashboardServiceMock = { getDashboardSummary: jest.fn() };
 const activityLogMock = { logActivity: jest.fn() };
 const loggerMock = { info: jest.fn(), warn: jest.fn(), error: jest.fn() };
 const prismaMock = {
-  business: { findUnique: jest.fn() },
+  business: { findUnique: jest.fn(), findFirst: jest.fn(), findMany: jest.fn() },
   serviceCategory: { findMany: jest.fn() },
   priceBookItem: { findMany: jest.fn() },
   followUp: { create: jest.fn() },
@@ -163,6 +163,19 @@ describe('ai bridge routes', () => {
     customerServiceMock.create.mockResolvedValue({ id: 'customer-1' });
     prismaMock.followUp.create.mockResolvedValue({ id: 'follow-up-1' });
     prismaMock.teamCheckin.create.mockResolvedValue({ id: 'checkin-1' });
+    prismaMock.business.findFirst.mockResolvedValue({
+      id: BUSINESS_ID,
+      name: 'Ajicore',
+      ai_phone_number: '+15551234567',
+      internal_api_token: 'biz-token-123',
+    });
+    prismaMock.business.findMany.mockResolvedValue([
+      {
+        id: BUSINESS_ID,
+        ai_phone_number: '+15551234567',
+        internal_api_token: 'biz-token-123',
+      },
+    ]);
     prismaMock.business.findUnique.mockResolvedValue({
       id: BUSINESS_ID,
       name: 'Ajicore',
@@ -244,6 +257,74 @@ describe('ai bridge routes', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.status).toBe('completed');
+  });
+
+  test('business-by-phone resolves a tenant with x-api-key only', async () => {
+    harness.authState.fail = 'requireInternalBusinessAccess';
+
+    const response = await harness.request({
+      path: '/api/internal/ai/business-by-phone',
+      query: { phone: '+15551234567' },
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      business_id: BUSINESS_ID,
+      ai_phone_number: '+15551234567',
+      name: 'Ajicore',
+      internal_api_token: 'biz-token-123',
+    });
+    expect(prismaMock.business.findFirst).toHaveBeenCalledTimes(1);
+  });
+
+  test('business-by-phone returns 404 for unknown phone', async () => {
+    prismaMock.business.findFirst.mockResolvedValueOnce(null);
+
+    const response = await harness.request({
+      path: '/api/internal/ai/business-by-phone',
+      query: { phone: '+15550000000' },
+    });
+
+    expect(response.status).toBe(404);
+    expect(response.body.error).toBe('no business owns this number');
+  });
+
+  test('business-by-phone still requires x-api-key', async () => {
+    harness.authState.fail = 'requireInternalApiKey';
+    harness.authState.status = 401;
+
+    const response = await harness.request({
+      path: '/api/internal/ai/business-by-phone',
+      query: { phone: '+15551234567' },
+    });
+
+    expect(response.status).toBe(401);
+  });
+
+  test('business-by-phone validates E.164 input', async () => {
+    const response = await harness.request({
+      path: '/api/internal/ai/business-by-phone',
+      query: { phone: 'abc' },
+    });
+
+    expect(response.status).toBe(400);
+  });
+
+  test('active businesses returns scheduler payload with x-api-key only', async () => {
+    harness.authState.fail = 'requireInternalBusinessAccess';
+
+    const response = await harness.request({
+      path: '/api/internal/ai/businesses/active',
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual([
+      {
+        business_id: BUSINESS_ID,
+        ai_phone_number: '+15551234567',
+        internal_api_token: 'biz-token-123',
+      },
+    ]);
   });
 
   test.each(protectedRoutes)('$paths.0 success on both aliases', async (routeConfig) => {

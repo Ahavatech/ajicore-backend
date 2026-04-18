@@ -1,29 +1,34 @@
 jest.mock('../../src/lib/prisma', () => ({
   business: {
     findFirst: jest.fn(),
+    findUnique: jest.fn(),
     update: jest.fn(),
   },
   user: {
     update: jest.fn(),
     findUnique: jest.fn(),
   },
+  $transaction: jest.fn(),
 }));
 
 jest.mock('twilio', () => {
   const localList = jest.fn();
   const tollFreeList = jest.fn();
   const incomingCreate = jest.fn();
+  const incomingRemove = jest.fn();
   const messagingPhoneNumbersCreate = jest.fn();
   const messagesCreate = jest.fn();
+  const incomingPhoneNumbers = jest.fn((sid) => ({
+    remove: () => incomingRemove(sid),
+  }));
+  incomingPhoneNumbers.create = incomingCreate;
 
   const factory = jest.fn(() => ({
     availablePhoneNumbers: jest.fn(() => ({
       local: { list: localList },
       tollFree: { list: tollFreeList },
     })),
-    incomingPhoneNumbers: {
-      create: incomingCreate,
-    },
+    incomingPhoneNumbers,
     messaging: {
       v1: {
         services: jest.fn(() => ({
@@ -42,6 +47,7 @@ jest.mock('twilio', () => {
     localList,
     tollFreeList,
     incomingCreate,
+    incomingRemove,
     messagingPhoneNumbersCreate,
     messagesCreate,
   };
@@ -66,6 +72,10 @@ const authService = require('../../src/domains/auth/auth.service');
 describe('auth.service Twilio provisioning', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    prisma.$transaction.mockImplementation(async (callback) => callback({
+      user: prisma.user,
+      business: prisma.business,
+    }));
   });
 
   test('getAvailableNumbers fetches local Twilio numbers', async () => {
@@ -145,5 +155,32 @@ describe('auth.service Twilio provisioning', () => {
     }));
     expect(result.ai_phone_number).toBe('+12125550123');
     expect(result.twilio_phone_sid).toBe('PN123');
+  });
+
+  test('onboardingStep3 releases the Twilio number if the DB transaction fails', async () => {
+    prisma.business.findFirst.mockResolvedValue({
+      id: 'biz-1',
+      name: 'Ajicore Plumbing',
+      owner_id: 'user-1',
+      twilio_phone_sid: null,
+      ai_phone_number: null,
+    });
+    prisma.$transaction.mockRejectedValue(new Error('db write failed'));
+    twilio.__mocks.incomingCreate.mockResolvedValue({
+      sid: 'PN123',
+      phoneNumber: '+12125550123',
+      friendlyName: 'Ajicore Plumbing - +12125550123',
+      isoCountry: 'US',
+    });
+    twilio.__mocks.messagingPhoneNumbersCreate.mockResolvedValue({ sid: 'PN123' });
+    twilio.__mocks.incomingRemove.mockResolvedValue(true);
+
+    await expect(authService.onboardingStep3('user-1', {
+      phone_number: '+12125550123',
+      search_type: 'area_code',
+      area_code: '212',
+    })).rejects.toThrow('db write failed');
+
+    expect(twilio.__mocks.incomingRemove).toHaveBeenCalledWith('PN123');
   });
 });
