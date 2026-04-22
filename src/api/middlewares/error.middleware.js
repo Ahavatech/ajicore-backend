@@ -35,7 +35,7 @@ function errorHandler(err, req, res, next) {
   // Safe response - NEVER send stack traces to clients
   const clientResponse = {
     error: getErrorType(statusCode),
-    message: getClientMessage(statusCode, err.name),
+    message: getClientMessage(statusCode, err),
     requestId,  // Help users and support reference the error
   };
 
@@ -66,7 +66,9 @@ function getErrorType(statusCode) {
   return types[statusCode] || 'Error';
 }
 
-function getClientMessage(statusCode, errorName) {
+function getClientMessage(statusCode, err) {
+  const errorName = err.name;
+
   // Generic messages to avoid information leakage
   const messages = {
     400: 'Invalid request data',
@@ -82,10 +84,16 @@ function getClientMessage(statusCode, errorName) {
 
   // Use specific message for known error types
   if (errorName === 'ValidationError') {
-    return 'Validation failed. Please check your input.';
+    return err.message || 'Please check your input and try again.';
   }
   if (errorName === 'AuthenticationError') {
     return 'Invalid credentials.';
+  }
+  if (errorName === 'ConflictError') {
+    return err.message || 'That information is already in use.';
+  }
+  if (errorName === 'UnprocessableEntityError') {
+    return err.message || 'Some information could not be processed.';
   }
 
   return messages[statusCode] || 'An error occurred';

@@ -127,6 +127,50 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             internal_api_token: { type: 'string' },
           },
         },
+        AuthSignupInput: {
+          type: 'object',
+          required: ['email', 'password'],
+          additionalProperties: false,
+          properties: {
+            email: {
+              type: 'string',
+              format: 'email',
+              minLength: 3,
+              example: 'user@example.com',
+              description: 'Required. Must be a valid email address and cannot be blank. The backend trims spaces and stores it lowercase.',
+            },
+            password: {
+              type: 'string',
+              minLength: 8,
+              nullable: false,
+              writeOnly: true,
+              example: 'password123',
+              description: 'Required JSON string. Must not be empty or whitespace-only. Must be at least 8 characters long. No uppercase, lowercase, number, or special-character requirement is currently enforced. No maximum length is currently enforced.',
+            },
+          },
+        },
+        AuthSigninInput: {
+          type: 'object',
+          required: ['email', 'password'],
+          additionalProperties: false,
+          properties: {
+            email: {
+              type: 'string',
+              format: 'email',
+              minLength: 3,
+              example: 'user@example.com',
+              description: 'Required. Must be the email address used during signup and cannot be blank.',
+            },
+            password: {
+              type: 'string',
+              minLength: 1,
+              nullable: false,
+              writeOnly: true,
+              example: 'password123',
+              description: 'Required JSON string. Must not be empty. Use the exact password created during signup. New passwords created through signup/reset/change-password must be at least 8 characters, with no uppercase, lowercase, number, or special-character requirement currently enforced.',
+            },
+          },
+        },
         AuthForgotPasswordInput: {
           type: 'object',
           required: ['email'],
@@ -162,7 +206,13 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
           properties: {
             email: { type: 'string', format: 'email' },
             code: { type: 'string' },
-            new_password: { type: 'string', minLength: 8 },
+            new_password: {
+              type: 'string',
+              minLength: 8,
+              nullable: false,
+              writeOnly: true,
+              description: 'Required JSON string. Must be at least 8 characters long. No uppercase, lowercase, number, or special-character requirement is currently enforced.',
+            },
           },
         },
         AuthResetPasswordResponse: {

@@ -32,20 +32,33 @@ const TWILIO_AVAILABLE_NUMBER_LIMIT = 5;
  * Register a new user with email and password (Step 1).
  */
 async function signup({ email, password }) {
-  const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
-  if (existing) {
-    throw new ConflictError('An account with this email already exists.');
+  if (typeof email !== 'string' || email.trim() === '') {
+    throw new ValidationError('Please enter your email address.');
   }
 
-  if (!password || password.length < 8) {
+  if (!isValidEmail(email)) {
+    throw new ValidationError('Please enter a valid email address.');
+  }
+
+  if (typeof password !== 'string' || password.trim() === '') {
+    throw new ValidationError('Please enter a password.');
+  }
+
+  if (password.length < 8) {
     throw new ValidationError('Password must be at least 8 characters long.');
+  }
+
+  const normalizedEmail = email.toLowerCase().trim();
+  const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+  if (existing) {
+    throw new ConflictError('An account with this email already exists.');
   }
 
   const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
 
   const user = await prisma.user.create({
     data: {
-      email: email.toLowerCase(),
+      email: normalizedEmail,
       password_hash,
       auth_provider: 'Email',
       onboarding_step: 2,
@@ -834,6 +847,10 @@ function normalizeE164Number(phoneNumber) {
     throw new ValidationError('phone_number must be a valid E.164 phone number.');
   }
   return normalized;
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(email || '').trim());
 }
 
 function buildBusinessPhoneFriendlyName(businessName, phoneNumber) {
