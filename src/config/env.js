@@ -75,6 +75,14 @@ const env = {
   // Internal API Key
   INTERNAL_API_KEY: process.env.INTERNAL_API_KEY,
 
+  // Uploads / Cloudinary (optional mirror for local uploads)
+  BACKEND_URL: process.env.BACKEND_URL,
+  CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
+  CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
+  CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
+  CLOUDINARY_FOLDER: process.env.CLOUDINARY_FOLDER || 'ajicore/uploads',
+  UPLOAD_RETURN_CLOUDINARY_URL: process.env.UPLOAD_RETURN_CLOUDINARY_URL === 'true',
+
   // CORS
   ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS || '',
 

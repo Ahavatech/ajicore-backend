@@ -4,6 +4,28 @@
  */
 const prisma = require('../../lib/prisma');
 
+const REPORT_SERVICE_KEYS = ['plumbing', 'electrical', 'cleaning', 'security', 'hvac'];
+
+function roundMoney(value) {
+  return Math.round(Number(value || 0) * 100) / 100;
+}
+
+function roundTrend(value) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.round(value * 10) / 10;
+}
+
+function normalizeServiceKey(serviceType) {
+  const normalized = String(serviceType || '').trim().toLowerCase();
+  return REPORT_SERVICE_KEYS.includes(normalized) ? normalized : 'hvac';
+}
+
+function getJobRevenue(job) {
+  return (job.invoices || []).reduce((jobSum, invoice) => {
+    return jobSum + (invoice.payments || []).reduce((paySum, payment) => paySum + payment.amount, 0);
+  }, 0);
+}
+
 async function getKPIs({ business_id, timeframe = 'This Month' }) {
   let startDate = new Date();
   
@@ -75,19 +97,20 @@ async function getKPIs({ business_id, timeframe = 'This Month' }) {
     },
   });
   const customersTrend = previousCustomers > 0 ? ((newCustomers - previousCustomers) / previousCustomers) * 100 : 0;
-  const avgJobValueTrend = previousJobs.length > 0 
-    ? ((avgJobValue - (previousRevenue / previousJobs.length)) / (previousRevenue / previousJobs.length)) * 100 
+  const previousAvgJobValue = previousJobs.length > 0 ? previousRevenue / previousJobs.length : 0;
+  const avgJobValueTrend = previousAvgJobValue > 0
+    ? ((avgJobValue - previousAvgJobValue) / previousAvgJobValue) * 100
     : 0;
 
   return {
-    revenue: Math.round(totalRevenue * 100) / 100,
-    revenueTrend: Math.round(revenueTrend * 10) / 10,
+    revenue: roundMoney(totalRevenue),
+    revenueTrend: roundTrend(revenueTrend),
     jobs: totalJobs,
-    jobsTrend: Math.round(jobsTrend * 10) / 10,
+    jobsTrend: roundTrend(jobsTrend),
     newCustomers,
-    customersTrend: Math.round(customersTrend * 10) / 10,
-    avgJobValue: Math.round(avgJobValue * 100) / 100,
-    avgJobValueTrend: Math.round(avgJobValueTrend * 10) / 10,
+    customersTrend: roundTrend(customersTrend),
+    avgJobValue: roundMoney(avgJobValue),
+    avgJobValueTrend: roundTrend(avgJobValueTrend),
   };
 }
 
@@ -107,10 +130,14 @@ async function getFinancials({ business_id, year = new Date().getFullYear() }) {
       include: { invoices: { include: { payments: true } } },
     });
 
+    const revenueBreakdown = REPORT_SERVICE_KEYS.reduce((acc, key) => ({ ...acc, [key]: 0 }), {});
+    const jobsCount = REPORT_SERVICE_KEYS.reduce((acc, key) => ({ ...acc, [key]: 0 }), {});
     const revenue = jobs.reduce((sum, job) => {
-      return sum + job.invoices.reduce((jobSum, invoice) => {
-        return jobSum + invoice.payments.reduce((paySum, payment) => paySum + payment.amount, 0);
-      }, 0);
+      const jobRevenue = getJobRevenue(job);
+      const serviceKey = normalizeServiceKey(job.service_type);
+      revenueBreakdown[serviceKey] += jobRevenue;
+      jobsCount[serviceKey] += 1;
+      return sum + jobRevenue;
     }, 0);
 
     const expenses = await prisma.expense.findMany({
@@ -123,34 +150,27 @@ async function getFinancials({ business_id, year = new Date().getFullYear() }) {
     const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
     const profit = revenue - totalExpenses;
 
-    // Mock breakdown - in production, this should come from categorization
+    const expensesByCategory = expenses.reduce((acc, exp) => {
+      const name = String(exp.category || 'Other').replace(/([A-Z])/g, ' $1').trim();
+      acc[name] = (acc[name] || 0) + exp.amount;
+      return acc;
+    }, {});
+    const expensesList = Object.entries(expensesByCategory).map(([name, amount]) => ({
+      name,
+      amount: -roundMoney(amount),
+    }));
+
     const monthBreakdown = {
-      revenue: {
-        plumbing: Math.floor(revenue * 0.25),
-        electrical: Math.floor(revenue * 0.2),
-        cleaning: Math.floor(revenue * 0.15),
-        security: Math.floor(revenue * 0.15),
-        hvac: Math.floor(revenue * 0.25),
-      },
-      expensesList: [
-        { name: 'Payroll & Wages', amount: -Math.floor(totalExpenses * 0.5) },
-        { name: 'Materials & Equipment', amount: -Math.floor(totalExpenses * 0.3) },
-        { name: 'Fleet & Fuel', amount: -Math.floor(totalExpenses * 0.2) },
-      ],
-      jobsCount: {
-        hvac: Math.floor(jobs.length * 0.25),
-        plumbing: Math.floor(jobs.length * 0.25),
-        electrical: Math.floor(jobs.length * 0.2),
-        cleaning: Math.floor(jobs.length * 0.15),
-        security: Math.floor(jobs.length * 0.15),
-      },
+      revenue: Object.fromEntries(Object.entries(revenueBreakdown).map(([key, amount]) => [key, roundMoney(amount)])),
+      expensesList,
+      jobsCount,
     };
 
     months.push({
       month: monthStart.toLocaleString('default', { month: 'short' }),
-      revenue: Math.round(revenue * 100) / 100,
-      expenses: -Math.round(totalExpenses * 100) / 100,
-      profit: Math.round(profit * 100) / 100,
+      revenue: roundMoney(revenue),
+      expenses: -roundMoney(totalExpenses),
+      profit: roundMoney(profit),
       breakdown: monthBreakdown,
     });
   }

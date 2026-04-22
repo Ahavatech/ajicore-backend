@@ -182,7 +182,6 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
           type: 'object',
           properties: {
             message: { type: 'string' },
-            dev_reset_code: { type: 'string', nullable: true },
           },
         },
         AuthVerifyResetCodeInput: {

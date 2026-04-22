@@ -15,7 +15,7 @@ async function upload(req, res, next) {
       });
     }
 
-    const url = uploadService.buildPublicUrl(req, file.filename);
+    const url = await uploadService.resolveUploadUrl(req, file);
     res.json({ url });
   } catch (err) {
     next(err);

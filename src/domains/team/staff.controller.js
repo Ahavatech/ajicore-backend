@@ -238,11 +238,9 @@ async function getStaffTimesheets(req, res, next) {
 async function getStaffPayroll(req, res, next) {
   try {
     const { id } = req.params;
-    const payrollRecords = await prisma.payrollRecord.findMany({
-      where: { staff_id: id },
-      orderBy: { period_end: 'desc' },
-    });
-    res.json(payrollRecords);
+    const { start_date, end_date } = req.query;
+    const payroll = await payrollService.calculateStaffPayroll(id, start_date, end_date);
+    res.json(payroll);
   } catch (err) { next(err); }
 }
 

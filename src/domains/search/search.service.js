@@ -3,6 +3,7 @@
  * Business logic for global/omnibar search across multiple entities.
  */
 const prisma = require('../../lib/prisma');
+const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
 function sanitizeSearchInput(input, maxLength = 100) {
   if (!input) return null;
@@ -121,7 +122,6 @@ async function globalSearch({ business_id, q, limit = 5 }) {
     }),
   ]);
 
-    const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
   const formatMoney = (amount) => currency.format(Number(amount || 0));
 
   const invoiceStatusLabel = (status) => {
@@ -130,6 +130,12 @@ async function globalSearch({ business_id, q, limit = 5 }) {
     if (status === 'Paid') return 'Paid';
     if (status === 'Overdue') return 'Overdue';
     return 'Unpaid';
+  };
+
+  const quoteStatusLabel = (status) => {
+    if (!status) return 'Pending';
+    if (['Approved', 'Declined', 'Expired'].includes(status)) return status;
+    return 'Pending';
   };
 
   // Format results to generic schema
@@ -167,14 +173,14 @@ async function globalSearch({ business_id, q, limit = 5 }) {
       }),
       quotes: quotes.map((q) => ({
         id: q.id,
-        title: q.title || 'Untitled Quote',
-        subtitle: q.customer ? `${q.customer.first_name} ${q.customer.last_name}` : '',
+        title: q.title || q.description || 'Untitled Quote',
+        subtitle: `${formatMoney(q.total_amount)} - ${quoteStatusLabel(q.status)}`,
         type: 'quote',
       })),
       fleet: fleet.map((v) => ({
         id: v.id,
         title: v.make_model || 'Vehicle',
-        subtitle: v.license_plate || '',
+        subtitle: v.license_plate ? `License: ${v.license_plate}` : 'License: ',
         type: 'vehicle',
       })),
     },

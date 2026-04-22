@@ -6,6 +6,15 @@ const prisma = require('../../lib/prisma');
 const logger = require('../../utils/logger');
 const { NotFoundError, ValidationError } = require('../../utils/errors');
 
+function withRepairDateAlias(repair) {
+  if (!repair) return repair;
+  if (Array.isArray(repair)) return repair.map(withRepairDateAlias);
+  return {
+    ...repair,
+    date: repair.completion_date,
+  };
+}
+
 async function getVehicles(businessId) {
   const where = {};
   if (businessId) where.business_id = businessId;
@@ -114,7 +123,7 @@ async function logRepair(vehicleId, data, userId) {
     throw new ValidationError('completion_date (or date) is required.');
   }
 
-  return prisma.fleetRepair.create({
+  const repair = await prisma.fleetRepair.create({
     data: {
       vehicle_id: vehicleId,
       business_id: vehicle.business_id,
@@ -127,13 +136,17 @@ async function logRepair(vehicleId, data, userId) {
       created_by: userId,
     },
   });
+
+  return withRepairDateAlias(repair);
 }
 
 async function getRepairHistory(vehicleId) {
-  return prisma.fleetRepair.findMany({
+  const repairs = await prisma.fleetRepair.findMany({
     where: { vehicle_id: vehicleId },
     orderBy: { completion_date: 'desc' },
   });
+
+  return withRepairDateAlias(repairs);
 }
 
 async function getAllRepairs(businessId, filters = {}) {
@@ -141,11 +154,13 @@ async function getAllRepairs(businessId, filters = {}) {
   if (filters.vehicle_id) where.vehicle_id = filters.vehicle_id;
   if (filters.repair_type) where.repair_type = filters.repair_type;
 
-  return prisma.fleetRepair.findMany({
+  const repairs = await prisma.fleetRepair.findMany({
     where,
     include: { vehicle: { select: { id: true, make_model: true } } },
     orderBy: { completion_date: 'desc' },
   });
+
+  return withRepairDateAlias(repairs);
 }
 
 async function getMetrics(businessId) {
@@ -165,4 +180,4 @@ async function getMetrics(businessId) {
   };
 }
 
-module.exports = { getVehicles, getById, create, update, updateMileage, getMaintenanceAlerts, remove, logRepair, getRepairHistory, getAllRepairs, getMetrics };
+module.exports = { getVehicles, getById, create, update, updateMileage, getMaintenanceAlerts, remove, logRepair, getRepairHistory, getAllRepairs, getMetrics, withRepairDateAlias };
