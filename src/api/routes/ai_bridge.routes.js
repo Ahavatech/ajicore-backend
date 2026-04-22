@@ -9,6 +9,7 @@
  */
 const { Router } = require('express');
 const {
+  requireAiServiceApiKey,
   requireInternalApiKey,
   requireInternalBusinessAccess,
   requireInternalResourceAccess,
@@ -127,6 +128,53 @@ async function createAiAutomationArtifacts({
   }
 
   return artifacts;
+}
+
+async function getBusinessConfig(req, res, next) {
+  try {
+    const { business_id } = req.query;
+    const [business, categories, priceItems] = await Promise.all([
+      prisma.business.findUnique({ where: { id: business_id } }),
+      prisma.serviceCategory.findMany({ where: { business_id, is_active: true } }),
+      prisma.priceBookItem.findMany({
+        where: { business_id, is_active: true },
+        include: { category: true },
+      }),
+    ]);
+
+    if (!business) return res.status(404).json({ error: 'Business not found' });
+
+    res.json({
+      business: {
+        id: business.id,
+        name: business.name,
+        industry: business.industry,
+        business_hours: business.business_hours,
+        timezone: business.timezone,
+        company_phone: business.company_phone,
+        owner_phone: business.owner_phone,
+        dedicated_phone_number: business.dedicated_phone_number,
+        ai_phone_number: business.ai_phone_number,
+        ai_receptionist_name: business.ai_receptionist_name,
+        voice_gender: business.voice_gender,
+        ai_business_description: business.ai_business_description,
+        home_base_zip: business.home_base_zip,
+        service_radius_miles: business.service_radius_miles,
+        cost_per_mile_over_radius: business.cost_per_mile_over_radius,
+        service_area_description: business.service_area_description,
+        unknown_service_handling: business.unknown_service_handling,
+        unknown_service_call_fee: business.unknown_service_call_fee,
+        quote_expiry_days: business.quote_expiry_days,
+        payment_follow_up_days: business.payment_follow_up_days,
+        payment_interval: business.payment_interval,
+        alert_settings: business.alert_settings,
+        automation_settings: business.automation_settings,
+        communication_settings: business.communication_settings,
+      },
+      service_categories: categories,
+      price_book: priceItems,
+    });
+  } catch (err) { next(err); }
 }
 
 // ============================================
@@ -261,6 +309,8 @@ router.post(withAiAlias('/ai/calls/status', '/calls/status'), async (req, res, n
 // ============================================
 // Protected Internal AI Routes
 // ============================================
+router.get('/ai/business-config', requireAiServiceApiKey, requireFields(['business_id'], 'query'), requireInternalBusinessAccess('query'), getBusinessConfig);
+
 router.use(requireInternalApiKey);
 
 router.get('/ai/business-by-phone', async (req, res, next) => {
@@ -705,6 +755,7 @@ router.post('/ai/book', requireFields(['business_id', 'booking_type'], 'body'), 
  * /api/internal/ai/business-config:
  *   get:
  *     summary: Fetch AI receptionist and dispatcher business context
+ *     description: Uses `x-api-key` mapped to `AI_SERVICE_API_KEY` plus the per-business `x-business-token`.
  *     tags: [AI Bridge]
  *     security:
  *       - apiKeyAuth: []
@@ -724,53 +775,6 @@ router.post('/ai/book', requireFields(['business_id', 'booking_type'], 'body'), 
  *             schema:
  *               $ref: '#/components/schemas/AIBusinessConfigResponse'
  */
-router.get('/ai/business-config', requireFields(['business_id'], 'query'), requireInternalBusinessAccess('query'), async (req, res, next) => {
-  try {
-    const { business_id } = req.query;
-    const [business, categories, priceItems] = await Promise.all([
-      prisma.business.findUnique({ where: { id: business_id } }),
-      prisma.serviceCategory.findMany({ where: { business_id, is_active: true } }),
-      prisma.priceBookItem.findMany({
-        where: { business_id, is_active: true },
-        include: { category: true },
-      }),
-    ]);
-
-    if (!business) return res.status(404).json({ error: 'Business not found' });
-
-    res.json({
-      business: {
-        id: business.id,
-        name: business.name,
-        industry: business.industry,
-        business_hours: business.business_hours,
-        timezone: business.timezone,
-        company_phone: business.company_phone,
-        owner_phone: business.owner_phone,
-        dedicated_phone_number: business.dedicated_phone_number,
-        ai_phone_number: business.ai_phone_number,
-        ai_receptionist_name: business.ai_receptionist_name,
-        voice_gender: business.voice_gender,
-        ai_business_description: business.ai_business_description,
-        home_base_zip: business.home_base_zip,
-        service_radius_miles: business.service_radius_miles,
-        cost_per_mile_over_radius: business.cost_per_mile_over_radius,
-        service_area_description: business.service_area_description,
-        unknown_service_handling: business.unknown_service_handling,
-        unknown_service_call_fee: business.unknown_service_call_fee,
-        quote_expiry_days: business.quote_expiry_days,
-        payment_follow_up_days: business.payment_follow_up_days,
-        payment_interval: business.payment_interval,
-        alert_settings: business.alert_settings,
-        automation_settings: business.automation_settings,
-        communication_settings: business.communication_settings,
-      },
-      service_categories: categories,
-      price_book: priceItems,
-    });
-  } catch (err) { next(err); }
-});
-
 /**
  * @swagger
  * /api/internal/ai/business/profile:

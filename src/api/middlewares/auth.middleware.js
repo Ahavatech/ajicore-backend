@@ -213,6 +213,27 @@ function requireInternalApiKey(req, res, next) {
 }
 
 /**
+ * Middleware to verify the AI service API key.
+ * Used by endpoints called directly by the external AI service.
+ */
+function requireAiServiceApiKey(req, res, next) {
+  const apiKey = getTokenHeader(req, 'x-api-key');
+
+  if (!safeTokenMatch(env.AI_SERVICE_API_KEY, apiKey)) {
+    logger.warn('Unauthorized AI service API access attempt', {
+      ip: req.ip,
+      path: req.originalUrl,
+    });
+    return res.status(401).json({
+      error: 'Unauthorized',
+      message: 'Invalid or missing AI service API key.',
+    });
+  }
+
+  next();
+}
+
+/**
  * Middleware to verify JWT token from Authorization header.
  * Attaches decoded user payload to req.user on success.
  *
@@ -245,6 +266,7 @@ function requireAuth(req, res, next) {
 
 module.exports = {
   requireInternalApiKey,
+  requireAiServiceApiKey,
   requireAuth,
   requireBusinessAccess,
   requireResourceAccess,

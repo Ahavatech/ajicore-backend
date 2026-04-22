@@ -59,6 +59,9 @@ function createAuthModuleMock(state) {
     requireInternalApiKey: direct('requireInternalApiKey', (req) => {
       req.headers['x-api-key'] = req.headers['x-api-key'] || 'internal-key';
     }),
+    requireAiServiceApiKey: direct('requireAiServiceApiKey', (req) => {
+      req.headers['x-api-key'] = req.headers['x-api-key'] || 'ai-service-key';
+    }),
     requireBusinessAccess: factory('requireBusinessAccess', (req) => {
       req.business = { id: BUSINESS_ID };
     }),

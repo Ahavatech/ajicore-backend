@@ -19,7 +19,7 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
 ## Authentication
 - **Frontend routes**: Use \`Authorization: Bearer <jwt_token>\` header
 
-- **AI / Internal routes**: Use both \`x-api-key: <internal_api_key>\` and \`x-business-token: <business_internal_api_token>\`
+- **AI / Internal routes**: Most protected routes use both \`x-api-key: <internal_api_key>\` and \`x-business-token: <business_internal_api_token>\`. \`GET /api/internal/ai/business-config\` uses \`x-api-key: <ai_service_api_key>\` plus \`x-business-token\`.
 
 ## Page Guide
 

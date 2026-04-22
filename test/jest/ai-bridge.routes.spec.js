@@ -504,6 +504,9 @@ describe('ai bridge routes', () => {
   });
 
   test('business config returns business context', async () => {
+    harness.authState.fail = 'requireInternalApiKey';
+    harness.authState.status = 401;
+
     const response = await harness.request({
       path: '/api/internal/ai/business-config',
       query: { business_id: BUSINESS_ID },
@@ -512,6 +515,18 @@ describe('ai bridge routes', () => {
     expect(response.status).toBe(200);
     expect(response.body.business.id).toBe(BUSINESS_ID);
     expect(response.body.service_categories).toEqual([{ id: 'cat-1' }]);
+  });
+
+  test('business config requires the AI service API key middleware', async () => {
+    harness.authState.fail = 'requireAiServiceApiKey';
+    harness.authState.status = 401;
+
+    const response = await harness.request({
+      path: '/api/internal/ai/business-config',
+      query: { business_id: BUSINESS_ID },
+    });
+
+    expect(response.status).toBe(401);
   });
 
   test('business config returns 404 when business is missing', async () => {
