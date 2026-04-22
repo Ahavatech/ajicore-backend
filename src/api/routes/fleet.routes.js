@@ -67,6 +67,62 @@ router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('
  */
 router.get('/maintenance-alerts', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), vehicleController.getMaintenanceAlerts);
 
+// Business-scoped helpers (MUST be above '/:id' to avoid Express route collisions)
+
+/**
+ * @swagger
+ * /api/fleet/repairs:
+ *   get:
+ *     summary: Get all repairs for a business
+ *     tags: [Fleet]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: business_id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *       - in: query
+ *         name: vehicle_id
+ *         schema: { type: string, format: uuid }
+ *       - in: query
+ *         name: repair_type
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Repairs retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/FleetRepair'
+ */
+router.get('/repairs', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), vehicleController.getAllRepairs);
+
+/**
+ * @swagger
+ * /api/fleet/metrics:
+ *   get:
+ *     summary: Get fleet KPI aggregates
+ *     tags: [Fleet]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: business_id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Fleet metrics retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/FleetMetrics'
+ */
+router.get('/metrics', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), vehicleController.getMetrics);
+
 /**
  * @swagger
  * /api/fleet/{id}:
@@ -220,7 +276,7 @@ router.delete('/:id', validateUUID('id'), requireResourceAccess('vehicle'), vehi
  *             schema:
  *               $ref: '#/components/schemas/FleetRepair'
  */
-router.post('/:id/repairs', validateUUID('id'), requireResourceAccess('vehicle'), requireFields(['repair_type', 'description', 'completion_date']), vehicleController.logRepair);
+router.post('/:id/repairs', validateUUID('id'), requireResourceAccess('vehicle'), requireFields(['description']), vehicleController.logRepair);
 
 /**
  * @swagger
@@ -247,35 +303,5 @@ router.post('/:id/repairs', validateUUID('id'), requireResourceAccess('vehicle')
  */
 router.get('/:id/repairs', validateUUID('id'), requireResourceAccess('vehicle'), vehicleController.getRepairHistory);
 
-/**
- * @swagger
- * /api/fleet/repairs:
- *   get:
- *     summary: Get all repairs for a business
- *     tags: [Fleet]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: business_id
- *         required: true
- *         schema: { type: string, format: uuid }
- *       - in: query
- *         name: vehicle_id
- *         schema: { type: string, format: uuid }
- *       - in: query
- *         name: repair_type
- *         schema: { type: string }
- *     responses:
- *       200:
- *         description: Repairs retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/FleetRepair'
- */
-router.get('/repairs', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), vehicleController.getAllRepairs);
 
 module.exports = router;

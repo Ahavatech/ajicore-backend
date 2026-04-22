@@ -4,7 +4,7 @@
  */
 const prisma = require('../../lib/prisma');
 const logger = require('../../utils/logger');
-const { NotFoundError } = require('../../utils/errors');
+const { NotFoundError, ValidationError } = require('../../utils/errors');
 
 async function getVehicles(businessId) {
   const where = {};
@@ -20,9 +20,19 @@ async function create(data) {
   return prisma.vehicle.create({
     data: {
       business_id: data.business_id,
+      name: data.name || null,
       make_model: data.make_model,
       year: data.year || null,
       license_plate: data.license_plate || null,
+      type: data.type || null,
+      vin: data.vin || null,
+      color: data.color || null,
+      purchase_date: data.purchase_date ? new Date(data.purchase_date) : null,
+      purchase_price: data.purchase_price || null,
+      insurance_provider: data.insurance_provider || null,
+      policy_number: data.policy_number || null,
+      insurance_cost: data.insurance_cost || null,
+      assigned_staff_id: data.assigned_staff_id || null,
       mileage: data.mileage || 0,
       insurance_expiry: data.insurance_expiry ? new Date(data.insurance_expiry) : null,
       registration_renewal: data.registration_renewal ? new Date(data.registration_renewal) : null,
@@ -35,8 +45,13 @@ async function create(data) {
 
 async function update(id, data) {
   const updateData = {};
-  const fields = ['make_model', 'year', 'license_plate', 'maintenance_cycle_miles', 'last_maintenance_mileage', 'notes'];
+  const fields = [
+    'name', 'make_model', 'year', 'license_plate', 'type', 'vin', 'color',
+    'purchase_price', 'insurance_provider', 'policy_number', 'insurance_cost',
+    'assigned_staff_id', 'mileage', 'maintenance_cycle_miles', 'last_maintenance_mileage', 'notes'
+  ];
   fields.forEach((f) => { if (data[f] !== undefined) updateData[f] = data[f]; });
+  if (data.purchase_date) updateData.purchase_date = new Date(data.purchase_date);
   if (data.insurance_expiry) updateData.insurance_expiry = new Date(data.insurance_expiry);
   if (data.registration_renewal) updateData.registration_renewal = new Date(data.registration_renewal);
   return prisma.vehicle.update({ where: { id }, data: updateData });
@@ -90,16 +105,25 @@ async function logRepair(vehicleId, data, userId) {
   const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
   if (!vehicle) throw new NotFoundError('Vehicle not found.');
 
+  if (data.business_id && data.business_id !== vehicle.business_id) {
+    throw new ValidationError('business_id does not match this vehicle.');
+  }
+
+  const completionDateRaw = data.completion_date || data.date;
+  if (!completionDateRaw) {
+    throw new ValidationError('completion_date (or date) is required.');
+  }
+
   return prisma.fleetRepair.create({
     data: {
       vehicle_id: vehicleId,
       business_id: vehicle.business_id,
-      repair_type: data.repair_type,
+      repair_type: data.repair_type || 'maintenance',
       description: data.description,
-      cost: data.cost || null,
-      completion_date: new Date(data.completion_date),
-      miles_at_service: data.miles_at_service || null,
-      notes: data.notes || null,
+      cost: data.cost ?? null,
+      completion_date: new Date(completionDateRaw),
+      miles_at_service: data.miles_at_service ?? null,
+      notes: data.notes ?? null,
       created_by: userId,
     },
   });
@@ -124,4 +148,21 @@ async function getAllRepairs(businessId, filters = {}) {
   });
 }
 
-module.exports = { getVehicles, getById, create, update, updateMileage, getMaintenanceAlerts, remove, logRepair, getRepairHistory, getAllRepairs };
+async function getMetrics(businessId) {
+  const agg = await prisma.fleetRepair.aggregate({
+    where: { business_id: businessId },
+    _sum: { cost: true },
+    _count: { _all: true },
+  });
+
+  const totalRepairCosts = agg._sum.cost || 0;
+  const count = agg._count._all || 0;
+  const avgRepairCost = count > 0 ? totalRepairCosts / count : 0;
+
+  return {
+    totalRepairCosts: Math.round(totalRepairCosts * 100) / 100,
+    avgRepairCost: Math.round(avgRepairCost * 100) / 100,
+  };
+}
+
+module.exports = { getVehicles, getById, create, update, updateMileage, getMaintenanceAlerts, remove, logRepair, getRepairHistory, getAllRepairs, getMetrics };

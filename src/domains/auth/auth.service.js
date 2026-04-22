@@ -533,8 +533,9 @@ async function forgotPassword(email) {
     logger.info(`Password reset code generated for user: ${user.email}`);
   }
 
-  const response = {
-    message: 'If an account exists for this email, a password reset code has been generated.',
+    const response = {
+    // Keep the response generic to avoid account enumeration.
+    message: 'Code sent',
   };
 
   if (dev_reset_code) {
@@ -555,8 +556,8 @@ async function verifyResetCode(email, code) {
 
   validateStoredResetCode(user, code);
 
-  return {
-    message: 'Reset code verified.',
+    return {
+    message: 'Valid',
     valid: true,
   };
 }

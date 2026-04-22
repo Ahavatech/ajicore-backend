@@ -229,6 +229,8 @@ model Business {
   bank_transactions    BankTransaction[]
   categorization_rules CategorizationRule[]
   ai_event_logs        AiEventLog[]
+  notifications        Notification[]
+  payroll_records      PayrollRecord[]
 
   @@map("businesses")
 }
@@ -281,6 +283,9 @@ model Staff {
   name                    String
   role                    StaffRole @default(Technician)
   hourly_rate             Float
+  employment_type         String?   // "Full-Time", "Contractor", etc.
+  entry_level             String?   // "Senior", "Junior", etc.
+  notes                   String?
   email                   String?
   phone                   String?
   check_in_frequency_hours Float?
@@ -288,12 +293,14 @@ model Staff {
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
 
-  business        Business     @relation(fields: [business_id], references: [id], onDelete: Cascade)
-  assigned_jobs   Job[]        @relation("AssignedStaff")
-  assigned_quotes Quote[]      @relation("AssignedQuoteStaff")
-  timesheets      Timesheet[]
-  active_job      Job?         @relation("StaffActiveJob", fields: [active_job_id], references: [id], onDelete: SetNull)
-  team_checkins   TeamCheckin[]
+  business          Business         @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  assigned_jobs     Job[]            @relation("AssignedStaff")
+  assigned_quotes   Quote[]          @relation("AssignedQuoteStaff")
+  timesheets        Timesheet[]
+  payroll_records   PayrollRecord[]
+  active_job        Job?             @relation("StaffActiveJob", fields: [active_job_id], references: [id], onDelete: SetNull)
+  team_checkins     TeamCheckin[]
+  assigned_vehicles Vehicle[]
 
   @@map("staff")
 }
@@ -316,22 +323,24 @@ model Timesheet {
 }
 
 model Customer {
-  id           String   @id @default(uuid())
-  business_id  String
-  first_name   String
-  last_name    String
-  phone_number String?
-  email        String?
-  address      String?
-  zip_code     String?
-  notes        String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String   @id @default(uuid())
+  business_id    String
+  first_name     String
+  last_name      String
+  customer_type  String?  @default("Individual") // "Individual" | "Company"
+  company_name   String?
+  phone_number   String?
+  email          String?
+  address        String?
+  zip_code       String?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  business  Business   @relation(fields: [business_id], references: [id], onDelete: Cascade)
-  jobs      Job[]
-  quotes    Quote[]
-  follow_ups FollowUp[]
+  business      Business    @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  jobs          Job[]
+  quotes        Quote[]
+  follow_ups    FollowUp[]
   ai_event_logs AiEventLog[]
 
   @@map("customers")
@@ -390,6 +399,7 @@ model Job {
   actual_start_time    DateTime?
   actual_end_time      DateTime?
   photos_urls          Json?
+  line_items           Json?    // Array of {price_book_id, quantity, price, name}
   is_emergency         Boolean   @default(false)
   source               JobSource @default(Manual)
   from_quote_id        String?
@@ -541,6 +551,15 @@ model Vehicle {
   make_model               String
   year                     Int?
   license_plate            String?
+  type                     String?   // "Truck", "Van", "SUV", etc.
+  vin                      String?
+  color                    String?
+  purchase_date            DateTime?
+  purchase_price           Float?
+  insurance_provider       String?
+  policy_number            String?
+  insurance_cost           Float?
+  assigned_staff_id        String?
   mileage                  Int       @default(0)
   insurance_expiry         DateTime?
   registration_renewal     DateTime?
@@ -552,8 +571,9 @@ model Vehicle {
   createdAt                DateTime  @default(now())
   updatedAt                DateTime  @updatedAt
 
-  business Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
-  repairs  FleetRepair[]
+  business           Business      @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  assigned_staff     Staff?        @relation(fields: [assigned_staff_id], references: [id], onDelete: SetNull)
+  repairs            FleetRepair[]
 
   @@map("vehicles")
 }
@@ -676,4 +696,38 @@ model AiEventLog {
   customer Customer? @relation(fields: [customer_id], references: [id], onDelete: SetNull)
 
   @@map("ai_event_logs")
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  business_id String
+  title       String
+  message     String
+  type        String   @default("SystemAlert")  // "SystemAlert", "JobAlert", "PaymentAlert", etc.
+  is_read     Boolean  @default(false)
+  link        String?  // URL to navigate to when clicked
+  createdAt   DateTime @default(now())
+
+  business Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+  @@index([business_id, is_read, createdAt])
+}
+
+model PayrollRecord {
+  id          String   @id @default(uuid())
+  business_id String
+  staff_id    String
+  period_start DateTime
+  period_end   DateTime
+  total_hours  Float
+  hourly_rate  Float
+  gross_pay    Float
+  notes        String?
+  createdAt   DateTime @default(now())
+
+  business Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  staff    Staff    @relation(fields: [staff_id], references: [id], onDelete: Cascade)
+
+  @@map("payroll_records")
 }

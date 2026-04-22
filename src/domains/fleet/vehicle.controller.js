@@ -77,4 +77,12 @@ async function getAllRepairs(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { getAllVehicles, getVehicleById, createVehicle, updateVehicle, updateMileage, getMaintenanceAlerts, deleteVehicle, logRepair, getRepairHistory, getAllRepairs };
+async function getMetrics(req, res, next) {
+  try {
+    const { business_id } = req.query;
+    const metrics = await fleetService.getMetrics(business_id);
+    res.json(metrics);
+  } catch (err) { next(err); }
+}
+
+module.exports = { getAllVehicles, getVehicleById, createVehicle, updateVehicle, updateMileage, getMaintenanceAlerts, deleteVehicle, logRepair, getRepairHistory, getAllRepairs, getMetrics };

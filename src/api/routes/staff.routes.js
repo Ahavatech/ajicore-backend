@@ -132,6 +132,25 @@ router.get('/timesheets', requireFields(['business_id'], 'query'), requireBusine
 
 /**
  * @swagger
+ * /api/staff/metrics:
+ *   get:
+ *     summary: Get staff metrics
+ *     tags: [Team]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: business_id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Staff metrics retrieved successfully
+ */
+router.get('/metrics', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), staffController.getStaffMetrics);
+
+/**
+ * @swagger
  * /api/staff/{id}:
  *   get:
  *     summary: Get a staff member by ID
@@ -272,5 +291,44 @@ router.post('/:id/clock-in', validateUUID('id'), requireResourceAccess('staff'),
  *               $ref: '#/components/schemas/Timesheet'
  */
 router.post('/:id/clock-out', validateUUID('id'), requireResourceAccess('staff'), staffController.clockOut);
+
+
+/**
+ * @swagger
+ * /api/staff/{id}/timesheets:
+ *   get:
+ *     summary: Get timesheets for a specific staff member
+ *     tags: [Team]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Timesheets retrieved successfully
+ */
+router.get('/:id/timesheets', validateUUID('id'), requireResourceAccess('staff'), staffController.getStaffTimesheets);
+
+/**
+ * @swagger
+ * /api/staff/{id}/payroll:
+ *   get:
+ *     summary: Get payroll records for a specific staff member
+ *     tags: [Team]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Payroll records retrieved successfully
+ */
+router.get('/:id/payroll', validateUUID('id'), requireResourceAccess('staff'), staffController.getStaffPayroll);
 
 module.exports = router;

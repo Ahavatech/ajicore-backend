@@ -7,6 +7,35 @@ const { requireFields, validateUUID } = require('../middlewares/validate.middlew
 const router = Router();
 router.use(requireAuth);
 
+/**
+ * @swagger
+ * tags:
+ *   name: Customers
+ *   description: Customer management
+ */
+
+/**
+ * @swagger
+ * /api/customers/metrics:
+ *   get:
+ *     summary: Get CRM aggregate metrics (KPI cards)
+ *     tags: [Customers]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: business_id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Customer KPIs
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/CustomerMetrics'
+ */
+router.get('/metrics', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), customerController.getMetrics);
 
 router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), customerController.getAll);
 

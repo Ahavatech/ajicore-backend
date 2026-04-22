@@ -207,10 +207,23 @@ router.get('/:id', validateUUID('id'), requireResourceAccess('job'), jobControll
  *               service_type: { type: string }
  *               address: { type: string }
  *               scheduled_start_time: { type: string, format: date-time }
- *               scheduled_end_time: { type: string, format: date-time }
+  *               scheduled_end_time: { type: string, format: date-time }
  *               service_call_fee: { type: number }
  *               is_emergency: { type: boolean }
  *               status: { type: string }
+ *               photo_urls:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: uri
+ *               line_items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     price_book_id: { type: string, format: uuid }
+ *                     quantity: { type: number }
+ *                     price: { type: number }
  *     responses:
  *       201:
  *         description: Job created successfully
@@ -242,10 +255,23 @@ router.post('/', requireFields(['business_id', 'customer_id']), requireBusinessA
  *               service_type: { type: string }
  *               address: { type: string }
  *               scheduled_start_time: { type: string, format: date-time }
- *               scheduled_end_time: { type: string, format: date-time }
+  *               scheduled_end_time: { type: string, format: date-time }
  *               service_call_fee: { type: number }
  *               is_emergency: { type: boolean }
  *               status: { type: string }
+ *               photo_urls:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: uri
+ *               line_items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     price_book_id: { type: string, format: uuid }
+ *                     quantity: { type: number }
+ *                     price: { type: number }
  *     responses:
  *       200:
  *         description: Job updated successfully

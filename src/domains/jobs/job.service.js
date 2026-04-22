@@ -18,6 +18,36 @@ function buildJobLabel(job) {
   return job.service_type || job.title || job.type || 'Service Job';
 }
 
+// Transform job to include hydrated relational data
+function hydrateJob(job) {
+  if (!job) return null;
+
+  const photo_urls = Array.isArray(job.photos_urls)
+    ? job.photos_urls
+    : (job.photos_urls ? job.photos_urls : []);
+
+  const line_items = Array.isArray(job.line_items)
+    ? job.line_items
+    : (job.line_items ? job.line_items : []);
+
+  return {
+    ...job,
+    // Frontend expects these hydrated display fields (no raw UUID-only rendering)
+    customer_name: buildCustomerName(job.customer),
+    staff_name: job.assigned_staff ? job.assigned_staff.name : null,
+
+    // Frontend naming (legacy DB field is photos_urls)
+    photo_urls,
+    line_items,
+  };
+}
+
+
+// Transform array of jobs
+function hydrateJobs(jobs) {
+  return Array.isArray(jobs) ? jobs.map(hydrateJob) : jobs;
+}
+
 async function getJobs({
   business_id,
   status,
@@ -103,11 +133,11 @@ async function getJobs({
     }),
     prisma.job.count({ where }),
   ]);
-  return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  return { data: hydrateJobs(data), total, page, limit, totalPages: Math.ceil(total / limit) };
 }
 
 async function getJobById(id) {
-  return prisma.job.findUnique({
+  const job = await prisma.job.findUnique({
     where: { id },
     include: {
       customer: true,
@@ -118,9 +148,12 @@ async function getJobById(id) {
       timesheets: { include: { staff: true } },
     },
   });
+  return hydrateJob(job);
 }
 
 async function createJob(data) {
+  const photoUrls = data.photo_urls ?? data.photos_urls;
+
   const job = await prisma.job.create({
     data: {
       business_id: data.business_id,
@@ -136,12 +169,15 @@ async function createJob(data) {
       service_type: data.service_type || null,
       scheduled_start_time: data.scheduled_start_time ? new Date(data.scheduled_start_time) : null,
       scheduled_end_time: data.scheduled_end_time ? new Date(data.scheduled_end_time) : null,
+      photos_urls: Array.isArray(photoUrls) ? photoUrls : (photoUrls ? photoUrls : null),
+      line_items: Array.isArray(data.line_items) ? data.line_items : (data.line_items ? data.line_items : null),
       is_emergency: data.is_emergency ?? false,
       source: data.source || 'Manual',
       from_quote_id: data.from_quote_id || null,
     },
     include: { customer: true, assigned_staff: true },
   });
+
 
   if (data.price_book_item_id) {
     await prisma.priceBookItem.update({
@@ -170,20 +206,42 @@ async function createJob(data) {
     },
   });
 
-  return job;
+  return hydrateJob(job);
 }
 
 async function updateJob(id, data) {
   const updateData = {};
-  const scalarFields = ['assigned_staff_id', 'status', 'title', 'job_details',
-    'price_book_item_id', 'service_call_fee', 'is_emergency', 'photos_urls', 'address', 'service_type', 'type'];
-  scalarFields.forEach((f) => { if (data[f] !== undefined) updateData[f] = data[f]; });
+  const scalarFields = [
+    'assigned_staff_id',
+    'status',
+    'title',
+    'job_details',
+    'price_book_item_id',
+    'service_call_fee',
+    'is_emergency',
+    'address',
+    'service_type',
+    'type',
+  ];
+
+  scalarFields.forEach((f) => {
+    if (data[f] !== undefined) updateData[f] = data[f];
+  });
+
+  // Accept frontend naming (photo_urls) + legacy/internal naming (photos_urls)
+  if (data.photo_urls !== undefined) updateData.photos_urls = data.photo_urls;
+  if (data.photos_urls !== undefined) updateData.photos_urls = data.photos_urls;
+
+  // Pricebook line items array
+  if (data.line_items !== undefined) updateData.line_items = data.line_items;
+
   if (data.scheduled_start_time) updateData.scheduled_start_time = new Date(data.scheduled_start_time);
   if (data.scheduled_end_time) updateData.scheduled_end_time = new Date(data.scheduled_end_time);
   if (data.actual_start_time) updateData.actual_start_time = new Date(data.actual_start_time);
   if (data.actual_end_time) updateData.actual_end_time = new Date(data.actual_end_time);
 
   const job = await prisma.job.update({ where: { id }, data: updateData, include: { customer: true, assigned_staff: true } });
+
 
   if (job.assigned_staff_id) {
     if (job.status === 'InProgress') {
@@ -211,8 +269,9 @@ async function updateJob(id, data) {
     },
   });
 
-  return job;
+    return hydrateJob(job);
 }
+
 
 async function startJob(id) {
   const job = await prisma.job.findUnique({ where: { id } });
@@ -248,8 +307,9 @@ async function startJob(id) {
     },
   });
 
-  return startedJob;
+    return hydrateJob(startedJob);
 }
+
 
 async function completeJob(id) {
   const job = await prisma.job.findUnique({ where: { id } });
@@ -285,8 +345,9 @@ async function completeJob(id) {
     },
   });
 
-  return completedJob;
+    return hydrateJob(completedJob);
 }
+
 
 async function addMaterials(jobId, materials) {
   const results = [];

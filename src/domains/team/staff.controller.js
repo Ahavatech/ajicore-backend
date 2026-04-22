@@ -133,6 +133,9 @@ async function createStaff(req, res, next) {
         name: req.body.name,
         role: req.body.role || 'Technician',
         hourly_rate: req.body.hourly_rate,
+        employment_type: req.body.employment_type || null,
+        entry_level: req.body.entry_level || null,
+        notes: req.body.notes || null,
         email: req.body.email || null,
         phone: req.body.phone || null,
         check_in_frequency_hours: req.body.check_in_frequency_hours ?? null,
@@ -145,7 +148,7 @@ async function createStaff(req, res, next) {
 async function updateStaff(req, res, next) {
   try {
     const updateData = {};
-    const fields = ['name', 'role', 'hourly_rate', 'email', 'phone', 'check_in_frequency_hours'];
+    const fields = ['name', 'role', 'hourly_rate', 'employment_type', 'entry_level', 'notes', 'email', 'phone', 'check_in_frequency_hours'];
     fields.forEach((f) => { if (req.body[f] !== undefined) updateData[f] = req.body[f]; });
     const staff = await prisma.staff.update({ where: { id: req.params.id }, data: updateData });
     res.json(staff);
@@ -220,4 +223,66 @@ async function calculatePayroll(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { getAllStaff, getAvailableStaff, getStaffById, createStaff, updateStaff, deleteStaff, clockIn, clockOut, getTimesheets, calculatePayroll };
+async function getStaffTimesheets(req, res, next) {
+  try {
+    const { id } = req.params;
+    const timesheets = await prisma.timesheet.findMany({
+      where: { staff_id: id },
+      include: { job: { include: { customer: true } } },
+      orderBy: { clock_in: 'desc' },
+    });
+    res.json(timesheets);
+  } catch (err) { next(err); }
+}
+
+async function getStaffPayroll(req, res, next) {
+  try {
+    const { id } = req.params;
+    const payrollRecords = await prisma.payrollRecord.findMany({
+      where: { staff_id: id },
+      orderBy: { period_end: 'desc' },
+    });
+    res.json(payrollRecords);
+  } catch (err) { next(err); }
+}
+
+async function getStaffMetrics(req, res, next) {
+  try {
+    const { business_id } = req.query;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Total hours today
+    const timesheetToday = await prisma.timesheet.findMany({
+      where: {
+        staff: { business_id },
+        clock_in: { gte: today, lt: tomorrow },
+      },
+    });
+
+    const totalHoursToday = timesheetToday.reduce((sum, ts) => sum + (ts.total_hours || 0), 0);
+
+    // Average jobs per day (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const jobsLast30Days = await prisma.job.findMany({
+      where: {
+        business_id,
+        status: { in: ['Completed', 'Invoiced'] },
+        createdAt: { gte: thirtyDaysAgo },
+      },
+    });
+
+    const avgJobsPerDay = Math.round((jobsLast30Days.length / 30) * 100) / 100;
+
+    res.json({
+      totalHoursToday: Math.round(totalHoursToday * 100) / 100,
+      avgJobsPerDay,
+    });
+  } catch (err) { next(err); }
+}
+
+module.exports = { getAllStaff, getAvailableStaff, getStaffById, createStaff, updateStaff, deleteStaff, clockIn, clockOut, getTimesheets, calculatePayroll, getStaffTimesheets, getStaffPayroll, getStaffMetrics };

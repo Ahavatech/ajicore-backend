@@ -27,6 +27,14 @@ async function findByPhone(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function getMetrics(req, res, next) {
+  try {
+    const { business_id } = req.query;
+    const metrics = await customerService.getMetrics(business_id);
+    res.json(metrics);
+  } catch (err) { next(err); }
+}
+
 async function create(req, res, next) {
   try {
     const customer = await customerService.create(req.body);
@@ -55,4 +63,4 @@ async function getHistory(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { getAll, getById, findByPhone, create, update, remove, getHistory };
+module.exports = { getAll, getById, findByPhone, getMetrics, create, update, remove, getHistory };

@@ -3,6 +3,7 @@
  * Configures middleware, routes, Swagger, and error handling.
  */
 const express = require('express');
+const path = require('path');
 const cors = require('cors');
 const helmet = require('helmet');
 const swaggerUi = require('swagger-ui-express');
@@ -27,6 +28,11 @@ const bookkeepingRoutes = require('./api/routes/bookkeeping.routes');
 const aiLogsRoutes = require('./api/routes/ai_logs.routes');
 const businessRoutes = require('./api/routes/business.routes');
 const conversationRoutes = require('./api/routes/conversations.routes');
+const notificationRoutes = require('./api/routes/notifications.routes');
+const searchRoutes = require('./api/routes/search.routes');
+const reportsRoutes = require('./api/routes/reports.routes');
+const uploadRoutes = require('./api/routes/upload.routes');
+
 
 // Middleware imports
 const { errorHandler, notFoundHandler } = require('./api/middlewares/error.middleware');
@@ -200,6 +206,15 @@ app.get('/api/docs.json', (_req, res) => {
 // Moved above rate limiting
 
 // ============================================
+// Static Assets
+// ============================================
+// Local uploads (used by /api/upload). In production, prefer an object store + signed URLs.
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads'), {
+  fallthrough: false,
+  maxAge: isDevelopment ? 0 : '7d',
+}));
+
+// ============================================
 // API Routes
 // ============================================
 app.use('/api/auth', authRoutes);
@@ -219,6 +234,11 @@ app.use('/api/bookkeeping', bookkeepingRoutes);
 app.use('/api/ai-logs', aiLogsRoutes);
 app.use('/api/business', businessRoutes);
 app.use('/api/conversations', conversationRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/search', searchRoutes);
+app.use('/api/reports', reportsRoutes);
+app.use('/api/upload', uploadRoutes);
+
 
 // ============================================
 // Error Handling

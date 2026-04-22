@@ -49,6 +49,7 @@ async function getCustomers({ business_id, search, page = 1, limit = 20 }) {
     where.OR = [
       { first_name: { contains: cleanSearch, mode: 'insensitive' } },
       { last_name: { contains: cleanSearch, mode: 'insensitive' } },
+      { company_name: { contains: cleanSearch, mode: 'insensitive' } },
       { email: { contains: cleanSearch, mode: 'insensitive' } },
       { phone_number: { contains: cleanSearch } },
     ];
@@ -112,6 +113,8 @@ async function create(data) {
       business_id: data.business_id,
       first_name: data.first_name,
       last_name: data.last_name,
+      customer_type: data.customer_type || 'Individual',
+      company_name: data.company_name || null,
       phone_number: data.phone_number || null,
       email: data.email || null,
       address: data.address || null,
@@ -124,7 +127,7 @@ async function create(data) {
 
 async function update(id, data) {
   const updateData = {};
-  const fields = ['first_name', 'last_name', 'phone_number', 'email', 'address', 'zip_code', 'notes'];
+  const fields = ['first_name', 'last_name', 'customer_type', 'company_name', 'phone_number', 'email', 'address', 'zip_code', 'notes'];
   fields.forEach((f) => { if (data[f] !== undefined) updateData[f] = data[f]; });
   const customer = await prisma.customer.update({ where: { id }, data: updateData });
   return withComputedName(customer);
@@ -149,4 +152,37 @@ async function getCustomerJobHistory(customerId) {
   return { jobs, quotes };
 }
 
-module.exports = { getCustomers, getById, findByPhone, create, update, remove, getCustomerJobHistory };
+async function getMetrics(businessId) {
+  const [totalCustomers, totalJobs, paymentAgg, jobsByCustomer] = await Promise.all([
+    prisma.customer.count({ where: { business_id: businessId } }),
+    prisma.job.count({ where: { business_id: businessId } }),
+    prisma.payment.aggregate({
+      where: {
+        invoice: {
+          job: { business_id: businessId },
+        },
+      },
+      _sum: { amount: true },
+    }),
+    prisma.job.groupBy({
+      by: ['customer_id'],
+      where: { business_id: businessId },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const totalRevenue = paymentAgg._sum.amount || 0;
+  const avgCustomerLifetimeValue = totalCustomers > 0 ? totalRevenue / totalCustomers : 0;
+
+  const repeatCount = jobsByCustomer.filter((row) => (row._count?._all || 0) > 1).length;
+  const repeatPercentage = totalCustomers > 0 ? (repeatCount / totalCustomers) * 100 : 0;
+
+  return {
+    total_customers: totalCustomers,
+    total_jobs_across_all: totalJobs,
+    avg_customer_lifetime_value: Math.round(avgCustomerLifetimeValue * 100) / 100,
+    repeat_customer_percentage: Math.round(repeatPercentage * 100) / 100,
+  };
+}
+
+module.exports = { getCustomers, getById, findByPhone, create, update, remove, getCustomerJobHistory, getMetrics };

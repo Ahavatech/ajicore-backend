@@ -171,38 +171,84 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             message: { type: 'string' },
           },
         },
-        Customer: {
+                Customer: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string', format: 'uuid' },
+                    business_id: { type: 'string', format: 'uuid' },
+                    customer_type: { type: 'string', enum: ['Individual', 'Company'], default: 'Individual' },
+                    company_name: { type: 'string', nullable: true },
+                    first_name: { type: 'string' },
+                    last_name: { type: 'string' },
+                    // Convenience field returned by API services (computed from first/last)
+                    name: { type: 'string', description: 'Computed display name' },
+                    phone_number: { type: 'string', nullable: true },
+                    email: { type: 'string', nullable: true },
+                    address: { type: 'string', nullable: true },
+                    zip_code: { type: 'string', nullable: true },
+                    notes: { type: 'string', nullable: true },
+                    createdAt: { type: 'string', format: 'date-time' },
+                    updatedAt: { type: 'string', format: 'date-time' },
+                  },
+                },
+                CustomerMetrics: {
+                  type: 'object',
+                  properties: {
+                    total_customers: { type: 'number' },
+                    total_jobs_across_all: { type: 'number' },
+                    avg_customer_lifetime_value: { type: 'number' },
+                    repeat_customer_percentage: { type: 'number' },
+                  },
+                },
+                Job: {
           type: 'object',
           properties: {
             id: { type: 'string', format: 'uuid' },
-            business_id: { type: 'string' },
-            first_name: { type: 'string' },
-            last_name: { type: 'string' },
-            phone_number: { type: 'string' },
-            email: { type: 'string' },
-            address: { type: 'string' },
-            zip_code: { type: 'string' },
-            notes: { type: 'string' },
-            createdAt: { type: 'string', format: 'date-time' },
-          },
-        },
-        Job: {
-          type: 'object',
-          properties: {
-            id: { type: 'string', format: 'uuid' },
-            business_id: { type: 'string' },
-            customer_id: { type: 'string' },
-            assigned_staff_id: { type: 'string', nullable: true },
+            business_id: { type: 'string', format: 'uuid' },
+            customer_id: { type: 'string', format: 'uuid' },
+            assigned_staff_id: { type: 'string', format: 'uuid', nullable: true },
+
+            // Hydrated display fields (added to avoid raw UUID rendering in UI)
+            customer_name: { type: 'string', nullable: true },
+            staff_name: { type: 'string', nullable: true },
+
             type: { type: 'string', enum: ['Job', 'ServiceCall'] },
             status: { type: 'string', enum: ['Scheduled', 'InProgress', 'Completed', 'Invoiced', 'Cancelled'] },
-            title: { type: 'string' },
-            job_details: { type: 'string' },
-            service_call_fee: { type: 'number', nullable: true },
+            title: { type: 'string', nullable: true },
+            job_details: { type: 'string', nullable: true },
+            service_type: { type: 'string', nullable: true },
+            address: { type: 'string', nullable: true },
+
             scheduled_start_time: { type: 'string', format: 'date-time', nullable: true },
+            scheduled_end_time: { type: 'string', format: 'date-time', nullable: true },
             actual_start_time: { type: 'string', format: 'date-time', nullable: true },
             actual_end_time: { type: 'string', format: 'date-time', nullable: true },
+
+            service_call_fee: { type: 'number', nullable: true },
             is_emergency: { type: 'boolean' },
             source: { type: 'string', enum: ['AI', 'Manual', 'SMS'] },
+
+            photo_urls: {
+              type: 'array',
+              description: 'Array of uploaded photo URLs attached to this job',
+              items: { type: 'string', format: 'uri' },
+            },
+            line_items: {
+              type: 'array',
+              description: 'Array of pricebook line items attached at creation/update time',
+              items: {
+                type: 'object',
+                properties: {
+                  price_book_id: { type: 'string', format: 'uuid' },
+                  quantity: { type: 'number' },
+                  price: { type: 'number' },
+                  name: { type: 'string', nullable: true },
+                },
+              },
+            },
+
+            createdAt: { type: 'string', format: 'date-time', nullable: true },
+            updatedAt: { type: 'string', format: 'date-time', nullable: true },
           },
         },
         JobAvailabilityConflict: {
@@ -382,6 +428,18 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             make_model: { type: 'string' },
             year: { type: 'integer', nullable: true },
             license_plate: { type: 'string', nullable: true },
+
+            // Expanded vehicle profile
+            type: { type: 'string', nullable: true, description: 'e.g. Truck, Van, SUV' },
+            vin: { type: 'string', nullable: true },
+            color: { type: 'string', nullable: true },
+            purchase_date: { type: 'string', format: 'date-time', nullable: true },
+            purchase_price: { type: 'number', nullable: true },
+            insurance_provider: { type: 'string', nullable: true },
+            policy_number: { type: 'string', nullable: true },
+            insurance_cost: { type: 'number', nullable: true },
+            assigned_staff_id: { type: 'string', format: 'uuid', nullable: true },
+
             mileage: { type: 'integer' },
             insurance_expiry: { type: 'string', format: 'date-time', nullable: true },
             registration_renewal: { type: 'string', format: 'date-time', nullable: true },
@@ -401,6 +459,17 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             make_model: { type: 'string' },
             year: { type: 'integer' },
             license_plate: { type: 'string' },
+
+            type: { type: 'string' },
+            vin: { type: 'string' },
+            color: { type: 'string' },
+            purchase_date: { type: 'string', format: 'date-time' },
+            purchase_price: { type: 'number' },
+            insurance_provider: { type: 'string' },
+            policy_number: { type: 'string' },
+            insurance_cost: { type: 'number' },
+            assigned_staff_id: { type: 'string', format: 'uuid' },
+
             mileage: { type: 'integer' },
             insurance_expiry: { type: 'string', format: 'date-time' },
             registration_renewal: { type: 'string', format: 'date-time' },
@@ -416,6 +485,17 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             make_model: { type: 'string' },
             year: { type: 'integer' },
             license_plate: { type: 'string' },
+
+            type: { type: 'string' },
+            vin: { type: 'string' },
+            color: { type: 'string' },
+            purchase_date: { type: 'string', format: 'date-time' },
+            purchase_price: { type: 'number' },
+            insurance_provider: { type: 'string' },
+            policy_number: { type: 'string' },
+            insurance_cost: { type: 'number' },
+            assigned_staff_id: { type: 'string', format: 'uuid' },
+
             mileage: { type: 'integer' },
             insurance_expiry: { type: 'string', format: 'date-time' },
             registration_renewal: { type: 'string', format: 'date-time' },
@@ -450,6 +530,9 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             name: { type: 'string' },
             role: { type: 'string', enum: ['Owner', 'Manager', 'Technician', 'Apprentice', 'Admin'] },
             hourly_rate: { type: 'number' },
+            employment_type: { type: 'string', nullable: true, description: 'e.g. Full-Time, Contractor' },
+            entry_level: { type: 'string', nullable: true, description: 'e.g. Senior, Junior' },
+            notes: { type: 'string', nullable: true },
             email: { type: 'string', format: 'email', nullable: true },
             phone: { type: 'string', nullable: true },
             check_in_frequency_hours: { type: 'number', nullable: true },
@@ -466,6 +549,9 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             name: { type: 'string' },
             role: { type: 'string', enum: ['Owner', 'Manager', 'Technician', 'Apprentice', 'Admin'] },
             hourly_rate: { type: 'number' },
+            employment_type: { type: 'string' },
+            entry_level: { type: 'string' },
+            notes: { type: 'string' },
             email: { type: 'string', format: 'email' },
             phone: { type: 'string' },
             check_in_frequency_hours: { type: 'number' },
@@ -477,6 +563,9 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             name: { type: 'string' },
             role: { type: 'string', enum: ['Owner', 'Manager', 'Technician', 'Apprentice', 'Admin'] },
             hourly_rate: { type: 'number' },
+            employment_type: { type: 'string' },
+            entry_level: { type: 'string' },
+            notes: { type: 'string' },
             email: { type: 'string', format: 'email' },
             phone: { type: 'string' },
             check_in_frequency_hours: { type: 'number' },
@@ -1182,19 +1271,7 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             message: { type: 'string' },
           },
         },
-        JobAvailabilityResponse: {
-          type: 'object',
-          properties: {
-            available: { type: 'boolean' },
-            conflicts: {
-              type: 'array',
-              items: { $ref: '#/components/schemas/Job' },
-            },
-            staff_id: { type: 'string', format: 'uuid' },
-            start_time: { type: 'string', format: 'date-time' },
-            end_time: { type: 'string', format: 'date-time' },
-          },
-        },
+
         Error: {
           type: 'object',
           properties: {
@@ -1236,6 +1313,10 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
       { name: 'Automation', description: 'Automation settings for reminders, expiries, and check-in defaults' },
       { name: 'Communication', description: 'Messaging defaults, AI receptionist settings, and communication behavior' },
       { name: 'Conversations', description: 'Customer call and SMS history' },
+      { name: 'Notifications', description: 'Notification center feed + read/unread actions' },
+      { name: 'Search', description: 'Global omnibar search' },
+      { name: 'Reports', description: 'Aggregated analytics endpoints for dashboards and leaderboards' },
+      { name: 'Upload', description: 'Universal file upload endpoint' },
       { name: 'Bookkeeping', description: 'Transactions, summaries, categorization, and rules' },
       { name: 'AI Logs', description: 'AI event log inspection and manual event creation' },
       { name: 'AI Bridge', description: 'Internal AI service API (x-api-key required; business-scoped routes also require x-business-token)' },
