@@ -389,6 +389,13 @@ describe('app-level endpoints', () => {
     expect(response.status).toBe(200);
     expect(payload.paths['/api/auth/signin']).toBeDefined();
     expect(payload.paths['/api/internal/ai/business-by-phone']).toBeDefined();
+    expect(payload.components.schemas.AuthSignupInput.properties.email.format).toBe('email');
+    expect(payload.components.schemas.AuthSignupInput.properties.password.minLength).toBe(8);
+    expect(payload.components.schemas.AuthSignupInput.properties.password.writeOnly).toBe(true);
+    expect(payload.components.schemas.AuthSignupInput.properties.password.description).toContain('No uppercase');
+    expect(payload.components.schemas.AuthSigninInput.properties.email.description).toContain('signup');
+    expect(payload.components.schemas.AuthSigninInput.properties.password.minLength).toBe(1);
+    expect(payload.components.schemas.AuthSigninInput.properties.password.description).toContain('exact password');
   });
 
   test('GET /api/reference returns Scalar HTML', async () => {

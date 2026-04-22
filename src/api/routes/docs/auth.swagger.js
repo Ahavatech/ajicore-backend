@@ -41,16 +41,26 @@
  *           schema:
  *             type: object
  *             required: [email, password]
+ *             additionalProperties: false
  *             properties:
  *               email:
  *                 type: string
  *                 format: email
+ *                 minLength: 3
+ *                 example: user@example.com
+ *                 description: Required. Must be a valid email address and cannot be blank. The backend trims spaces and stores it lowercase.
  *               password:
  *                 type: string
  *                 minLength: 8
+ *                 nullable: false
+ *                 writeOnly: true
+ *                 example: password123
+ *                 description: Required JSON string. Must not be empty or whitespace-only. Must be at least 8 characters long. No uppercase, lowercase, number, or special-character requirement is currently enforced. No maximum length is currently enforced.
  *     responses:
  *       201:
  *         description: Account created — returns JWT and onboarding_step 1
+ *       400:
+ *         description: Missing/invalid email or password. Example messages include "Please enter a valid email address." and "Password must be at least 8 characters long."
  *       409:
  *         description: Email already in use
  */
@@ -98,15 +108,26 @@
  *           schema:
  *             type: object
  *             required: [email, password]
+ *             additionalProperties: false
  *             properties:
  *               email:
  *                 type: string
  *                 format: email
+ *                 minLength: 3
+ *                 example: user@example.com
+ *                 description: Required. Must be the email address used during signup and cannot be blank.
  *               password:
  *                 type: string
+ *                 minLength: 1
+ *                 nullable: false
+ *                 writeOnly: true
+ *                 example: password123
+ *                 description: Required JSON string. Must not be empty. Use the exact password created during signup. New passwords created through signup/reset/change-password must be at least 8 characters, with no uppercase, lowercase, number, or special-character requirement currently enforced.
  *     responses:
  *       200:
  *         description: Signed in — returns JWT, user, and onboarding_step
+ *       400:
+ *         description: Missing email or password.
  *       401:
  *         description: Invalid credentials
  */
@@ -184,9 +205,16 @@
  *             properties:
  *               current_password:
  *                 type: string
+ *                 minLength: 1
+ *                 nullable: false
+ *                 writeOnly: true
+ *                 description: Required JSON string. Must be the current account password.
  *               new_password:
  *                 type: string
  *                 minLength: 8
+ *                 nullable: false
+ *                 writeOnly: true
+ *                 description: Required JSON string. Must be at least 8 characters long. No uppercase, lowercase, number, or special-character requirement is currently enforced.
  *     responses:
  *       200:
  *         description: Password updated successfully
