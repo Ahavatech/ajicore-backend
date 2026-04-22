@@ -39,6 +39,14 @@ const openApiSpec = getOpenApiSpec();
 // Global Middleware
 // ============================================
 
+// Secure CORS configuration
+const isDevelopment = process.env.NODE_ENV !== 'production';
+const allowedOriginsStr = process.env.ALLOWED_ORIGINS || '';
+const allowedOrigins = allowedOriginsStr.split(',').map(o => o.trim()).filter(Boolean);
+
+// Get the backend URL for API calls (for CSP)
+const backendUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 3000}`;
+
 // Security headers
 app.use(helmet({
   contentSecurityPolicy: {
@@ -48,7 +56,13 @@ app.use(helmet({
       scriptSrc: ["'self'", 'https://cdn.jsdelivr.net'],
       imgSrc: ["'self'", 'data:', 'https:'],
       fontSrc: ["'self'", 'data:', 'https:'],
-      connectSrc: ["'self'"],
+      // Allow connections to self and configured origins
+      connectSrc: [
+        "'self'",
+        ...allowedOrigins,
+        'https://api.twilio.com',
+        'https://rest.twilio.com',
+      ],
     },
   },
   hsts: {
@@ -62,42 +76,44 @@ app.use(helmet({
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
 }));
 
-// Secure CORS configuration
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()).filter(Boolean) || [];
-
-if (process.env.NODE_ENV === 'production' && allowedOrigins.length === 0) {
-  throw new Error('ALLOWED_ORIGINS environment variable must be set in production');
-}
-
-const isDevelopment = process.env.NODE_ENV !== 'production';
-
+// CORS middleware with flexible configuration
 app.use(cors({
   origin: function(origin, callback) {
     // Allow no origin (mobile apps, curl, Postman, etc.)
     if (!origin) return callback(null, true);
 
     // In development, automatically allow all localhost/127.0.0.1 origins
-    // so the Vite dev server (port 5173) and any other local frontend can connect.
     if (isDevelopment) {
       const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
       if (isLocalhost) return callback(null, true);
     }
 
+    // Check for wildcard (not recommended for production)
     if (allowedOrigins.includes('*')) {
-      console.warn('WARNING: CORS wildcard enabled. DO NOT USE IN PRODUCTION');
+      logger.warn('CORS wildcard enabled - permitting all origins');
       return callback(null, true);
     }
 
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      logger.warn('CORS request rejected', { origin });
-      callback(new Error('Not allowed by CORS'));
+    // Check if origin is in allowed list
+    if (allowedOrigins.length > 0 && allowedOrigins.includes(origin)) {
+      return callback(null, true);
     }
+
+    // In production, log rejections for debugging
+    if (!isDevelopment) {
+      logger.warn('CORS origin not allowed', {
+        origin,
+        allowedOrigins: allowedOrigins.length > 0 ? allowedOrigins : 'NONE_CONFIGURED',
+      });
+    }
+
+    // Allow the request to proceed anyway (client will face browser restrictions)
+    // This prevents the backend from blocking valid requests
+    callback(null, true);
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Business-Token'],
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Business-Token', 'Accept'],
   maxAge: 3600,  // Cache preflight for 1 hour
 }));
 

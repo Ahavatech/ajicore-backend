@@ -30,7 +30,6 @@ if (process.env.NODE_ENV === 'production') {
     'TWILIO_ACCOUNT_SID',
     'TWILIO_AUTH_TOKEN',
     'INTERNAL_API_KEY',
-    'ALLOWED_ORIGINS',
   ];
 
   const missingProd = productionRequired.filter(v => !process.env[v]);
@@ -75,6 +74,9 @@ const env = {
 
   // Internal API Key
   INTERNAL_API_KEY: process.env.INTERNAL_API_KEY,
+
+  // CORS
+  ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS || '',
 
   // Helpers
   isDevelopment: process.env.NODE_ENV === 'development',
