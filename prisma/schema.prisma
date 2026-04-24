@@ -231,6 +231,8 @@ model Business {
   ai_event_logs        AiEventLog[]
   notifications        Notification[]
   payroll_records      PayrollRecord[]
+  finance_settings     BusinessFinanceSettings?
+  bookkeeping_transactions BookkeepingTransaction[]
 
   @@map("businesses")
 }
@@ -360,11 +362,15 @@ model Quote {
   sent_at                 DateTime?
   expires_at              DateTime?
   approved_at             DateTime?
-  declined_at             DateTime?
+    declined_at             DateTime?
   total_amount            Float?
+
   notes                   String?
+  decline_reason          String?
+    line_items              Json?
   is_emergency            Boolean     @default(false)
   source                  JobSource   @default(Manual)
+
   converted_to_job_id     String?
   follow_up_count         Int         @default(0)
   auto_reminders_paused   Boolean     @default(false)
@@ -581,11 +587,14 @@ model Vehicle {
 model FleetRepair {
   id                String    @id @default(uuid())
   vehicle_id        String
-  business_id       String
+    business_id       String
   repair_type       String    // "maintenance", "insurance_claim", "emergency_repair"
+
   description       String
+  provider          String?
   cost              Float?
   completion_date   DateTime
+
   miles_at_service  Int?
   notes             String?
   created_by        String?
@@ -731,3 +740,72 @@ model PayrollRecord {
 
   @@map("payroll_records")
 }
+
+// ============================================
+// Financial Settings & Bookkeeping
+// ============================================
+
+model BusinessFinanceSettings {
+  id          String   @id @default(uuid())
+  business_id String   @unique
+  
+  // Company Info
+  company_name        String?
+  company_website     String?
+  company_email       String?
+  company_phone       String?
+  company_logo_url    String?
+  company_notes       String?
+  
+  // Display Toggles
+  show_website        Boolean @default(true)
+  show_email          Boolean @default(true)
+  show_phone          Boolean @default(true)
+  show_address        Boolean @default(true)
+  
+  // Invoice Reminders
+  remind_before_3_days  Boolean @default(false)
+  remind_on_due_date    Boolean @default(true)
+  remind_after_3_days   Boolean @default(true)
+  remind_after_7_days   Boolean @default(true)
+  
+  // Quote Follow-ups
+  quote_followup_days_2 Boolean @default(true)
+  quote_followup_days_3 Boolean @default(false)
+  quote_followup_days_4 Boolean @default(false)
+  quote_followup_days_7 Boolean @default(true)
+  
+  // Defaults
+  default_due_date    String  @default("Upon Receipt")  // "Upon Receipt", "Net 15", "Net 30", custom date
+  
+  // Stripe Integration
+  stripe_account_id   String?
+  stripe_connected_at DateTime?
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  business Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
+
+  @@map("business_finance_settings")
+}
+
+model BookkeepingTransaction {
+  id          String   @id @default(uuid())
+  business_id String
+  source      String   // "fleet", "job", "invoice", "manual"
+  is_income   Boolean  @default(false)
+  amount      Float
+  category    String   // "Fleet & Operations", "Labor", "Materials", etc.
+  description String?
+  reference_id String?  // ID of related fleet repair, job, etc.
+  transaction_date DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  business Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
+
+  @@map("bookkeeping_transactions")
+  @@index([business_id, transaction_date])
+}
+

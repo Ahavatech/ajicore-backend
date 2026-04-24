@@ -53,6 +53,9 @@ async function create(data) {
 }
 
 async function update(id, data) {
+  const vehicle = await prisma.vehicle.findUnique({ where: { id } });
+  if (!vehicle) throw new NotFoundError('Vehicle not found.');
+
   const updateData = {};
   const fields = [
     'name', 'make_model', 'year', 'license_plate', 'type', 'vin', 'color',
@@ -63,7 +66,35 @@ async function update(id, data) {
   if (data.purchase_date) updateData.purchase_date = new Date(data.purchase_date);
   if (data.insurance_expiry) updateData.insurance_expiry = new Date(data.insurance_expiry);
   if (data.registration_renewal) updateData.registration_renewal = new Date(data.registration_renewal);
+  
+    const renewal_cost = data.renewal_cost;
+
+  // If renewal_cost is present, enforce atomic bookkeeping feeder behavior.
+  if (renewal_cost !== undefined && renewal_cost !== null && Number(renewal_cost) > 0) {
+    const { updated } = await prisma.$transaction(async (tx) => {
+      const updatedVehicle = await tx.vehicle.update({ where: { id }, data: updateData });
+
+      await tx.bookkeepingTransaction.create({
+        data: {
+          business_id: vehicle.business_id,
+          source: 'fleet',
+          is_income: false,
+          amount: Number(renewal_cost),
+          category: 'Fleet & Operations',
+          description: `Fleet renewal: ${updatedVehicle.make_model} (${updatedVehicle.license_plate || 'unknown plate'})`,
+          reference_id: id,
+          transaction_date: new Date(),
+        },
+      });
+
+      return { updated: updatedVehicle };
+    });
+
+    return updated;
+  }
+
   return prisma.vehicle.update({ where: { id }, data: updateData });
+
 }
 
 async function updateMileage(id, newMileage) {
@@ -123,21 +154,45 @@ async function logRepair(vehicleId, data, userId) {
     throw new ValidationError('completion_date (or date) is required.');
   }
 
-  const repair = await prisma.fleetRepair.create({
-    data: {
-      vehicle_id: vehicleId,
-      business_id: vehicle.business_id,
-      repair_type: data.repair_type || 'maintenance',
-      description: data.description,
-      cost: data.cost ?? null,
-      completion_date: new Date(completionDateRaw),
-      miles_at_service: data.miles_at_service ?? null,
-      notes: data.notes ?? null,
-      created_by: userId,
-    },
+    const cost = data.cost;
+  const completion_date = new Date(completionDateRaw);
+
+  const repair = await prisma.$transaction(async (tx) => {
+    const createdRepair = await tx.fleetRepair.create({
+      data: {
+        vehicle_id: vehicleId,
+        business_id: vehicle.business_id,
+        repair_type: data.repair_type || 'maintenance',
+        description: data.description,
+        provider: data.provider || null,
+        cost: cost ?? null,
+        completion_date,
+        miles_at_service: data.miles_at_service ?? null,
+        notes: data.notes ?? null,
+        created_by: userId,
+      },
+    });
+
+    if (cost !== undefined && cost !== null && Number(cost) > 0) {
+      await tx.bookkeepingTransaction.create({
+        data: {
+          business_id: vehicle.business_id,
+          source: 'fleet',
+          is_income: false,
+          amount: Number(cost),
+          category: 'Fleet & Operations',
+          description: `Fleet repair: ${data.description}`,
+          reference_id: createdRepair.id,
+          transaction_date: completion_date,
+        },
+      });
+    }
+
+    return createdRepair;
   });
 
   return withRepairDateAlias(repair);
+
 }
 
 async function getRepairHistory(vehicleId) {

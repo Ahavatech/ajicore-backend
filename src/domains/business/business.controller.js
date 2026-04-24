@@ -72,6 +72,46 @@ async function updateCommunication(req, res, next) {
   }
 }
 
+async function getFinanceSettings(req, res, next) {
+  try {
+    const result = await businessService.getFinanceSettings(req.query.business_id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function updateFinanceSettings(req, res, next) {
+  try {
+    const result = await businessService.updateFinanceSettings(req.body.business_id, req.body);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Canonical RESTful variants used by the Definitive Backend API Blueprint
+async function getFinanceSettingsById(req, res, next) {
+  try {
+    const result = await businessService.getFinanceSettings(req.params.id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function updateFinanceSettingsById(req, res, next) {
+  try {
+    const result = await businessService.updateFinanceSettings(req.params.id, {
+      ...req.body,
+      business_id: req.params.id,
+    });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   getProfile,
   updateProfile,
@@ -81,4 +121,9 @@ module.exports = {
   updateAutomation,
   getCommunication,
   updateCommunication,
+  getFinanceSettings,
+  updateFinanceSettings,
+  getFinanceSettingsById,
+  updateFinanceSettingsById,
 };
+

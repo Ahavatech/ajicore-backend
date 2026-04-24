@@ -218,6 +218,8 @@
  *             schema:
  *               type: object
  *               properties:
+ *                 message: { type: string, example: Approved }
+ *                 converted_to_job_id: { type: string, format: uuid }
  *                 quote:
  *                   $ref: '#/components/schemas/Quote'
  *                 job:

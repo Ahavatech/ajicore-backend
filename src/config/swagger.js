@@ -348,7 +348,7 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             },
           },
         },
-        Quote: {
+                Quote: {
           type: 'object',
           properties: {
             id: { type: 'string', format: 'uuid' },
@@ -357,6 +357,21 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             status: { type: 'string', enum: ['EstimateScheduled', 'Draft', 'Sent', 'Approved', 'Declined', 'Expired'] },
             title: { type: 'string' },
             total_amount: { type: 'number', nullable: true, description: 'null = TBD until approved' },
+            decline_reason: { type: 'string', nullable: true },
+            line_items: {
+              type: 'array',
+              nullable: true,
+              description: 'Optional line items (mirrors Job.line_items JSON) used during Quote → Job conversion',
+              items: {
+                type: 'object',
+                properties: {
+                  price_book_id: { type: 'string', format: 'uuid', nullable: true },
+                  quantity: { type: 'number' },
+                  price: { type: 'number' },
+                  name: { type: 'string', nullable: true },
+                },
+              },
+            },
             expires_at: { type: 'string', format: 'date-time', nullable: true },
             converted_to_job_id: { type: 'string', nullable: true },
           },
@@ -527,13 +542,15 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             notes: { type: 'string' },
           },
         },
-        VehicleUpdateInput: {
+                VehicleUpdateInput: {
           type: 'object',
           properties: {
             name: { type: 'string' },
             make_model: { type: 'string' },
             year: { type: 'integer' },
             license_plate: { type: 'string' },
+            renewal_cost: { type: 'number', nullable: true, description: 'When provided (>0), creates a BookkeepingTransaction expense entry (Fleet & Operations).' },
+
 
             type: { type: 'string' },
             vin: { type: 'string' },
@@ -560,15 +577,59 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             mileage: { type: 'integer', minimum: 0 },
           },
         },
-        VehicleMaintenanceAlert: {
+                VehicleMaintenanceAlert: {
+          type: 'object',
+          description: 'Grouped maintenance alerts per vehicle (shape returned by GET /api/fleet/maintenance-alerts)',
+          properties: {
+            vehicle: { $ref: '#/components/schemas/Vehicle' },
+            alerts: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  type: { type: 'string', example: 'registration_expiring' },
+                  message: { type: 'string', example: 'Registration expires in 15 days' },
+                },
+              },
+            },
+          },
+        },
+        FleetRepairInput: {
+          type: 'object',
+          required: ['description'],
+          properties: {
+            business_id: { type: 'string', format: 'uuid', nullable: true },
+            date: { type: 'string', format: 'date-time', nullable: true, description: 'Alias for completion_date' },
+            completion_date: { type: 'string', format: 'date-time', nullable: true },
+            description: { type: 'string' },
+            provider: { type: 'string', nullable: true },
+            cost: { type: 'number', nullable: true },
+            repair_type: { type: 'string', nullable: true, description: 'maintenance | insurance_claim | emergency_repair' },
+            miles_at_service: { type: 'integer', nullable: true },
+            notes: { type: 'string', nullable: true },
+          },
+        },
+        FleetRepair: {
           type: 'object',
           properties: {
+            id: { type: 'string', format: 'uuid' },
             vehicle_id: { type: 'string', format: 'uuid' },
-            make_model: { type: 'string' },
-            license_plate: { type: 'string', nullable: true },
-            reason: { type: 'string' },
-            due_date: { type: 'string', format: 'date-time', nullable: true },
-            due_mileage: { type: 'integer', nullable: true },
+            business_id: { type: 'string', format: 'uuid' },
+            repair_type: { type: 'string' },
+            description: { type: 'string' },
+            provider: { type: 'string', nullable: true },
+            cost: { type: 'number', nullable: true },
+            completion_date: { type: 'string', format: 'date-time' },
+            date: { type: 'string', format: 'date-time', description: 'Frontend alias for completion_date' },
+            miles_at_service: { type: 'integer', nullable: true },
+            notes: { type: 'string', nullable: true },
+          },
+        },
+        FleetMetrics: {
+          type: 'object',
+          properties: {
+            totalRepairCosts: { type: 'number' },
+            avgRepairCost: { type: 'number' },
           },
         },
         StaffMember: {
@@ -643,7 +704,7 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             total_pay: { type: 'number' },
           },
         },
-        QuoteInput: {
+                QuoteInput: {
           type: 'object',
           required: ['business_id', 'customer_id'],
           properties: {
@@ -656,11 +717,16 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             scheduled_estimate_date: { type: 'string', format: 'date-time', nullable: true },
             total_amount: { type: 'number', nullable: true },
             notes: { type: 'string', nullable: true },
+            line_items: {
+              type: 'array',
+              nullable: true,
+              items: { type: 'object', additionalProperties: true },
+            },
             is_emergency: { type: 'boolean' },
             status: { type: 'string', enum: ['EstimateScheduled', 'Draft', 'Sent', 'Approved', 'Declined', 'Expired'] },
           },
         },
-        QuoteUpdateInput: {
+                QuoteUpdateInput: {
           type: 'object',
           properties: {
             assigned_staff_id: { type: 'string', format: 'uuid', nullable: true },
@@ -670,6 +736,12 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             scheduled_estimate_date: { type: 'string', format: 'date-time', nullable: true },
             total_amount: { type: 'number', nullable: true },
             notes: { type: 'string', nullable: true },
+            decline_reason: { type: 'string', nullable: true },
+            line_items: {
+              type: 'array',
+              nullable: true,
+              items: { type: 'object', additionalProperties: true },
+            },
             is_emergency: { type: 'boolean' },
             status: { type: 'string', enum: ['EstimateScheduled', 'Draft', 'Sent', 'Approved', 'Declined', 'Expired'] },
             expires_at: { type: 'string', format: 'date-time', nullable: true },
@@ -1352,6 +1424,9 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
       { name: 'PriceBook', description: 'Service categories and price book' },
       { name: 'Inventory', description: 'Materials and inventory' },
       { name: 'Fleet', description: 'Vehicle and fleet management' },
+      { name: 'Financial Settings', description: 'Invoice & quote settings and Stripe metadata' },
+      { name: 'Integrations', description: 'Third-party integrations (Stripe, etc.)' },
+
       { name: 'Schedule', description: 'Schedule and calendar endpoints, including availability checks' },
       { name: 'Team', description: 'Staff directory, payroll, timesheets, and clock-in/out actions' },
       { name: 'Team Check-Ins', description: 'Field staff check-ins and escalation flows' },

@@ -121,9 +121,11 @@ async function create(data) {
       description: data.description || null,
       price_book_item_id: data.price_book_item_id || null,
       scheduled_estimate_date: data.scheduled_estimate_date ? new Date(data.scheduled_estimate_date) : null,
-      total_amount: data.total_amount ?? null,
+            total_amount: data.total_amount ?? null,
       notes: data.notes || null,
+      line_items: data.line_items ?? null,
       is_emergency: data.is_emergency ?? false,
+
       source: data.source || 'Manual',
     },
     include: { customer: true, assigned_staff: true },
@@ -148,8 +150,8 @@ async function create(data) {
 
 async function update(id, data) {
   const updateData = {};
-  const scalarFields = ['title', 'description', 'notes', 'total_amount', 'assigned_staff_id',
-    'price_book_item_id', 'is_emergency'];
+    const scalarFields = ['title', 'description', 'notes', 'decline_reason', 'total_amount', 'assigned_staff_id',
+    'price_book_item_id', 'line_items', 'is_emergency'];
   scalarFields.forEach((f) => { if (data[f] !== undefined) updateData[f] = data[f]; });
 
   if (data.scheduled_estimate_date) updateData.scheduled_estimate_date = new Date(data.scheduled_estimate_date);
@@ -221,34 +223,60 @@ async function sendQuote(id) {
 async function approveAndConvert(id, jobData = {}) {
   const quote = await prisma.quote.findUnique({
     where: { id },
-    include: { customer: true },
+    include: { customer: true, converted_job: true },
   });
   if (!quote) throw new NotFoundError('Quote not found.');
   if (quote.status === 'Expired') throw new ValidationError('Cannot approve an expired quote.');
+  if (quote.status === 'Declined') throw new ValidationError('Cannot approve a declined quote.');
 
-  const job = await prisma.job.create({
-    data: {
-      business_id: quote.business_id,
-      customer_id: quote.customer_id,
-      assigned_staff_id: jobData.assigned_staff_id || quote.assigned_staff_id || null,
-      type: 'Job',
-      status: 'Scheduled',
-      title: jobData.title || quote.title,
-      job_details: jobData.job_details || quote.description,
-      scheduled_start_time: jobData.scheduled_start_time ? new Date(jobData.scheduled_start_time) : null,
-      scheduled_end_time: jobData.scheduled_end_time ? new Date(jobData.scheduled_end_time) : null,
-      source: quote.source,
-    },
-    include: { customer: true },
-  });
+  // Idempotency: if already converted, return the existing job reference.
+  if (quote.converted_to_job_id) {
+    const job = quote.converted_job || await prisma.job.findUnique({ where: { id: quote.converted_to_job_id } });
 
-  await prisma.quote.update({
-    where: { id },
-    data: {
-      status: 'Approved',
-      approved_at: new Date(),
-      converted_to_job_id: job.id,
-    },
+    return {
+      message: 'Approved',
+      converted_to_job_id: quote.converted_to_job_id,
+      quote: { id: quote.id, status: 'Approved', converted_to_job_id: quote.converted_to_job_id },
+      job,
+    };
+  }
+
+  const scheduled_start_time = jobData.scheduled_start_time ? new Date(jobData.scheduled_start_time) : null;
+  const scheduled_end_time = jobData.scheduled_end_time ? new Date(jobData.scheduled_end_time) : null;
+
+  const { job } = await prisma.$transaction(async (tx) => {
+    const createdJob = await tx.job.create({
+      data: {
+        business_id: quote.business_id,
+        customer_id: quote.customer_id,
+        assigned_staff_id: jobData.assigned_staff_id || quote.assigned_staff_id || null,
+        type: 'Job',
+        status: 'Scheduled',
+        title: jobData.title || quote.title,
+        job_details: jobData.job_details || quote.description,
+        scheduled_start_time,
+        scheduled_end_time,
+        source: quote.source,
+        is_emergency: quote.is_emergency,
+        price_book_item_id: quote.price_book_item_id || null,
+        from_quote_id: quote.id,
+        line_items: jobData.line_items !== undefined
+          ? jobData.line_items
+          : (quote.line_items ?? null),
+      },
+      include: { customer: true },
+    });
+
+    await tx.quote.update({
+      where: { id },
+      data: {
+        status: 'Approved',
+        approved_at: new Date(),
+        converted_to_job_id: createdJob.id,
+      },
+    });
+
+    return { job: createdJob };
   });
 
   logger.info(`Quote ${id} approved and converted to Job ${job.id}`);
@@ -269,7 +297,7 @@ async function approveAndConvert(id, jobData = {}) {
       business_id: quote.business_id,
       customer_id: quote.customer_id,
       job_id: job.id,
-      event_type: job.scheduled_start_time ? 'schedule.job_created' : 'job.created',
+      event_type: scheduled_start_time ? 'schedule.job_created' : 'job.created',
       title: `Job created from quote for ${buildCustomerName(quote.customer)}`,
       details: {
         quote_id: quote.id,
@@ -278,8 +306,14 @@ async function approveAndConvert(id, jobData = {}) {
     }),
   ]);
 
-  return { quote: { id, status: 'Approved', converted_to_job_id: job.id }, job };
+  return {
+    message: 'Approved',
+    converted_to_job_id: job.id,
+    quote: { id: quote.id, status: 'Approved', converted_to_job_id: job.id },
+    job,
+  };
 }
+
 
 /**
  * Decline a quote.
@@ -290,6 +324,7 @@ async function declineQuote(id, reason) {
     data: {
       status: 'Declined',
       declined_at: new Date(),
+      decline_reason: reason || null,
       notes: reason ? `Declined: ${reason}` : undefined,
     },
     include: {

@@ -1,52 +1,72 @@
-jest.mock('../../src/lib/prisma', () => ({
-  customer: {
-    count: jest.fn(),
-    findMany: jest.fn(),
-  },
-  job: {
-    count: jest.fn(),
-    groupBy: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-    findMany: jest.fn(),
-  },
-  payment: {
-    aggregate: jest.fn(),
-  },
-  vehicle: {
-    findUnique: jest.fn(),
-    findMany: jest.fn(),
-  },
-  fleetRepair: {
-    aggregate: jest.fn(),
-    create: jest.fn(),
-    findMany: jest.fn(),
-  },
-  staff: {
-    findUnique: jest.fn(),
-    findMany: jest.fn(),
-    update: jest.fn(),
-    updateMany: jest.fn(),
-  },
-  notification: {
-    count: jest.fn(),
-    findMany: jest.fn(),
-    update: jest.fn(),
-    updateMany: jest.fn(),
-  },
-  invoice: {
-    findMany: jest.fn(),
-  },
-  quote: {
-    findMany: jest.fn(),
-  },
-  expense: {
-    findMany: jest.fn(),
-  },
-  priceBookItem: {
-    update: jest.fn(),
-  },
-}));
+jest.mock('../../src/lib/prisma', () => {
+  const prisma = {
+    customer: {
+      count: jest.fn(),
+      findMany: jest.fn(),
+    },
+    job: {
+      count: jest.fn(),
+      groupBy: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      findMany: jest.fn(),
+    },
+    payment: {
+      aggregate: jest.fn(),
+    },
+    vehicle: {
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      update: jest.fn(),
+    },
+    fleetRepair: {
+      aggregate: jest.fn(),
+      create: jest.fn(),
+      findMany: jest.fn(),
+    },
+    bookkeepingTransaction: {
+      create: jest.fn(),
+    },
+    staff: {
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+    },
+    notification: {
+      count: jest.fn(),
+      findMany: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+    },
+    invoice: {
+      findMany: jest.fn(),
+    },
+    quote: {
+      findMany: jest.fn(),
+    },
+    expense: {
+      findMany: jest.fn(),
+    },
+    priceBookItem: {
+      update: jest.fn(),
+    },
+  };
+
+  prisma.$transaction = jest.fn(async (arg) => {
+    if (typeof arg === 'function') {
+      return arg(prisma);
+    }
+
+    if (Array.isArray(arg)) {
+      return Promise.all(arg);
+    }
+
+    return arg;
+  });
+
+  return prisma;
+});
 
 jest.mock('../../src/domains/ai_logs/activity_log.service', () => ({
   logActivitySafe: jest.fn().mockResolvedValue(undefined),

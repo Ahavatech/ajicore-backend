@@ -32,6 +32,7 @@ const notificationRoutes = require('./api/routes/notifications.routes');
 const searchRoutes = require('./api/routes/search.routes');
 const reportsRoutes = require('./api/routes/reports.routes');
 const uploadRoutes = require('./api/routes/upload.routes');
+const integrationsRoutes = require('./api/routes/integrations.routes');
 
 
 // Middleware imports
@@ -238,6 +239,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/integrations', integrationsRoutes);
 
 
 // ============================================
