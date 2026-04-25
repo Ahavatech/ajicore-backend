@@ -61,6 +61,17 @@ router.get('/invoices/:id', validateUUID('id'), requireResourceAccess('invoice')
 
 /**
  * @swagger
+ * /api/billing/invoices/{id}/pdf:
+ *   get:
+ *     summary: Download invoice PDF
+ *     tags: [Billing]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get('/invoices/:id/pdf', validateUUID('id'), requireResourceAccess('invoice'), billingController.downloadInvoicePdf);
+
+/**
+ * @swagger
  * /api/billing/invoices/{id}/total:
  *   get:
  *     summary: Get total amount for an invoice

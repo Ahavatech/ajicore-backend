@@ -6,6 +6,7 @@ const prisma = require('../../lib/prisma');
 const stripeGateway = require('../../integrations/payments/stripe_gateway');
 const logger = require('../../utils/logger');
 const { logActivitySafe } = require('../ai_logs/activity_log.service');
+const { recordLedgerTransaction } = require('../bookkeeping/ledger.service');
 const { NotFoundError, ValidationError } = require('../../utils/errors');
 
 function buildCustomerName(customer) {
@@ -39,7 +40,12 @@ async function processPayment(invoiceId, paymentData) {
 
   if (remaining <= 0) throw new ValidationError('Invoice is already fully paid.');
 
-  const amount = Math.min(paymentData.amount, remaining);
+  const requestedAmount = parseFloat(paymentData.amount);
+  if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
+    throw new ValidationError('Payment amount must be a positive number.');
+  }
+
+  const amount = Math.min(requestedAmount, remaining);
   let stripePaymentId = null;
 
   if (paymentData.payment_method_id && stripeGateway.isConfigured()) {
@@ -72,6 +78,17 @@ async function processPayment(invoiceId, paymentData) {
     where: { id: invoiceId },
     data: { status: newStatus, paid_at: newStatus === 'Paid' ? new Date() : undefined },
     include: { line_items: true, payments: true },
+  });
+
+  await recordLedgerTransaction({
+    business_id: invoice.job.business_id,
+    source: 'invoice',
+    is_income: true,
+    amount,
+    category: 'Job Income',
+    description: `Payment recorded for invoice ${invoiceId}`,
+    reference_id: invoiceId,
+    transaction_date: payment.paid_at,
   });
 
   if (newStatus === 'Paid') {

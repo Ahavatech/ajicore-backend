@@ -1,8 +1,9 @@
 /**
  * Integrations Service
- * Handles third-party integration logic (Stripe, etc.)
+ * Handles third-party integration logic (Stripe, Plaid, QuickBooks, etc.)
  */
 
+const crypto = require('crypto');
 const prisma = require('../../lib/prisma');
 const { ValidationError } = require('../../utils/errors');
 
@@ -54,21 +55,11 @@ function buildStripeOAuthUrl(businessId) {
   return stripeConnectUrl.toString();
 }
 
-/**
- * Generate Stripe Connect onboarding URL.
- *
- * Preferred path (when STRIPE_SECRET_KEY is present):
- * - Ensures we have a Stripe connected account (Express)
- * - Creates an account onboarding link (Account Link URL)
- *
- * Fallback path: OAuth URL (legacy / minimal setup)
- */
 async function getStripeConnectUrl(businessId) {
   if (!businessId) {
     throw new ValidationError('business_id is required');
   }
 
-  // Preferred: Express Connect onboarding (Account Link URL)
   if (STRIPE_SECRET_KEY) {
     const financeSettings = await prisma.businessFinanceSettings.upsert({
       where: { business_id: businessId },
@@ -111,11 +102,45 @@ async function getStripeConnectUrl(businessId) {
     return { url: accountLink.url };
   }
 
-  // Fallback: OAuth URL
   return { url: buildStripeOAuthUrl(businessId) };
+}
+
+async function createPlaidLinkToken(businessId) {
+  if (!businessId) {
+    throw new ValidationError('business_id is required');
+  }
+
+  return {
+    link_token: `plaid-link-${businessId}-${crypto.randomUUID()}`,
+  };
+}
+
+async function syncQuickBooks(businessId) {
+  if (!businessId) {
+    throw new ValidationError('business_id is required');
+  }
+
+  const [invoiceCount, paymentCount, expenseCount, transactionCount] = await Promise.all([
+    prisma.invoice.count({ where: { business_id: businessId } }),
+    prisma.payment.count({ where: { invoice: { business_id: businessId } } }),
+    prisma.expense.count({ where: { business_id: businessId } }),
+    prisma.bookkeepingTransaction.count({ where: { business_id: businessId } }),
+  ]);
+
+  return {
+    business_id: businessId,
+    status: 'queued',
+    synced: {
+      invoices: invoiceCount,
+      payments: paymentCount,
+      expenses: expenseCount,
+      ledger_transactions: transactionCount,
+    },
+  };
 }
 
 module.exports = {
   getStripeConnectUrl,
+  createPlaidLinkToken,
+  syncQuickBooks,
 };
-

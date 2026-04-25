@@ -3,6 +3,7 @@
  * HTTP handlers for invoices, payments, and expenses.
  */
 const invoiceService = require('./invoice.service');
+const { generateInvoicePdf } = require('./invoice_pdf.service');
 const paymentService = require('./payment.service');
 const expenseService = require('./expense.service');
 
@@ -78,6 +79,18 @@ async function processPayment(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function downloadInvoicePdf(req, res, next) {
+  try {
+    const invoice = await invoiceService.getById(req.params.id);
+    if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
+
+    const buffer = generateInvoicePdf(invoice);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="invoice-${invoice.id}.pdf"`);
+    res.send(buffer);
+  } catch (err) { next(err); }
+}
+
 async function getExpenses(req, res, next) {
   try {
     const { business_id, category, job_id, start_date, end_date, page = 1, limit = 20 } = req.query;
@@ -110,5 +123,6 @@ async function deleteExpense(req, res, next) {
 module.exports = {
   getAll, getById, getInvoicesByJob, createInvoice, updateInvoice, sendInvoice,
   voidInvoice, refundInvoice, getTotal, processPayment,
+  downloadInvoicePdf,
   getExpenses, createExpense, updateExpense, deleteExpense,
 };

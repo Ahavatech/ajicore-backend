@@ -8,7 +8,7 @@ async function list(req, res, next) {
   try {
     const { business_id, is_income, category, page, limit } = req.query;
     const result = await txService.getTransactions({ business_id, is_income, category, page, limit });
-    res.json({ success: true, ...result });
+    res.json(result);
   } catch (err) {
     next(err);
   }
@@ -73,7 +73,7 @@ async function summary(req, res, next) {
   try {
     const { business_id } = req.query;
     const data = await txService.getSummary(business_id);
-    res.json({ success: true, data });
+    res.json(data);
   } catch (err) {
     next(err);
   }

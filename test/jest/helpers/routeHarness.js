@@ -97,7 +97,8 @@ function createRouteHarness({
   });
 
   extraMocks.forEach(({ modulePath, factory }) => {
-    jest.doMock(abs(modulePath), factory);
+    const targetPath = modulePath.startsWith('src/') ? abs(modulePath) : modulePath;
+    jest.doMock(targetPath, factory);
   });
 
   const router = require(abs(routeModulePath));

@@ -14,6 +14,26 @@ async function getStripeConnectUrl(req, res, next) {
   }
 }
 
+async function getPlaidLinkToken(req, res, next) {
+  try {
+    const result = await integrationsService.createPlaidLinkToken(req.query.business_id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function syncQuickBooks(req, res, next) {
+  try {
+    const result = await integrationsService.syncQuickBooks(req.body.business_id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   getStripeConnectUrl,
+  getPlaidLinkToken,
+  syncQuickBooks,
 };

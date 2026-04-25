@@ -106,11 +106,12 @@ const standardModules = [
     name: 'billing.routes',
     routeModulePath: 'src/api/routes/billing.routes.js',
     basePath: '/api/billing',
-    controllerModules: [{ modulePath: 'src/domains/billing/invoice.controller.js', handlers: ['getAll', 'getInvoicesByJob', 'getById', 'getTotal', 'createInvoice', 'updateInvoice', 'sendInvoice', 'voidInvoice', 'refundInvoice', 'processPayment', 'getExpenses', 'createExpense', 'updateExpense', 'deleteExpense'] }],
+    controllerModules: [{ modulePath: 'src/domains/billing/invoice.controller.js', handlers: ['getAll', 'getInvoicesByJob', 'getById', 'downloadInvoicePdf', 'getTotal', 'createInvoice', 'updateInvoice', 'sendInvoice', 'voidInvoice', 'refundInvoice', 'processPayment', 'getExpenses', 'createExpense', 'updateExpense', 'deleteExpense'] }],
     routes: [
       { method: 'get', path: '/invoices', handler: 'getAll', query: { business_id: BUSINESS_ID }, invalidQuery: {}, failureAuth: 'requireAuth' },
       { method: 'get', path: `/invoices/job/${VALID_UUID}`, handler: 'getInvoicesByJob', invalidPath: '/invoices/job/bad-uuid', failureAuth: 'requireAuth' },
       { method: 'get', path: `/invoices/${VALID_UUID}`, handler: 'getById', invalidPath: '/invoices/bad-uuid', failureAuth: 'requireAuth' },
+      { method: 'get', path: `/invoices/${VALID_UUID}/pdf`, handler: 'downloadInvoicePdf', invalidPath: '/invoices/bad-uuid/pdf', failureAuth: 'requireAuth' },
       { method: 'get', path: `/invoices/${VALID_UUID}/total`, handler: 'getTotal', invalidPath: '/invoices/bad-uuid/total', failureAuth: 'requireAuth' },
       { method: 'post', path: '/invoices', handler: 'createInvoice', body: { business_id: BUSINESS_ID, job_id: VALID_UUID }, invalidBody: { business_id: BUSINESS_ID }, failureAuth: 'requireAuth' },
       { method: 'patch', path: `/invoices/${VALID_UUID}`, handler: 'updateInvoice', body: { status: 'Sent' }, invalidPath: '/invoices/bad-uuid', failureAuth: 'requireAuth' },
@@ -241,9 +242,28 @@ const standardModules = [
     name: 'bookkeeping.routes',
     routeModulePath: 'src/api/routes/bookkeeping.routes.js',
     basePath: '/api/bookkeeping',
+    extraMocks: [
+      {
+        modulePath: 'multer',
+        factory: () => {
+          const middlewareFactory = () => ({
+            single: () => (req, _res, next) => {
+              req.file = req.file || {
+                filename: 'receipt.jpg',
+                originalname: 'acme-fuel-42.50.jpg',
+              };
+              next();
+            },
+          });
+          middlewareFactory.diskStorage = jest.fn(() => ({}));
+          return middlewareFactory;
+        },
+      },
+    ],
     controllerModules: [
       { modulePath: 'src/domains/bookkeeping/bank_transaction.controller.js', handlers: ['list', 'summary', 'show', 'create', 'bulkCreate', 'update', 'categorize', 'remove'], label: 'transactions' },
       { modulePath: 'src/domains/bookkeeping/categorization_rule.controller.js', handlers: ['list', 'show', 'create', 'update', 'remove'], label: 'rules' },
+      { modulePath: 'src/domains/bookkeeping/receipt_ocr.controller.js', handlers: ['processReceipt'], label: 'receipt-ocr' },
     ],
     routes: [
       { method: 'get', path: '/transactions', handler: 'list', query: { business_id: BUSINESS_ID }, invalidQuery: {}, failureAuth: 'requireAuth', modulePath: 'src/domains/bookkeeping/bank_transaction.controller.js' },
@@ -254,11 +274,23 @@ const standardModules = [
       { method: 'patch', path: `/transactions/${VALID_UUID}`, handler: 'update', body: { amount: 100 }, invalidPath: '/transactions/bad-uuid', failureAuth: 'requireAuth', modulePath: 'src/domains/bookkeeping/bank_transaction.controller.js' },
       { method: 'patch', path: `/transactions/${VALID_UUID}/categorize`, handler: 'categorize', body: { category: 'Office' }, invalidPath: '/transactions/bad-uuid/categorize', failureAuth: 'requireAuth', modulePath: 'src/domains/bookkeeping/bank_transaction.controller.js' },
       { method: 'delete', path: `/transactions/${VALID_UUID}`, handler: 'remove', invalidPath: '/transactions/bad-uuid', failureAuth: 'requireAuth', modulePath: 'src/domains/bookkeeping/bank_transaction.controller.js' },
+      { method: 'post', path: '/receipt-ocr', handler: 'processReceipt', body: { stub: true }, failureAuth: 'requireAuth', modulePath: 'src/domains/bookkeeping/receipt_ocr.controller.js' },
       { method: 'get', path: '/rules', handler: 'list', query: { business_id: BUSINESS_ID }, invalidQuery: {}, failureAuth: 'requireAuth', modulePath: 'src/domains/bookkeeping/categorization_rule.controller.js' },
       { method: 'get', path: `/rules/${VALID_UUID}`, handler: 'show', invalidPath: '/rules/bad-uuid', failureAuth: 'requireAuth', modulePath: 'src/domains/bookkeeping/categorization_rule.controller.js' },
       { method: 'post', path: '/rules', handler: 'create', body: { business_id: BUSINESS_ID }, invalidBody: {}, failureAuth: 'requireAuth', modulePath: 'src/domains/bookkeeping/categorization_rule.controller.js' },
       { method: 'patch', path: `/rules/${VALID_UUID}`, handler: 'update', body: { name: 'Rule' }, invalidPath: '/rules/bad-uuid', failureAuth: 'requireAuth', modulePath: 'src/domains/bookkeeping/categorization_rule.controller.js' },
       { method: 'delete', path: `/rules/${VALID_UUID}`, handler: 'remove', invalidPath: '/rules/bad-uuid', failureAuth: 'requireAuth', modulePath: 'src/domains/bookkeeping/categorization_rule.controller.js' },
+    ],
+  },
+  {
+    name: 'integrations.routes',
+    routeModulePath: 'src/api/routes/integrations.routes.js',
+    basePath: '/api/integrations',
+    controllerModules: [{ modulePath: 'src/domains/integrations/integrations.controller.js', handlers: ['getStripeConnectUrl', 'getPlaidLinkToken', 'syncQuickBooks'] }],
+    routes: [
+      { method: 'get', path: '/stripe/connect-url', handler: 'getStripeConnectUrl', query: { business_id: BUSINESS_ID }, invalidQuery: {}, failureAuth: 'requireAuth' },
+      { method: 'get', path: '/plaid/link-token', handler: 'getPlaidLinkToken', query: { business_id: BUSINESS_ID }, invalidQuery: {}, failureAuth: 'requireAuth' },
+      { method: 'post', path: '/quickbooks/sync', handler: 'syncQuickBooks', body: { business_id: BUSINESS_ID }, invalidBody: {}, failureAuth: 'requireAuth' },
     ],
   },
   {
@@ -277,7 +309,7 @@ const standardModules = [
     name: 'business.routes',
     routeModulePath: 'src/api/routes/business.routes.js',
     basePath: '/api/business',
-    controllerModules: [{ modulePath: 'src/domains/business/business.controller.js', handlers: ['getProfile', 'updateProfile', 'getAlerts', 'updateAlerts', 'getAutomation', 'updateAutomation', 'getCommunication', 'updateCommunication'] }],
+    controllerModules: [{ modulePath: 'src/domains/business/business.controller.js', handlers: ['getProfile', 'updateProfile', 'getAlerts', 'updateAlerts', 'getAutomation', 'updateAutomation', 'getCommunication', 'updateCommunication', 'getFinanceSettings', 'updateFinanceSettings', 'getFinanceSettingsById', 'updateFinanceSettingsById'] }],
     routes: [
       { method: 'get', path: '/profile', handler: 'getProfile', query: { business_id: BUSINESS_ID }, invalidQuery: {}, failureAuth: 'requireAuth' },
       { method: 'patch', path: '/profile', handler: 'updateProfile', body: { business_id: BUSINESS_ID }, invalidBody: {}, failureAuth: 'requireAuth' },
@@ -287,6 +319,10 @@ const standardModules = [
       { method: 'patch', path: '/automation', handler: 'updateAutomation', body: { business_id: BUSINESS_ID }, invalidBody: {}, failureAuth: 'requireAuth' },
       { method: 'get', path: '/communication', handler: 'getCommunication', query: { business_id: BUSINESS_ID }, invalidQuery: {}, failureAuth: 'requireAuth' },
       { method: 'patch', path: '/communication', handler: 'updateCommunication', body: { business_id: BUSINESS_ID }, invalidBody: {}, failureAuth: 'requireAuth' },
+      { method: 'get', path: '/finance-settings', handler: 'getFinanceSettings', query: { business_id: BUSINESS_ID }, invalidQuery: {}, failureAuth: 'requireAuth' },
+      { method: 'patch', path: '/finance-settings', handler: 'updateFinanceSettings', body: { business_id: BUSINESS_ID }, invalidBody: {}, failureAuth: 'requireAuth' },
+      { method: 'get', path: `/${VALID_UUID}/finance-settings`, handler: 'getFinanceSettingsById', invalidPath: '/bad-uuid/finance-settings', failureAuth: 'requireAuth' },
+      { method: 'patch', path: `/${VALID_UUID}/finance-settings`, handler: 'updateFinanceSettingsById', body: { company_info: { name: 'Ajicore' } }, invalidPath: '/bad-uuid/finance-settings', failureAuth: 'requireAuth' },
     ],
   },
   {

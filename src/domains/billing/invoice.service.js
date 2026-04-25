@@ -12,6 +12,7 @@
 const prisma = require('../../lib/prisma');
 const logger = require('../../utils/logger');
 const { logActivitySafe } = require('../ai_logs/activity_log.service');
+const { recordLedgerTransaction } = require('../bookkeeping/ledger.service');
 const { NotFoundError, ValidationError } = require('../../utils/errors');
 
 function buildCustomerName(customer) {
@@ -243,9 +244,11 @@ async function refundInvoice(id, { amount, reason, userId }) {
     throw new ValidationError('Refund amount cannot exceed amount paid.');
   }
 
+  const nextStatus = refundAmt >= totalPaid ? 'Refunded' : 'PartiallyPaid';
+
   const updated = await prisma.invoice.update({
     where: { id },
-    data: { status: 'Refunded', refunded_at: new Date(), refund_amount: refundAmt, refund_reason: reason || null },
+    data: { status: nextStatus, refunded_at: new Date(), refund_amount: refundAmt, refund_reason: reason || null },
   });
 
   await prisma.invoiceEditLog.create({
@@ -254,6 +257,17 @@ async function refundInvoice(id, { amount, reason, userId }) {
 
   logger.info(`Invoice ${id} refunded: $${refundAmt}`);
   const refundedInvoice = await getById(id);
+
+  await recordLedgerTransaction({
+    business_id: refundedInvoice.business_id,
+    source: 'invoice',
+    is_income: false,
+    amount: -Math.abs(refundAmt),
+    category: 'Job Income',
+    description: `Refund recorded for invoice ${id}${reason ? `: ${reason}` : ''}`,
+    reference_id: id,
+    transaction_date: refundedInvoice.refunded_at || new Date(),
+  });
 
   await logActivitySafe({
     business_id: refundedInvoice.business_id,
