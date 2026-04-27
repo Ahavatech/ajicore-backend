@@ -220,7 +220,165 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             message: { type: 'string' },
           },
         },
-                Customer: {
+        PhoneNumberCapabilities: {
+          type: 'object',
+          description: 'Capabilities available on the phone number (voice, SMS, MMS)',
+          properties: {
+            voice: { type: 'boolean', example: true },
+            sms: { type: 'boolean', example: true },
+            mms: { type: 'boolean', example: false },
+          },
+        },
+        AvailablePhoneNumber: {
+          type: 'object',
+          description: 'A single available Twilio phone number from search results',
+          properties: {
+            phone_number: {
+              type: 'string',
+              format: 'e164',
+              example: '+12025551234',
+              description: 'E.164 formatted phone number (international format)',
+            },
+            friendly_name: { type: 'string', example: 'US/United States' },
+            locality: { type: 'string', example: 'Washington', nullable: true },
+            region: { type: 'string', example: 'DC', nullable: true },
+            postal_code: { type: 'string', example: '20001', nullable: true },
+            country: { type: 'string', example: 'US', description: 'ISO country code' },
+            capabilities: { $ref: '#/components/schemas/PhoneNumberCapabilities' },
+            type: { type: 'string', enum: ['local', 'toll_free'], example: 'local' },
+            area_code: { type: 'string', example: '202', nullable: true },
+          },
+        },
+        GetAvailableNumbersQuery: {
+          type: 'object',
+          required: ['type'],
+          properties: {
+            type: {
+              type: 'string',
+              enum: ['city', 'area_code', 'toll_free'],
+              description: 'Search type: "city" requires city parameter, "area_code" requires area_code parameter, "toll_free" needs no additional parameters',
+            },
+            city: {
+              type: 'string',
+              example: 'Washington',
+              description: 'City name (required if type=city)',
+            },
+            area_code: {
+              type: 'string',
+              example: '202',
+              description: '3-digit area code (required if type=area_code, auto-sanitized)',
+            },
+          },
+        },
+        GetAvailableNumbersResponse: {
+          type: 'object',
+          description: 'Available phone numbers from Twilio based on search criteria',
+          properties: {
+            type: { type: 'string', enum: ['city', 'area_code', 'toll_free'] },
+            country: { type: 'string', example: 'US' },
+            numbers: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/AvailablePhoneNumber' },
+              maxItems: 5,
+              description: 'Up to 5 available numbers matching search criteria',
+            },
+            count: { type: 'integer', example: 2, minimum: 0, maximum: 5 },
+          },
+        },
+        OnboardingStep3Input: {
+          type: 'object',
+          required: ['phone_number', 'search_type'],
+          additionalProperties: false,
+          properties: {
+            phone_number: {
+              type: 'string',
+              format: 'e164',
+              example: '+12025551234',
+              description: 'E.164 formatted phone number selected from available-numbers search',
+            },
+            search_type: {
+              type: 'string',
+              enum: ['city', 'area_code', 'toll_free'],
+              description: 'The search type used to find this number',
+            },
+          },
+        },
+        OnboardingStep3Response: {
+          type: 'object',
+          description: 'Successful Twilio phone number provisioning for AI business',
+          properties: {
+            message: {
+              type: 'string',
+              example: 'AI business number provisioned.',
+            },
+            user: {
+              type: 'object',
+              description: 'Updated user (onboarding_step advanced to 4)',
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                email: { type: 'string', format: 'email' },
+                onboarding_step: { type: 'integer', example: 4 },
+              },
+            },
+            business: {
+              type: 'object',
+              description: 'Updated business with provisioned phone number details',
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                name: { type: 'string' },
+                ai_phone_number: {
+                  type: 'string',
+                  format: 'e164',
+                  example: '+12025551234',
+                },
+                dedicated_phone_number: {
+                  type: 'string',
+                  format: 'e164',
+                  example: '+12025551234',
+                },
+                ai_phone_country: { type: 'string', example: 'US' },
+                ai_phone_area_code: { type: 'string', example: '202' },
+                twilio_phone_sid: {
+                  type: 'string',
+                  example: 'PNxxxxxxxxxxxx',
+                  description: 'Twilio SID for this provisioned number',
+                },
+                twilio_phone_friendly_name: {
+                  type: 'string',
+                  example: 'Acme Corp - +12025551234',
+                  description: 'Friendly name configured in Twilio',
+                },
+              },
+            },
+            ai_phone_number: {
+              type: 'string',
+              format: 'e164',
+              example: '+12025551234',
+            },
+            twilio_phone_sid: { type: 'string', example: 'PNxxxxxxxxxxxx' },
+            onboarding_step: { type: 'integer', example: 4 },
+          },
+        },
+        OnboardingSkip3Response: {
+          type: 'object',
+          description: 'User skipped step 3 (AI number provisioning)',
+          properties: {
+            message: {
+              type: 'string',
+              example: 'AI number setup skipped.',
+            },
+            user: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                email: { type: 'string', format: 'email' },
+                onboarding_step: { type: 'integer', example: 4 },
+              },
+            },
+            onboarding_step: { type: 'integer', example: 4 },
+          },
+        },
+        Customer: {
                   type: 'object',
                   properties: {
                     id: { type: 'string', format: 'uuid' },
