@@ -83,6 +83,12 @@ const env = {
   CLOUDINARY_FOLDER: process.env.CLOUDINARY_FOLDER || 'ajicore/uploads',
   UPLOAD_RETURN_CLOUDINARY_URL: process.env.UPLOAD_RETURN_CLOUDINARY_URL === 'true',
 
+  // Google Cloud Storage (primary upload destination)
+  GCS_PROJECT_ID: process.env.GCS_PROJECT_ID,
+  GCS_BUCKET_NAME: process.env.GCS_BUCKET_NAME,
+  GCS_KEY_FILE: process.env.GCS_KEY_FILE,
+  STORAGE_MODE: process.env.STORAGE_MODE || 'local', // 'local' | 'gcs'
+
   // CORS
   ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS || '',
 
