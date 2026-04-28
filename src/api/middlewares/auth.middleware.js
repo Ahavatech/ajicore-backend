@@ -197,8 +197,9 @@ function requireInternalResourceAccess(resource, options = {}) {
  */
 function requireInternalApiKey(req, res, next) {
   const apiKey = req.headers['x-api-key'];
+  const expected = env.INTERNAL_API_KEY || env.AI_SERVICE_API_KEY;
 
-  if (!apiKey || apiKey !== env.INTERNAL_API_KEY) {
+  if (!apiKey || !expected || apiKey !== expected) {
     logger.warn('Unauthorized internal API access attempt', {
       ip: req.ip,
       path: req.originalUrl,
@@ -218,8 +219,9 @@ function requireInternalApiKey(req, res, next) {
  */
 function requireAiServiceApiKey(req, res, next) {
   const apiKey = getTokenHeader(req, 'x-api-key');
+  const expected = env.AI_SERVICE_API_KEY || env.INTERNAL_API_KEY;
 
-  if (!safeTokenMatch(env.AI_SERVICE_API_KEY, apiKey)) {
+  if (!safeTokenMatch(expected, apiKey)) {
     logger.warn('Unauthorized AI service API access attempt', {
       ip: req.ip,
       path: req.originalUrl,
