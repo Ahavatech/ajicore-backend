@@ -10,9 +10,15 @@
  */
 const crypto = require('crypto');
 const fs = require('fs/promises');
-const { Storage } = require('@google-cloud/storage');
 const env = require('../../config/env');
 const logger = require('../../utils/logger');
+
+let Storage = null;
+try {
+  ({ Storage } = require('@google-cloud/storage'));
+} catch (err) {
+  Storage = null;
+}
 
 let gcsClient = null;
 let gcsBucket = null;
@@ -25,6 +31,10 @@ function initializeGCS() {
   
   if (!env.GCS_PROJECT_ID || !env.GCS_BUCKET_NAME) {
     logger.warn('GCS not configured: missing GCS_PROJECT_ID or GCS_BUCKET_NAME');
+    return null;
+  }
+  if (!Storage) {
+    logger.warn('GCS not available: @google-cloud/storage is not installed');
     return null;
   }
 

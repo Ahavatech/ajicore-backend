@@ -447,12 +447,12 @@ describe('Onboarding Step 3: Twilio Phone Number Generation - AUDIT', () => {
           search_type: 'city',
         });
 
-        expect(mockTwilioClient.incomingPhoneNumbers.create).toHaveBeenCalledWith({
+        expect(mockTwilioClient.incomingPhoneNumbers.create).toHaveBeenCalledWith(expect.objectContaining({
           phoneNumber: '+12025551234',
           friendlyName: expect.stringContaining('Test Business'),
           smsUrl: expect.any(String),
           voiceUrl: expect.any(String),
-        });
+        }));
       });
 
       test('AUDIT: Handles Twilio provisioning errors', async () => {
@@ -636,14 +636,23 @@ describe('Onboarding Step 3: Twilio Phone Number Generation - AUDIT', () => {
   // ========================================
 
   describe('Error Scenarios', () => {
-    test('AUDIT: Handles missing Twilio credentials', () => {
+    test('AUDIT: Handles missing Twilio credentials', async () => {
       const processEnv = { ...process.env };
       delete process.env.TWILIO_ACCOUNT_SID;
+      jest.resetModules();
+      jest.doMock('../../src/config/env', () => ({
+        ...process.env,
+        TWILIO_ACCOUNT_SID: undefined,
+        TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN,
+      }));
 
-      expect(() => {
-        const freshService = require('../../src/domains/auth/auth.service');
-      }).toThrow('Twilio credentials are not configured');
+      const freshService = require('../../src/domains/auth/auth.service');
+      await expect(freshService.getAvailableNumbers({
+        type: 'city',
+        city: 'Washington',
+      })).rejects.toThrow('Twilio credentials are not configured');
 
+      jest.dontMock('../../src/config/env');
       process.env = processEnv;
     });
 

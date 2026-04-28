@@ -58,9 +58,23 @@ async function remove(req, res, next) {
 
 async function getHistory(req, res, next) {
   try {
-    const history = await customerService.getCustomerJobHistory(req.params.id);
+    const history = await customerService.getCustomerJobHistory(req.params.id, req.query.business_id || req.business?.id);
     res.json(history);
   } catch (err) { next(err); }
 }
 
-module.exports = { getAll, getById, findByPhone, getMetrics, create, update, remove, getHistory };
+async function getBilling(req, res, next) {
+  try {
+    const billing = await customerService.getCustomerBilling(req.params.id, req.query.business_id || req.business?.id);
+    res.json(billing);
+  } catch (err) { next(err); }
+}
+
+async function getSchedule(req, res, next) {
+  try {
+    const schedule = await customerService.getCustomerSchedule(req.params.id, req.query.business_id || req.business?.id);
+    res.json(schedule);
+  } catch (err) { next(err); }
+}
+
+module.exports = { getAll, getById, findByPhone, getMetrics, create, update, remove, getHistory, getBilling, getSchedule };

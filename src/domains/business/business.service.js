@@ -323,6 +323,7 @@ async function getFinanceSettings(businessId) {
       days_7: settings.quote_followup_days_7,
     },
     default_due_date: settings.default_due_date,
+    markup_percent: settings.markup_percent ?? 49,
     stripe_connected: !!settings.stripe_account_id,
     stripe_account_id: settings.stripe_account_id || null,
   };
@@ -383,6 +384,9 @@ async function updateFinanceSettings(businessId, data) {
   if (data.default_due_date) {
     updateData.default_due_date = data.default_due_date;
   }
+  if (data.markup_percent !== undefined) {
+    updateData.markup_percent = Number(data.markup_percent);
+  }
 
   const updated = await prisma.businessFinanceSettings.update({
     where: { business_id: businessId },
@@ -418,6 +422,7 @@ async function updateFinanceSettings(businessId, data) {
       days_7: updated.quote_followup_days_7,
     },
     default_due_date: updated.default_due_date,
+    markup_percent: updated.markup_percent ?? 49,
   };
 }
 

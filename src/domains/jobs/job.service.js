@@ -18,6 +18,10 @@ function buildJobLabel(job) {
   return job.service_type || job.title || job.type || 'Service Job';
 }
 
+function buildCustomerAddress(job) {
+  return job.address || job.customer?.location_main || job.customer?.address || null;
+}
+
 // Transform job to include hydrated relational data
 function hydrateJob(job) {
   if (!job) return null;
@@ -34,6 +38,7 @@ function hydrateJob(job) {
     ...job,
     // Frontend expects these hydrated display fields (no raw UUID-only rendering)
     customer_name: buildCustomerName(job.customer),
+    customer_address: buildCustomerAddress(job),
     staff_name: job.assigned_staff ? job.assigned_staff.name : null,
 
     // Frontend naming (legacy DB field is photos_urls)

@@ -21,6 +21,7 @@ async function processPayment(invoiceId, paymentData) {
     include: {
       line_items: true,
       payments: true,
+      customer: true,
       job: {
         include: {
           customer: true,
@@ -34,7 +35,7 @@ async function processPayment(invoiceId, paymentData) {
     throw new ValidationError(`Cannot apply payment to a ${invoice.status} invoice.`);
   }
 
-  const subtotal = invoice.line_items.reduce((sum, line) => sum + (line.is_credit ? -line.total : line.total), 0);
+  const subtotal = invoice.total_amount ?? invoice.line_items.reduce((sum, line) => sum + (line.is_credit ? -line.total : line.total), 0);
   const totalPaid = invoice.payments.reduce((sum, payment) => sum + payment.amount, 0);
   const remaining = subtotal - totalPaid;
 
@@ -81,7 +82,7 @@ async function processPayment(invoiceId, paymentData) {
   });
 
   await recordLedgerTransaction({
-    business_id: invoice.job.business_id,
+    business_id: invoice.business_id || invoice.job?.business_id,
     source: 'invoice',
     is_income: true,
     amount,
@@ -101,11 +102,11 @@ async function processPayment(invoiceId, paymentData) {
   logger.info(`Payment of $${amount} applied to invoice ${invoiceId} -> ${newStatus}`);
 
   await logActivitySafe({
-    business_id: invoice.job.business_id,
-    customer_id: invoice.job.customer_id,
-    job_id: invoice.job_id,
+    business_id: invoice.business_id || invoice.job?.business_id,
+    customer_id: invoice.customer_id || invoice.job?.customer_id,
+    job_id: invoice.job_id || null,
     event_type: 'invoice.payment_received',
-    title: `Payment received from ${buildCustomerName(invoice.job.customer)}`,
+    title: `Payment received from ${buildCustomerName(invoice.customer || invoice.job?.customer)}`,
     details: {
       invoice_id: invoiceId,
       amount,

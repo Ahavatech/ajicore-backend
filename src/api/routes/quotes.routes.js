@@ -195,6 +195,25 @@ router.post('/:id/approve', validateUUID('id'), requireResourceAccess('quote'), 
 
 /**
  * @swagger
+ * /api/quotes/{id}/convert:
+ *   post:
+ *     summary: Convert an approved quote to a job
+ *     tags: [Quotes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Quote converted successfully
+ */
+router.post('/:id/convert', validateUUID('id'), requireResourceAccess('quote'), quoteController.convert);
+
+/**
+ * @swagger
  * /api/quotes/{id}/decline:
  *   post:
  *     summary: Decline a quote

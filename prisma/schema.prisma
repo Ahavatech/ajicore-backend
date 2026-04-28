@@ -28,6 +28,8 @@ enum JobStatus {
 enum QuoteStatus {
   EstimateScheduled
   Draft
+  Pending
+  Appointment
   Sent
   Approved
   Declined
@@ -47,6 +49,7 @@ enum DocumentType {
 enum InvoiceStatus {
   Draft
   Sent
+  Pending
   PartiallyPaid
   Paid
   Overdue
@@ -258,6 +261,7 @@ model PriceBookItem {
   category_id              String?
   name                     String
   description              String?
+  notes                    String?
   can_quote_phone          Boolean   @default(false)
   price_type               PriceType @default(NeedsOnsite)
   price                    Float?
@@ -265,6 +269,16 @@ model PriceBookItem {
   price_max                Float?
   visit_type               VisitType @default(FreeEstimate)
   service_call_fee         Float?
+  labor_time               String?
+  labor_cost               Float?
+  materials                Json?
+  tools                    Json?
+  total_materials_cost     Float?
+  total_tools_cost         Float?
+  base_cost                Float?
+  flat_rate                Float?
+  margin_amount            Float?
+  margin_percent           Float?
   suggested_materials      Json?
   recognition_tags         Json?
   estimated_duration_hours Float?
@@ -331,10 +345,16 @@ model Customer {
   last_name      String
   customer_type  String?  @default("Individual") // "Individual" | "Company"
   company_name   String?
+  poc_name       String?
   phone_number   String?
   email          String?
   address        String?
   zip_code       String?
+  location_main  String?
+  location_other String?
+  warranty_enabled Boolean @default(false)
+  warranty_due   DateTime?
+  profile_image_url String?
   notes          String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -342,6 +362,7 @@ model Customer {
   business      Business    @relation(fields: [business_id], references: [id], onDelete: Cascade)
   jobs          Job[]
   quotes        Quote[]
+  invoices      Invoice[]
   follow_ups    FollowUp[]
   ai_event_logs AiEventLog[]
 
@@ -355,19 +376,41 @@ model Quote {
   customer_id             String
   assigned_staff_id       String?
   status                  QuoteStatus @default(EstimateScheduled)
+  quote_number            String?
   title                   String?
+  service_name            String?
+  service_category        String?
+  contract_type           Json?
+  warranty_due            DateTime?
   description             String?
+  photos                  Json?
   price_book_item_id      String?
   scheduled_estimate_date DateTime?
+  scheduled_estimate_time String?
+  scheduled_start_time    DateTime?
+  scheduled_end_time      DateTime?
   sent_at                 DateTime?
   expires_at              DateTime?
   approved_at             DateTime?
-    declined_at             DateTime?
+  viewed_at               DateTime?
+  follow_up_at            DateTime?
+  declined_at             DateTime?
   total_amount            Float?
+  manual_subtotal         Float?
+  subtotal                Float?
+  discount_percent        Float?
+  discount_amount         Float?
+  tax_percent             Float?
+  tax_amount              Float?
+  deposit_percent         Float?
+  deposit_amount          Float?
+  due_amount              Float?
+  payment_due_terms       String?
 
   notes                   String?
   decline_reason          String?
-    line_items              Json?
+  line_items              Json?
+  is_estimate_appointment Boolean     @default(false)
   is_emergency            Boolean     @default(false)
   source                  JobSource   @default(Manual)
 
@@ -429,9 +472,28 @@ model Job {
 
 model Invoice {
   id                    String        @id @default(uuid())
-  job_id                String
+  job_id                String?
   business_id           String
+  customer_id           String?
+  invoice_number        String?
   status                InvoiceStatus @default(Draft)
+  service_name          String?
+  service_category      String?
+  contract_type         Json?
+  warranty_due          DateTime?
+  description           String?
+  photos                Json?
+  manual_subtotal       Float?
+  subtotal              Float?
+  discount_percent      Float?
+  discount_amount       Float?
+  tax_percent           Float?
+  tax_amount            Float?
+  deposit_percent       Float?
+  deposit_amount        Float?
+  due_amount            Float?
+  total_amount          Float?
+  payment_due_terms     String?
   notes                 String?
   internal_notes        String?
   due_date              DateTime?
@@ -449,7 +511,8 @@ model Invoice {
   createdAt             DateTime      @default(now())
   updatedAt             DateTime      @updatedAt
 
-  job        Job              @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  job        Job?             @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  customer   Customer?        @relation(fields: [customer_id], references: [id], onDelete: SetNull)
   line_items InvoiceLine[]
   edit_logs  InvoiceEditLog[]
   payments   Payment[]
@@ -777,6 +840,7 @@ model BusinessFinanceSettings {
   
   // Defaults
   default_due_date    String  @default("Upon Receipt")  // "Upon Receipt", "Net 15", "Net 30", custom date
+  markup_percent      Float   @default(49)
   
   // Stripe Integration
   stripe_account_id   String?

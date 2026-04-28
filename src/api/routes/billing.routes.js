@@ -90,7 +90,7 @@ router.get('/invoices/:id/total', validateUUID('id'), requireResourceAccess('inv
  *     security:
  *       - bearerAuth: []
  */
-router.post('/invoices', requireFields(['job_id', 'business_id']), requireBusinessAccess('body'), billingController.createInvoice);
+router.post('/invoices', requireFields(['business_id']), requireBusinessAccess('body'), billingController.createInvoice);
 
 /**
  * @swagger

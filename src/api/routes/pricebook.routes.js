@@ -64,7 +64,20 @@ router.get('/:id', validateUUID('id'), requireResourceAccess('priceBookItem'), p
  *               business_id: {type: string}
  *               name: {type: string}
  *               category_id: {type: string}
+ *               custom_category_name: {type: string}
+ *               notes: {type: string}
  *               can_quote_phone: {type: boolean}
+ *               labor_time: {type: string}
+ *               labor_cost: {type: number}
+ *               materials:
+ *                 type: array
+ *                 items: {type: object}
+ *               tools:
+ *                 type: array
+ *                 items: {type: object}
+ *               total_materials_cost: {type: number}
+ *               total_tools_cost: {type: number}
+ *               base_cost: {type: number}
  *               price_type: {type: string, enum: [Fixed, Range, NeedsOnsite]}
  *               price: {type: number}
  *               price_min: {type: number}

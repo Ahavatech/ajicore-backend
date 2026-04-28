@@ -36,7 +36,7 @@ async function getById(req, res, next) {
   try {
     const quote = await quoteService.getById(req.params.id);
     if (!quote) return res.status(404).json({ error: 'Quote not found' });
-    res.json(quote);
+    res.json({ ...quote, data: quote });
   } catch (err) { next(err); }
 }
 
@@ -63,7 +63,14 @@ async function sendQuote(req, res, next) {
 
 async function approve(req, res, next) {
   try {
-    const result = await quoteService.approveAndConvert(req.params.id, req.body);
+    const result = await quoteService.approveQuote(req.params.id);
+    res.json(result);
+  } catch (err) { next(err); }
+}
+
+async function convert(req, res, next) {
+  try {
+    const result = await quoteService.convertToJob(req.params.id, req.body);
     res.json(result);
   } catch (err) { next(err); }
 }
@@ -82,4 +89,4 @@ async function remove(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { getAll, getById, create, update, sendQuote, approve, decline, remove };
+module.exports = { getAll, getById, create, update, sendQuote, approve, convert, decline, remove };

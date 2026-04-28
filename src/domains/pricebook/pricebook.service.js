@@ -3,6 +3,85 @@
  * Manages service categories and price book items.
  */
 const prisma = require('../../lib/prisma');
+const { roundMoney, toNumber } = require('../../utils/financial_calculator');
+
+const DEFAULT_MARKUP_PERCENT = 49;
+
+function sumItems(items) {
+  if (!Array.isArray(items)) return 0;
+  return items.reduce((sum, item) => {
+    if (item.price !== undefined) return sum + toNumber(item.price);
+    return sum + (toNumber(item.qty, 1) * toNumber(item.rate));
+  }, 0);
+}
+
+async function getMarkupPercent(businessId) {
+  const settings = await prisma.businessFinanceSettings.findUnique({
+    where: { business_id: businessId },
+    select: { markup_percent: true },
+  }).catch(() => null);
+
+  return toNumber(settings?.markup_percent, DEFAULT_MARKUP_PERCENT);
+}
+
+function calculateUnitEconomics(data, markupPercent) {
+  const materials = Array.isArray(data.materials) ? data.materials : null;
+  const tools = Array.isArray(data.tools) ? data.tools : null;
+  const totalMaterialsCost = data.total_materials_cost !== undefined
+    ? toNumber(data.total_materials_cost)
+    : sumItems(materials);
+  const totalToolsCost = data.total_tools_cost !== undefined
+    ? toNumber(data.total_tools_cost)
+    : sumItems(tools);
+  const laborCost = data.labor_cost !== undefined ? toNumber(data.labor_cost) : null;
+  const baseCost = data.base_cost !== undefined
+    ? toNumber(data.base_cost)
+    : toNumber(laborCost) + totalMaterialsCost + totalToolsCost;
+  const flatRate = roundMoney(baseCost * (1 + (markupPercent / 100)));
+  const marginAmount = roundMoney(flatRate - baseCost);
+  const marginPercent = flatRate > 0 ? Math.round((marginAmount / flatRate) * 100) : 0;
+
+  return {
+    materials,
+    tools,
+    labor_cost: laborCost,
+    total_materials_cost: roundMoney(totalMaterialsCost),
+    total_tools_cost: roundMoney(totalToolsCost),
+    base_cost: roundMoney(baseCost),
+    flat_rate: flatRate,
+    margin_amount: marginAmount,
+    margin_percent: marginPercent,
+  };
+}
+
+function mapPriceBookItem(item) {
+  if (!item) return item;
+  return {
+    ...item,
+    notes: item.notes || item.description || null,
+    category_name: item.category?.name || null,
+  };
+}
+
+async function resolveCategoryId(data) {
+  if (!data.custom_category_name) return data.category_id || null;
+
+  const existing = await prisma.serviceCategory.findFirst({
+    where: {
+      business_id: data.business_id,
+      name: { equals: data.custom_category_name, mode: 'insensitive' },
+    },
+  });
+  if (existing) return existing.id;
+
+  const category = await prisma.serviceCategory.create({
+    data: {
+      business_id: data.business_id,
+      name: data.custom_category_name,
+    },
+  });
+  return category.id;
+}
 
 // ---- Service Categories ----
 
@@ -61,42 +140,76 @@ async function getPriceBookItems({ business_id, category_id, search, can_quote_p
     prisma.priceBookItem.count({ where }),
   ]);
 
-  return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  return { data: data.map(mapPriceBookItem), total, page, limit, totalPages: Math.ceil(total / limit) };
 }
 
 async function getPriceBookItemById(id) {
-  return prisma.priceBookItem.findUnique({
+  const item = await prisma.priceBookItem.findUnique({
     where: { id },
     include: { category: true },
   });
+  return mapPriceBookItem(item);
 }
 
 async function createPriceBookItem(data) {
-  return prisma.priceBookItem.create({
+  const categoryId = await resolveCategoryId(data);
+  const markupPercent = await getMarkupPercent(data.business_id);
+  const economics = calculateUnitEconomics(data, markupPercent);
+
+  const item = await prisma.priceBookItem.create({
     data: {
       business_id: data.business_id,
-      category_id: data.category_id || null,
+      category_id: categoryId,
       name: data.name,
-      description: data.description || null,
+      description: data.description || data.notes || null,
+      notes: data.notes || data.description || null,
       can_quote_phone: data.can_quote_phone ?? false,
       price_type: data.price_type || 'NeedsOnsite',
-      price: data.price ?? null,
+      price: data.price ?? economics.flat_rate ?? null,
       price_min: data.price_min ?? null,
       price_max: data.price_max ?? null,
       visit_type: data.visit_type || 'FreeEstimate',
       service_call_fee: data.service_call_fee ?? null,
+      labor_time: data.labor_time || null,
+      labor_cost: economics.labor_cost,
+      materials: economics.materials,
+      tools: economics.tools,
+      total_materials_cost: economics.total_materials_cost,
+      total_tools_cost: economics.total_tools_cost,
+      base_cost: economics.base_cost,
+      flat_rate: economics.flat_rate,
+      margin_amount: economics.margin_amount,
+      margin_percent: economics.margin_percent,
       suggested_materials: data.suggested_materials || null,
     },
     include: { category: true },
   });
+
+  return mapPriceBookItem(item);
 }
 
 async function updatePriceBookItem(id, data) {
   const updateData = {};
   const fields = ['name', 'description', 'can_quote_phone', 'price_type', 'price', 'price_min',
-    'price_max', 'visit_type', 'service_call_fee', 'suggested_materials', 'category_id', 'is_active'];
+    'price_max', 'visit_type', 'service_call_fee', 'suggested_materials', 'category_id', 'is_active',
+    'notes', 'labor_time'];
   fields.forEach((f) => { if (data[f] !== undefined) updateData[f] = data[f]; });
-  return prisma.priceBookItem.update({ where: { id }, data: updateData, include: { category: true } });
+
+  if (data.custom_category_name) {
+    const current = await prisma.priceBookItem.findUnique({ where: { id }, select: { business_id: true } });
+    updateData.category_id = await resolveCategoryId({ ...data, business_id: current.business_id });
+  }
+
+  const economicsFields = ['labor_cost', 'materials', 'tools', 'total_materials_cost', 'total_tools_cost', 'base_cost'];
+  if (economicsFields.some((field) => data[field] !== undefined)) {
+    const current = await prisma.priceBookItem.findUnique({ where: { id }, select: { business_id: true } });
+    const markupPercent = await getMarkupPercent(current.business_id);
+    Object.assign(updateData, calculateUnitEconomics(data, markupPercent));
+    updateData.price = updateData.flat_rate;
+  }
+
+  const item = await prisma.priceBookItem.update({ where: { id }, data: updateData, include: { category: true } });
+  return mapPriceBookItem(item);
 }
 
 async function incrementUsage(id) {

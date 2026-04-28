@@ -53,7 +53,7 @@ jest.mock('twilio', () => {
   };
 
   return factory;
-}, { virtual: true });
+});
 
 const prisma = require('../../src/lib/prisma');
 const twilio = require('twilio');
