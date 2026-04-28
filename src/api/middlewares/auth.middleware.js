@@ -196,39 +196,19 @@ function requireInternalResourceAccess(resource, options = {}) {
  * Middleware to verify internal API key (used by AI Bridge routes).
  */
 function requireInternalApiKey(req, res, next) {
-  const apiKey = req.headers['x-api-key'];
-  const expected = env.INTERNAL_API_KEY || env.AI_SERVICE_API_KEY;
+  const apiKey = getTokenHeader(req, 'x-api-key');
+  const expected = env.INTERNAL_API_KEY;
 
-  if (!apiKey || !expected || apiKey !== expected) {
+  if (!safeTokenMatch(expected, apiKey)) {
     logger.warn('Unauthorized internal API access attempt', {
       ip: req.ip,
       path: req.originalUrl,
+      hasApiKey: Boolean(apiKey),
+      internalKeyConfigured: Boolean(env.INTERNAL_API_KEY),
     });
     return res.status(401).json({
       error: 'Unauthorized',
       message: 'Invalid or missing API key.',
-    });
-  }
-
-  next();
-}
-
-/**
- * Middleware to verify the AI service API key.
- * Used by endpoints called directly by the external AI service.
- */
-function requireAiServiceApiKey(req, res, next) {
-  const apiKey = getTokenHeader(req, 'x-api-key');
-  const expected = env.AI_SERVICE_API_KEY || env.INTERNAL_API_KEY;
-
-  if (!safeTokenMatch(expected, apiKey)) {
-    logger.warn('Unauthorized AI service API access attempt', {
-      ip: req.ip,
-      path: req.originalUrl,
-    });
-    return res.status(401).json({
-      error: 'Unauthorized',
-      message: 'Invalid or missing AI service API key.',
     });
   }
 
@@ -244,14 +224,18 @@ function requireAiServiceApiKey(req, res, next) {
 function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  const match = typeof authHeader === 'string'
+    ? authHeader.match(/^Bearer\s+(.+)$/i)
+    : null;
+
+  if (!match) {
     return res.status(401).json({
       error: 'Unauthorized',
       message: 'Missing or malformed Authorization header. Expected: Bearer <token>',
     });
   }
 
-  const token = authHeader.split(' ')[1];
+  const token = match[1].trim();
   const decoded = verifyToken(token);
 
   if (!decoded) {
@@ -268,7 +252,6 @@ function requireAuth(req, res, next) {
 
 module.exports = {
   requireInternalApiKey,
-  requireAiServiceApiKey,
   requireAuth,
   requireBusinessAccess,
   requireResourceAccess,

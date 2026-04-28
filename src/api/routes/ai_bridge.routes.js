@@ -9,7 +9,6 @@
  */
 const { Router } = require('express');
 const {
-  requireAiServiceApiKey,
   requireInternalApiKey,
   requireInternalBusinessAccess,
   requireInternalResourceAccess,
@@ -309,7 +308,7 @@ router.post(withAiAlias('/ai/calls/status', '/calls/status'), async (req, res, n
 // ============================================
 // Protected Internal AI Routes
 // ============================================
-router.get('/ai/business-config', requireAiServiceApiKey, requireFields(['business_id'], 'query'), requireInternalBusinessAccess('query'), getBusinessConfig);
+router.get('/ai/business-config', requireInternalApiKey, requireFields(['business_id'], 'query'), requireInternalBusinessAccess('query'), getBusinessConfig);
 
 router.use(requireInternalApiKey);
 
@@ -755,7 +754,7 @@ router.post('/ai/book', requireFields(['business_id', 'booking_type'], 'body'), 
  * /api/internal/ai/business-config:
  *   get:
  *     summary: Fetch AI receptionist and dispatcher business context
- *     description: Uses `x-api-key` mapped to `AI_SERVICE_API_KEY` plus the per-business `x-business-token`.
+ *     description: Uses `x-api-key` mapped to `INTERNAL_API_KEY` plus the per-business `x-business-token`.
  *     tags: [AI Bridge]
  *     security:
  *       - apiKeyAuth: []

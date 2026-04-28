@@ -70,7 +70,6 @@ const env = {
 
   // AI Service
   AI_SERVICE_URL: process.env.AI_SERVICE_URL || 'http://localhost:4000',
-  AI_SERVICE_API_KEY: process.env.AI_SERVICE_API_KEY,
 
   // Internal API Key
   INTERNAL_API_KEY: process.env.INTERNAL_API_KEY,

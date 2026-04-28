@@ -120,7 +120,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Business-Token', 'Accept'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Business-Token', 'X-Business-Id', 'Accept'],
   maxAge: 3600,  // Cache preflight for 1 hour
 }));
 

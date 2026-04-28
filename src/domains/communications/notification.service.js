@@ -53,7 +53,7 @@ async function routeToAI(fromNumber, messageBody, context = {}) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': env.AI_SERVICE_API_KEY,
+        'x-api-key': env.INTERNAL_API_KEY,
       },
       body: JSON.stringify({ from: fromNumber, message: messageBody, context }),
     });
@@ -76,7 +76,7 @@ async function routeCallToAI(payload) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': env.AI_SERVICE_API_KEY,
+        'x-api-key': env.INTERNAL_API_KEY,
       },
       body: JSON.stringify(payload),
     });
