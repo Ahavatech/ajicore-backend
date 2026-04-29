@@ -11,7 +11,7 @@
 
 const { Router } = require('express');
 const staffController = require('../../domains/team/staff.controller');
-const { requireAuth, requireBusinessAccess, requireResourceAccess } = require('../middlewares/auth.middleware');
+const { requireAuth, requireRole, requireBusinessAccess, requireResourceAccess } = require('../middlewares/auth.middleware');
 const { requireFields, validateUUID } = require('../middlewares/validate.middleware');
 
 const router = Router();
@@ -53,7 +53,29 @@ router.use(requireAuth);
  *               items:
  *                 $ref: '#/components/schemas/StaffMember'
  */
-router.get('/available', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), staffController.getAvailableStaff);
+router.get('/available', requireRole(['admin']), requireFields(['business_id'], 'query'), requireBusinessAccess('query'), staffController.getAvailableStaff);
+
+router.get(
+  '/dashboard/summary',
+  requireFields(['business_id'], 'query'),
+  requireRole(['staff']),
+  requireBusinessAccess('query', 'business_id', { allowStaff: true }),
+  staffController.getDashboardSummary
+);
+
+router.post(
+  '/time-tracking',
+  requireRole(['staff']),
+  requireFields(['action']),
+  staffController.timeTracking
+);
+
+router.post(
+  '/availability',
+  requireRole(['staff']),
+  requireFields(['schedule']),
+  staffController.updateAvailability
+);
 
 /**
  * @swagger
@@ -78,7 +100,7 @@ router.get('/available', requireFields(['business_id'], 'query'), requireBusines
  *               items:
  *                 $ref: '#/components/schemas/StaffMember'
  */
-router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), staffController.getAllStaff);
+router.get('/', requireRole(['admin']), requireFields(['business_id'], 'query'), requireBusinessAccess('query'), staffController.getAllStaff);
 
 /**
  * @swagger
@@ -103,7 +125,7 @@ router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('
  *               items:
  *                 $ref: '#/components/schemas/PayrollSummary'
  */
-router.get('/payroll', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), staffController.calculatePayroll);
+router.get('/payroll', requireRole(['admin']), requireFields(['business_id'], 'query'), requireBusinessAccess('query'), staffController.calculatePayroll);
 
 /**
  * @swagger
@@ -128,7 +150,7 @@ router.get('/payroll', requireFields(['business_id'], 'query'), requireBusinessA
  *               items:
  *                 $ref: '#/components/schemas/Timesheet'
  */
-router.get('/timesheets', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), staffController.getTimesheets);
+router.get('/timesheets', requireRole(['admin']), requireFields(['business_id'], 'query'), requireBusinessAccess('query'), staffController.getTimesheets);
 
 /**
  * @swagger
@@ -147,7 +169,7 @@ router.get('/timesheets', requireFields(['business_id'], 'query'), requireBusine
  *       200:
  *         description: Staff metrics retrieved successfully
  */
-router.get('/metrics', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), staffController.getStaffMetrics);
+router.get('/metrics', requireRole(['admin']), requireFields(['business_id'], 'query'), requireBusinessAccess('query'), staffController.getStaffMetrics);
 
 /**
  * @swagger
@@ -172,7 +194,7 @@ router.get('/metrics', requireFields(['business_id'], 'query'), requireBusinessA
  *             schema:
  *               $ref: '#/components/schemas/StaffMember'
  */
-router.get('/:id', validateUUID('id'), requireResourceAccess('staff'), staffController.getStaffById);
+router.get('/:id', validateUUID('id'), requireResourceAccess('staff', { allowStaff: true }), staffController.getStaffById);
 
 /**
  * @swagger
@@ -196,7 +218,7 @@ router.get('/:id', validateUUID('id'), requireResourceAccess('staff'), staffCont
  *             schema:
  *               $ref: '#/components/schemas/StaffMember'
  */
-router.post('/', requireFields(['business_id', 'name', 'hourly_rate']), requireBusinessAccess('body'), staffController.createStaff);
+router.post('/', requireRole(['admin']), requireFields(['business_id', 'name', 'hourly_rate', 'email']), requireBusinessAccess('body'), staffController.createStaff);
 
 /**
  * @swagger
@@ -225,7 +247,7 @@ router.post('/', requireFields(['business_id', 'name', 'hourly_rate']), requireB
  *             schema:
  *               $ref: '#/components/schemas/StaffMember'
  */
-router.patch('/:id', validateUUID('id'), requireResourceAccess('staff'), staffController.updateStaff);
+router.patch('/:id', requireRole(['admin']), validateUUID('id'), requireResourceAccess('staff'), staffController.updateStaff);
 
 /**
  * @swagger
@@ -244,7 +266,7 @@ router.patch('/:id', validateUUID('id'), requireResourceAccess('staff'), staffCo
  *       200:
  *         description: Staff member deleted successfully
  */
-router.delete('/:id', validateUUID('id'), requireResourceAccess('staff'), staffController.deleteStaff);
+router.delete('/:id', requireRole(['admin']), validateUUID('id'), requireResourceAccess('staff'), staffController.deleteStaff);
 
 /**
  * @swagger
@@ -267,7 +289,7 @@ router.delete('/:id', validateUUID('id'), requireResourceAccess('staff'), staffC
  *             schema:
  *               $ref: '#/components/schemas/Timesheet'
  */
-router.post('/:id/clock-in', validateUUID('id'), requireResourceAccess('staff'), staffController.clockIn);
+router.post('/:id/clock-in', validateUUID('id'), requireResourceAccess('staff', { allowStaff: true }), staffController.clockIn);
 
 /**
  * @swagger
@@ -290,7 +312,7 @@ router.post('/:id/clock-in', validateUUID('id'), requireResourceAccess('staff'),
  *             schema:
  *               $ref: '#/components/schemas/Timesheet'
  */
-router.post('/:id/clock-out', validateUUID('id'), requireResourceAccess('staff'), staffController.clockOut);
+router.post('/:id/clock-out', validateUUID('id'), requireResourceAccess('staff', { allowStaff: true }), staffController.clockOut);
 
 
 /**
@@ -310,7 +332,7 @@ router.post('/:id/clock-out', validateUUID('id'), requireResourceAccess('staff')
  *       200:
  *         description: Timesheets retrieved successfully
  */
-router.get('/:id/timesheets', validateUUID('id'), requireResourceAccess('staff'), staffController.getStaffTimesheets);
+router.get('/:id/timesheets', validateUUID('id'), requireResourceAccess('staff', { allowStaff: true }), staffController.getStaffTimesheets);
 
 /**
  * @swagger
@@ -329,6 +351,6 @@ router.get('/:id/timesheets', validateUUID('id'), requireResourceAccess('staff')
  *       200:
  *         description: Payroll records retrieved successfully
  */
-router.get('/:id/payroll', validateUUID('id'), requireResourceAccess('staff'), staffController.getStaffPayroll);
+router.get('/:id/payroll', requireRole(['admin']), validateUUID('id'), requireResourceAccess('staff'), staffController.getStaffPayroll);
 
 module.exports = router;

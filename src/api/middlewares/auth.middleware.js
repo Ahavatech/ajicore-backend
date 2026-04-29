@@ -70,7 +70,60 @@ async function resolveBusinessIdForResource(resource, id) {
   return record?.business_id || null;
 }
 
-function requireBusinessAccess(source = 'query', field = 'business_id') {
+async function userHasBusinessAccess(user, businessId) {
+  if (!user?.id || !businessId) return null;
+
+  if (user.role === 'staff') {
+    return user.business_id === businessId ? { id: businessId } : null;
+  }
+
+  return userCanAccessBusiness(user.id, businessId);
+}
+
+async function staffCanAccessResource(user, resource, resourceId) {
+  if (!user?.staff_id) return false;
+
+  if (resource === 'staff') {
+    return user.staff_id === resourceId;
+  }
+
+  if (resource === 'job') {
+    const job = await prisma.job.findUnique({
+      where: { id: resourceId },
+      select: { assigned_staff_id: true, business_id: true },
+    });
+    return Boolean(job && job.business_id === user.business_id && job.assigned_staff_id === user.staff_id);
+  }
+
+  if (resource === 'quote') {
+    const quote = await prisma.quote.findUnique({
+      where: { id: resourceId },
+      select: { assigned_staff_id: true, business_id: true },
+    });
+    return Boolean(quote && quote.business_id === user.business_id && quote.assigned_staff_id === user.staff_id);
+  }
+
+  return false;
+}
+
+function requireRole(roles) {
+  const allowedRoles = Array.isArray(roles) ? roles : [roles];
+
+  return (req, res, next) => {
+    if (!req.user?.role || !allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: `This action requires one of: ${allowedRoles.join(', ')}`,
+      });
+    }
+
+    next();
+  };
+}
+
+function requireBusinessAccess(source = 'query', field = 'business_id', options = {}) {
+  const { allowStaff = false } = options;
+
   return async (req, res, next) => {
     try {
       const businessId = getSourceObject(req, source)?.[field];
@@ -78,7 +131,11 @@ function requireBusinessAccess(source = 'query', field = 'business_id') {
         throw new ValidationError(`${field} is required.`);
       }
 
-      const business = await userCanAccessBusiness(req.user.id, businessId);
+      if (req.user.role === 'staff' && !allowStaff) {
+        throw new AuthorizationError('You do not have access to this business.');
+      }
+
+      const business = await userHasBusinessAccess(req.user, businessId);
       if (!business) {
         throw new AuthorizationError('You do not have access to this business.');
       }
@@ -92,7 +149,12 @@ function requireBusinessAccess(source = 'query', field = 'business_id') {
 }
 
 function requireResourceAccess(resource, options = {}) {
-  const { source = 'params', field = 'id', notFoundLabel = resource } = options;
+  const {
+    source = 'params',
+    field = 'id',
+    notFoundLabel = resource,
+    allowStaff = false,
+  } = options;
 
   return async (req, res, next) => {
     try {
@@ -106,9 +168,20 @@ function requireResourceAccess(resource, options = {}) {
         throw new NotFoundError(notFoundLabel);
       }
 
-      const business = await userCanAccessBusiness(req.user.id, businessId);
+      if (req.user.role === 'staff' && !allowStaff) {
+        throw new AuthorizationError(`You do not have access to this ${notFoundLabel}.`);
+      }
+
+      const business = await userHasBusinessAccess(req.user, businessId);
       if (!business) {
         throw new AuthorizationError(`You do not have access to this ${notFoundLabel}.`);
+      }
+
+      if (req.user.role === 'staff') {
+        const allowed = await staffCanAccessResource(req.user, resource, resourceId);
+        if (!allowed) {
+          throw new AuthorizationError(`You do not have access to this ${notFoundLabel}.`);
+        }
       }
 
       req.business = { id: businessId };
@@ -257,6 +330,7 @@ function requireAuth(req, res, next) {
 module.exports = {
   requireInternalApiKey,
   requireAuth,
+  requireRole,
   requireBusinessAccess,
   requireResourceAccess,
   requireInternalBusinessAccess,

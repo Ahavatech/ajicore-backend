@@ -7,7 +7,12 @@ const path = require('path');
 const cors = require('cors');
 const helmet = require('helmet');
 const swaggerUi = require('swagger-ui-express');
-const { getOpenApiSpec, renderScalarHtml } = require('./config/openapi');
+const {
+  getOpenApiSpec,
+  getOpenApiDocumentUrl,
+  getSwaggerUiOptions,
+  renderScalarHtml,
+} = require('./config/openapi');
 const logger = require('./utils/logger');
 
 // Route imports
@@ -33,6 +38,7 @@ const searchRoutes = require('./api/routes/search.routes');
 const reportsRoutes = require('./api/routes/reports.routes');
 const uploadRoutes = require('./api/routes/upload.routes');
 const integrationsRoutes = require('./api/routes/integrations.routes');
+const usersRoutes = require('./api/routes/users.routes');
 
 
 // Middleware imports
@@ -41,6 +47,7 @@ const { rateLimiters } = require('./api/middlewares/rate_limit.middleware');
 
 const app = express();
 const openApiSpec = getOpenApiSpec();
+const openApiDocumentUrl = getOpenApiDocumentUrl();
 
 // ============================================
 // Global Middleware
@@ -185,14 +192,11 @@ app.use('/api', rateLimiters.standard);
 // ============================================
 // Swagger API Documentation
 // ============================================
-app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec, {
-  customSiteTitle: 'Ajicore API Docs',
-  customCss: '.swagger-ui .topbar { display: none }',
-}));
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(null, getSwaggerUiOptions(openApiDocumentUrl)));
 
 app.get('/api/reference', (_req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.send(renderScalarHtml('/api/docs.json'));
+  res.send(renderScalarHtml(openApiDocumentUrl));
 });
 
 // Serve raw swagger JSON for Postman import
@@ -226,6 +230,7 @@ app.use('/api/billing', billingRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/fleet', fleetRoutes);
 app.use('/api/staff', staffRoutes);
+app.use('/api/team', staffRoutes);
 app.use('/api/price-book', priceBookRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/internal', aiBridgeRoutes);
@@ -240,6 +245,7 @@ app.use('/api/search', searchRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/integrations', integrationsRoutes);
+app.use('/api/users', usersRoutes);
 
 
 // ============================================

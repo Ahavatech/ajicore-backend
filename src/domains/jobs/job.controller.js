@@ -13,18 +13,22 @@ async function getAllJobs(req, res, next) {
       type,
       customer_id,
       assigned_staff_id,
+      staff_id,
       start_date,
       end_date,
       search,
       page = 1,
       limit = 20,
     } = req.query;
+    const scopedStaffId = req.user.role === 'staff'
+      ? req.user.staff_id
+      : (staff_id || assigned_staff_id);
     const jobs = await jobService.getJobs({
       business_id,
       status,
       type,
       customer_id,
-      assigned_staff_id,
+      assigned_staff_id: scopedStaffId,
       start_date,
       end_date,
       search,

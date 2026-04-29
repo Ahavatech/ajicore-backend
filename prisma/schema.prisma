@@ -30,6 +30,7 @@ enum QuoteStatus {
   Draft
   Pending
   Appointment
+  Accepted
   Sent
   Approved
   Declined
@@ -64,6 +65,11 @@ enum StaffRole {
   Technician
   Apprentice
   Admin
+}
+
+enum UserRole {
+  admin
+  staff
 }
 
 enum AuthProvider {
@@ -151,6 +157,11 @@ model User {
   phone_otp_expires_at DateTime?
   first_name           String?
   last_name            String?
+  role                 UserRole     @default(admin)
+  business_id          String?
+  staff_id             String?      @unique
+  phone_number         String?
+  avatar_url           String?
   auth_provider        AuthProvider @default(Email)
   google_id            String?      @unique
   onboarding_step      Int          @default(1)
@@ -158,8 +169,10 @@ model User {
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
 
-  businesses     Business[]
-  invoice_edits  InvoiceEditLog[]
+  business        Business?         @relation("UserBusinessMembership", fields: [business_id], references: [id], onDelete: SetNull)
+  staff_profile   Staff?            @relation("StaffUserAccount", fields: [staff_id], references: [id], onDelete: SetNull)
+  owned_businesses Business[]       @relation("BusinessOwner")
+  invoice_edits   InvoiceEditLog[]
 
   @@map("users")
 }
@@ -217,7 +230,8 @@ model Business {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  owner                User?              @relation(fields: [owner_id], references: [id], onDelete: SetNull)
+  owner                User?              @relation("BusinessOwner", fields: [owner_id], references: [id], onDelete: SetNull)
+  member_users         User[]             @relation("UserBusinessMembership")
   staff                Staff[]
   customers            Customer[]
   jobs                 Job[]
@@ -306,6 +320,8 @@ model Staff {
   phone                   String?
   check_in_frequency_hours Float?
   active_job_id           String?
+  availability_schedule   Json?
+  current_status          String    @default("Clocked Out")
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
 
@@ -314,6 +330,7 @@ model Staff {
   assigned_quotes   Quote[]          @relation("AssignedQuoteStaff")
   timesheets        Timesheet[]
   payroll_records   PayrollRecord[]
+  user_account      User?            @relation("StaffUserAccount")
   active_job        Job?             @relation("StaffActiveJob", fields: [active_job_id], references: [id], onDelete: SetNull)
   team_checkins     TeamCheckin[]
   assigned_vehicles Vehicle[]
@@ -322,15 +339,17 @@ model Staff {
 }
 
 model Timesheet {
-  id          String    @id @default(uuid())
-  staff_id    String
-  job_id      String?
-  clock_in    DateTime
-  clock_out   DateTime?
-  total_hours Float?
-  notes       String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id                       String    @id @default(uuid())
+  staff_id                 String
+  job_id                   String?
+  clock_in                 DateTime
+  clock_out                DateTime?
+  total_hours              Float?
+  notes                    String?
+  break_started_at         DateTime?
+  accumulated_break_minutes Int      @default(0)
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
   staff Staff @relation(fields: [staff_id], references: [id], onDelete: Cascade)
   job   Job?  @relation(fields: [job_id], references: [id], onDelete: SetNull)
@@ -408,6 +427,7 @@ model Quote {
   payment_due_terms       String?
 
   notes                   String?
+  site_notes              String?
   decline_reason          String?
   line_items              Json?
   is_estimate_appointment Boolean     @default(false)

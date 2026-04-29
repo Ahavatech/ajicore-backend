@@ -12,7 +12,7 @@
 
 const { Router } = require('express');
 const jobController = require('../../domains/jobs/job.controller');
-const { requireAuth, requireBusinessAccess, requireResourceAccess } = require('../middlewares/auth.middleware');
+const { requireAuth, requireRole, requireBusinessAccess, requireResourceAccess } = require('../middlewares/auth.middleware');
 const { requireFields, validateUUID } = require('../middlewares/validate.middleware');
 
 const router = Router();
@@ -73,7 +73,7 @@ router.use(requireAuth);
  *                       items:
  *                         $ref: '#/components/schemas/Job'
  */
-router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), jobController.getAllJobs);
+router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('query', 'business_id', { allowStaff: true }), jobController.getAllJobs);
 
 /**
  * @swagger
@@ -104,7 +104,7 @@ router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('
  *               items:
  *                 $ref: '#/components/schemas/Job'
  */
-router.get('/schedule', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), jobController.getSchedule);
+router.get('/schedule', requireRole(['admin']), requireFields(['business_id'], 'query'), requireBusinessAccess('query'), jobController.getSchedule);
 
 /**
  * @swagger
@@ -153,6 +153,7 @@ router.get('/schedule', requireFields(['business_id'], 'query'), requireBusiness
  */
 router.get(
   '/availability',
+  requireRole(['admin']),
   requireFields(['staff_id', 'start_time', 'end_time'], 'query'),
   requireResourceAccess('staff', { source: 'query', field: 'staff_id', notFoundLabel: 'staff member' }),
   jobController.checkAvailability
@@ -181,7 +182,7 @@ router.get(
  *             schema:
  *               $ref: '#/components/schemas/Job'
  */
-router.get('/:id', validateUUID('id'), requireResourceAccess('job'), jobController.getJobById);
+router.get('/:id', validateUUID('id'), requireResourceAccess('job', { allowStaff: true }), jobController.getJobById);
 
 /**
  * @swagger
@@ -232,7 +233,7 @@ router.get('/:id', validateUUID('id'), requireResourceAccess('job'), jobControll
  *             schema:
  *               $ref: '#/components/schemas/Job'
  */
-router.post('/', requireFields(['business_id', 'customer_id']), requireBusinessAccess('body'), jobController.createJob);
+router.post('/', requireRole(['admin']), requireFields(['business_id', 'customer_id']), requireBusinessAccess('body'), jobController.createJob);
 
 /**
  * @swagger
@@ -280,7 +281,7 @@ router.post('/', requireFields(['business_id', 'customer_id']), requireBusinessA
  *             schema:
  *               $ref: '#/components/schemas/Job'
  */
-router.patch('/:id', validateUUID('id'), requireResourceAccess('job'), jobController.updateJob);
+router.patch('/:id', requireRole(['admin']), validateUUID('id'), requireResourceAccess('job'), jobController.updateJob);
 
 /**
  * @swagger
@@ -303,7 +304,7 @@ router.patch('/:id', validateUUID('id'), requireResourceAccess('job'), jobContro
  *             schema:
  *               $ref: '#/components/schemas/Job'
  */
-router.post('/:id/start', validateUUID('id'), requireResourceAccess('job'), jobController.startJob);
+router.post('/:id/start', requireRole(['admin', 'staff']), validateUUID('id'), requireResourceAccess('job', { allowStaff: true }), jobController.startJob);
 
 /**
  * @swagger
@@ -326,7 +327,7 @@ router.post('/:id/start', validateUUID('id'), requireResourceAccess('job'), jobC
  *             schema:
  *               $ref: '#/components/schemas/Job'
  */
-router.post('/:id/complete', validateUUID('id'), requireResourceAccess('job'), jobController.completeJob);
+router.post('/:id/complete', requireRole(['admin', 'staff']), validateUUID('id'), requireResourceAccess('job', { allowStaff: true }), jobController.completeJob);
 
 /**
  * @swagger
@@ -355,7 +356,7 @@ router.post('/:id/complete', validateUUID('id'), requireResourceAccess('job'), j
  *             schema:
  *               $ref: '#/components/schemas/Job'
  */
-router.post('/:id/materials', validateUUID('id'), requireResourceAccess('job'), requireFields(['materials']), jobController.addMaterials);
+router.post('/:id/materials', requireRole(['admin']), validateUUID('id'), requireResourceAccess('job'), requireFields(['materials']), jobController.addMaterials);
 
 /**
  * @swagger
@@ -391,7 +392,7 @@ router.post('/:id/materials', validateUUID('id'), requireResourceAccess('job'), 
  *             schema:
  *               $ref: '#/components/schemas/Job'
  */
-router.post('/:id/photos', validateUUID('id'), requireResourceAccess('job'), requireFields(['photo_urls']), jobController.addPhotos);
+router.post('/:id/photos', requireRole(['admin', 'staff']), validateUUID('id'), requireResourceAccess('job', { allowStaff: true }), requireFields(['photo_urls']), jobController.addPhotos);
 
 /**
  * @swagger
@@ -410,6 +411,6 @@ router.post('/:id/photos', validateUUID('id'), requireResourceAccess('job'), req
  *       200:
  *         description: Job deleted successfully
  */
-router.delete('/:id', validateUUID('id'), requireResourceAccess('job'), jobController.deleteJob);
+router.delete('/:id', requireRole(['admin']), validateUUID('id'), requireResourceAccess('job'), jobController.deleteJob);
 
 module.exports = router;

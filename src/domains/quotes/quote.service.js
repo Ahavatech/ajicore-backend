@@ -143,6 +143,7 @@ function quoteDetailPayload(quote) {
     total_amount: quote.total_amount || 0,
     due_amount: quote.due_amount ?? quote.deposit_amount ?? quote.total_amount ?? 0,
     due_date: quote.expires_at || null,
+    site_notes: quote.site_notes || null,
     footer_note: quote.business?.finance_settings?.company_notes || null,
     timeline: {
       created_at: quote.createdAt,
@@ -185,6 +186,7 @@ function buildQuoteData(data, existing = null) {
     scheduled_start_time: schedule.start || undefined,
     scheduled_end_time: schedule.end || undefined,
     notes: data.notes ?? undefined,
+    site_notes: data.site_notes ?? undefined,
     decline_reason: data.decline_reason ?? undefined,
     line_items: data.line_items !== undefined ? financials.line_items : undefined,
     is_estimate_appointment: data.is_estimate_appointment ?? undefined,
@@ -414,6 +416,36 @@ async function approveQuote(id) {
   return quoteListRow(quote);
 }
 
+async function acceptEstimateAppointment(id) {
+  const quote = await prisma.quote.findUnique({
+    where: { id },
+    include: { customer: true, assigned_staff: true },
+  });
+  if (!quote) throw new NotFoundError('Quote');
+  if (!quote.is_estimate_appointment) {
+    throw new ValidationError('Only estimate appointments can be accepted.');
+  }
+  if (!quote.assigned_staff_id) {
+    throw new ValidationError('This estimate appointment is not assigned to a staff member.');
+  }
+
+  const updated = await prisma.quote.update({
+    where: { id },
+    data: { status: 'Accepted' },
+    include: { customer: true, assigned_staff: true },
+  });
+
+  await logActivitySafe({
+    business_id: updated.business_id,
+    customer_id: updated.customer_id,
+    event_type: 'quote.appointment_accepted',
+    title: `Estimate appointment accepted by ${updated.assigned_staff?.name || 'assigned technician'}`,
+    details: { quote_id: updated.id, status: updated.status },
+  });
+
+  return quoteListRow(updated);
+}
+
 async function convertToJob(id, jobData = {}) {
   const quote = await prisma.quote.findUnique({
     where: { id },
@@ -470,13 +502,14 @@ async function convertToJob(id, jobData = {}) {
   return { message: 'Converted successfully', job_id: job.id };
 }
 
-async function declineQuote(id, reason) {
+async function declineQuote(id, reason, options = {}) {
   const quote = await prisma.quote.update({
     where: { id },
     data: {
       status: 'Declined',
       declined_at: new Date(),
       decline_reason: reason || null,
+      assigned_staff_id: options.unassignOnDecline ? null : undefined,
     },
     include: { customer: true, assigned_staff: true },
   });
@@ -490,6 +523,55 @@ async function declineQuote(id, reason) {
   });
 
   return quoteListRow(quote);
+}
+
+async function updateSiteNotes(id, notes) {
+  const quote = await prisma.quote.findUnique({
+    where: { id },
+    include: { customer: true, assigned_staff: true },
+  });
+  if (!quote) throw new NotFoundError('Quote');
+
+  const updated = await prisma.quote.update({
+    where: { id },
+    data: { site_notes: notes || null },
+    include: { customer: true, assigned_staff: true },
+  });
+
+  await logActivitySafe({
+    business_id: updated.business_id,
+    customer_id: updated.customer_id,
+    event_type: 'quote.site_notes_updated',
+    title: `Site notes updated for ${buildCustomerName(updated.customer)}`,
+    details: { quote_id: updated.id },
+  });
+
+  return quoteDetailPayload(updated);
+}
+
+function redactFinancialFieldsForStaff(quote) {
+  if (!quote) return quote;
+
+  const redacted = { ...quote };
+  [
+    'total_amount',
+    'manual_subtotal',
+    'subtotal',
+    'discount_percent',
+    'discount_amount',
+    'tax_percent',
+    'tax_amount',
+    'deposit_percent',
+    'deposit_amount',
+    'due_amount',
+    'payment_due_terms',
+    'line_items',
+    'footer_note',
+  ].forEach((field) => {
+    delete redacted[field];
+  });
+
+  return redacted;
 }
 
 async function expireOldQuotes() {
@@ -515,8 +597,11 @@ module.exports = {
   update,
   sendQuote,
   approveQuote,
+  acceptEstimateAppointment,
   convertToJob,
   declineQuote,
+  updateSiteNotes,
+  redactFinancialFieldsForStaff,
   expireOldQuotes,
   deleteQuote,
   parseEstimateWindow,

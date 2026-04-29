@@ -6,7 +6,7 @@
  */
 const { Router } = require('express');
 const quoteController = require('../../domains/quotes/quote.controller');
-const { requireAuth, requireBusinessAccess, requireResourceAccess } = require('../middlewares/auth.middleware');
+const { requireAuth, requireRole, requireBusinessAccess, requireResourceAccess } = require('../middlewares/auth.middleware');
 const { requireFields, validateUUID } = require('../middlewares/validate.middleware');
 
 const router = Router();
@@ -64,7 +64,7 @@ router.use(requireAuth);
  *                       items:
  *                         $ref: '#/components/schemas/Quote'
  */
-router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), quoteController.getAll);
+router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('query', 'business_id', { allowStaff: true }), quoteController.getAll);
 /**
  * @swagger
  * /api/quotes/{id}:
@@ -86,7 +86,7 @@ router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('
  *             schema:
  *               $ref: '#/components/schemas/Quote'
  */
-router.get('/:id', validateUUID('id'), requireResourceAccess('quote'), quoteController.getById);
+router.get('/:id', validateUUID('id'), requireResourceAccess('quote', { allowStaff: true }), quoteController.getById);
 
 /**
  * @swagger
@@ -110,7 +110,7 @@ router.get('/:id', validateUUID('id'), requireResourceAccess('quote'), quoteCont
  *             schema:
  *               $ref: '#/components/schemas/Quote'
  */
-router.post('/', requireFields(['business_id', 'customer_id']), requireBusinessAccess('body'), quoteController.create);
+router.post('/', requireRole(['admin']), requireFields(['business_id', 'customer_id']), requireBusinessAccess('body'), quoteController.create);
 /**
  * @swagger
  * /api/quotes/{id}:
@@ -138,7 +138,7 @@ router.post('/', requireFields(['business_id', 'customer_id']), requireBusinessA
  *             schema:
  *               $ref: '#/components/schemas/Quote'
  */
-router.patch('/:id', validateUUID('id'), requireResourceAccess('quote'), quoteController.update);
+router.patch('/:id', requireRole(['admin']), validateUUID('id'), requireResourceAccess('quote'), quoteController.update);
 
 /**
  * @swagger
@@ -161,7 +161,7 @@ router.patch('/:id', validateUUID('id'), requireResourceAccess('quote'), quoteCo
  *             schema:
  *               $ref: '#/components/schemas/Quote'
  */
-router.post('/:id/send', validateUUID('id'), requireResourceAccess('quote'), quoteController.sendQuote);
+router.post('/:id/send', requireRole(['admin']), validateUUID('id'), requireResourceAccess('quote'), quoteController.sendQuote);
 
 /**
  * @swagger
@@ -191,7 +191,9 @@ router.post('/:id/send', validateUUID('id'), requireResourceAccess('quote'), quo
  *                 job:
  *                   $ref: '#/components/schemas/Job'
  */
-router.post('/:id/approve', validateUUID('id'), requireResourceAccess('quote'), quoteController.approve);
+router.post('/:id/approve', requireRole(['admin']), validateUUID('id'), requireResourceAccess('quote'), quoteController.approve);
+
+router.post('/:id/accept', requireRole(['staff']), validateUUID('id'), requireResourceAccess('quote', { allowStaff: true }), quoteController.accept);
 
 /**
  * @swagger
@@ -210,7 +212,7 @@ router.post('/:id/approve', validateUUID('id'), requireResourceAccess('quote'), 
  *       200:
  *         description: Quote converted successfully
  */
-router.post('/:id/convert', validateUUID('id'), requireResourceAccess('quote'), quoteController.convert);
+router.post('/:id/convert', requireRole(['admin']), validateUUID('id'), requireResourceAccess('quote'), quoteController.convert);
 
 /**
  * @swagger
@@ -240,7 +242,16 @@ router.post('/:id/convert', validateUUID('id'), requireResourceAccess('quote'), 
  *             schema:
  *               $ref: '#/components/schemas/Quote'
  */
-router.post('/:id/decline', validateUUID('id'), requireResourceAccess('quote'), quoteController.decline);
+router.post('/:id/decline', requireRole(['admin', 'staff']), validateUUID('id'), requireResourceAccess('quote', { allowStaff: true }), quoteController.decline);
+
+router.patch(
+  '/:id/site-notes',
+  requireRole(['staff']),
+  validateUUID('id'),
+  requireResourceAccess('quote', { allowStaff: true }),
+  requireFields(['notes']),
+  quoteController.updateSiteNotes
+);
 /**
  * @swagger
  * /api/quotes/{id}:
@@ -258,6 +269,6 @@ router.post('/:id/decline', validateUUID('id'), requireResourceAccess('quote'), 
  *       200:
  *         description: Quote deleted successfully
  */
-router.delete('/:id', validateUUID('id'), requireResourceAccess('quote'), quoteController.remove);
+router.delete('/:id', requireRole(['admin']), validateUUID('id'), requireResourceAccess('quote'), quoteController.remove);
 
 module.exports = router;

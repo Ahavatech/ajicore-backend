@@ -60,18 +60,20 @@ async function signup({ email, password }) {
     data: {
       email: normalizedEmail,
       password_hash,
+      role: 'admin',
       auth_provider: 'Email',
       onboarding_step: 2,
     },
   });
 
-  const token = generateToken(user);
+  const userContext = await resolveUserContextById(user.id);
+  const token = generateToken(userContext);
   logger.info(`New user registered (email): ${user.email}`);
 
   return {
     message: 'Account created successfully.',
     token,
-    user: sanitizeUser(user),
+    user: buildUserResponse(userContext),
     onboarding_step: 2,
   };
 }
@@ -91,13 +93,14 @@ async function googleSignup({ google_id, email, first_name, last_name }) {
 
   if (user) {
     // Existing Google user — sign them in
-    const token = generateToken(user);
+    const userContext = await resolveUserContextById(user.id);
+    const token = generateToken(userContext);
     logger.info(`Google user signed in: ${user.email}`);
     return {
       message: 'Signed in successfully.',
       token,
-      user: sanitizeUser(user),
-      onboarding_step: user.onboarding_step,
+      user: buildUserResponse(userContext),
+      onboarding_step: userContext.onboarding_step,
       is_new: false,
     };
   }
@@ -115,18 +118,20 @@ async function googleSignup({ google_id, email, first_name, last_name }) {
       google_id,
       first_name: first_name || null,
       last_name: last_name || null,
+      role: 'admin',
       auth_provider: 'Google',
       onboarding_step: 2,
     },
   });
 
-  const token = generateToken(user);
+  const userContext = await resolveUserContextById(user.id);
+  const token = generateToken(userContext);
   logger.info(`New user registered (Google): ${user.email}`);
 
   return {
     message: 'Account created successfully.',
     token,
-    user: sanitizeUser(user),
+    user: buildUserResponse(userContext),
     onboarding_step: 2,
     is_new: true,
   };
@@ -150,7 +155,7 @@ async function onboardingStep2(userId, data) {
 
   const result = await prisma.$transaction(async (tx) => {
     // Update user with name info
-    const user = await tx.user.update({
+    let user = await tx.user.update({
       where: { id: userId },
       data: {
         first_name,
@@ -188,6 +193,13 @@ async function onboardingStep2(userId, data) {
       });
     }
 
+    user = await tx.user.update({
+      where: { id: userId },
+      data: {
+        business_id: business.id,
+      },
+    });
+
     return { user, business };
   });
 
@@ -195,7 +207,7 @@ async function onboardingStep2(userId, data) {
 
   return {
     message: 'Organization contact info saved.',
-    user: sanitizeUser(result.user),
+    user: buildUserResponse(await resolveUserContextById(result.user.id)),
     business: sanitizeBusiness(result.business),
     onboarding_step: 3,
   };
@@ -348,7 +360,7 @@ async function onboardingStep3(userId, data) {
 
   return {
     message: 'AI business number provisioned.',
-    user: sanitizeUser(user),
+    user: buildUserResponse(await resolveUserContextById(user.id)),
     business: sanitizeBusiness(updatedBusiness),
     ai_phone_number: provisionedNumber.phoneNumber,
     twilio_phone_sid: provisionedNumber.sid,
@@ -369,7 +381,7 @@ async function skipStep3(userId) {
 
   return {
     message: 'AI number setup skipped.',
-    user: sanitizeUser(user),
+    user: buildUserResponse(await resolveUserContextById(user.id)),
     onboarding_step: 4,
   };
 }
@@ -423,7 +435,7 @@ async function onboardingStep4(userId, data) {
 
   return {
     message: 'Service setup saved.',
-    user: sanitizeUser(user),
+    user: buildUserResponse(await resolveUserContextById(user.id)),
     business: sanitizeBusiness(updatedBusiness),
     onboarding_step: 5,
   };
@@ -463,7 +475,7 @@ async function onboardingStep5(userId, data) {
 
   return {
     message: 'Account created successfully!',
-    user: sanitizeUser(user),
+    user: buildUserResponse(await resolveUserContextById(user.id)),
     business: sanitizeBusiness(updatedBusiness),
     ai_phone_number: updatedBusiness.ai_phone_number || null,
     onboarding_completed: true,
@@ -496,15 +508,16 @@ async function signin({ email, password }) {
     throw new AuthenticationError('Invalid email or password.');
   }
 
-  const token = generateToken(user);
+  const userContext = await resolveUserContextById(user.id);
+  const token = generateToken(userContext);
   logger.info(`User signed in: ${user.email}`);
 
   return {
     message: 'Signed in successfully.',
     token,
-    user: sanitizeUser(user),
-    onboarding_step: user.onboarding_step,
-    onboarding_completed: user.onboarding_completed,
+    user: buildUserResponse(userContext),
+    onboarding_step: userContext.onboarding_step,
+    onboarding_completed: userContext.onboarding_completed,
   };
 }
 
@@ -512,13 +525,9 @@ async function signin({ email, password }) {
  * Get user by ID (for authenticated /me endpoint).
  */
 async function getUserById(id) {
-  const user = await prisma.user.findUnique({
-    where: { id },
-    include: { businesses: true },
-  });
-
+  const user = await resolveUserContextById(id);
   if (!user) return null;
-  return { ...sanitizeUser(user), businesses: user.businesses.map(sanitizeBusiness) };
+  return buildUserResponse(user);
 }
 
 async function forgotPassword(email) {
@@ -781,7 +790,7 @@ async function verifyOtp(userId, { otp }) {
 
   return {
     message: 'Phone number verified successfully.',
-    user: sanitizeUser(updatedUser),
+    user: buildUserResponse(await resolveUserContextById(updatedUser.id)),
     onboarding_step: 3,
   };
 }
@@ -799,7 +808,7 @@ async function skipOtp(userId) {
 
   return {
     message: 'Phone verification skipped.',
-    user: sanitizeUser(user),
+    user: buildUserResponse(await resolveUserContextById(user.id)),
     onboarding_step: 3,
   };
 }
@@ -810,7 +819,13 @@ async function skipOtp(userId) {
 
 function generateToken(user) {
   return jwt.sign(
-    { id: user.id, email: user.email },
+    {
+      id: user.id,
+      email: user.email,
+      role: user.role || 'admin',
+      business_id: user.business_id || null,
+      staff_id: user.staff_id || null,
+    },
     env.JWT_SECRET,
     { expiresIn: env.JWT_EXPIRES_IN || '7d' }
   );
@@ -819,6 +834,63 @@ function generateToken(user) {
 function sanitizeUser(user) {
   const { password_hash, phone_otp, phone_otp_expires_at, ...safe } = user;
   return safe;
+}
+
+async function resolveUserContextById(id) {
+  const user = await prisma.user.findUnique({
+    where: { id },
+    include: {
+      business: true,
+      staff_profile: true,
+      owned_businesses: true,
+    },
+  });
+
+  if (!user) return null;
+
+  const derivedBusinessId = user.business_id
+    || user.business?.id
+    || user.staff_profile?.business_id
+    || user.owned_businesses?.[0]?.id
+    || null;
+  const derivedStaffId = user.staff_id || user.staff_profile?.id || null;
+  const derivedRole = user.role || (derivedStaffId ? 'staff' : 'admin');
+
+  return {
+    ...user,
+    role: derivedRole,
+    business_id: derivedBusinessId,
+    staff_id: derivedStaffId,
+  };
+}
+
+function buildUserResponse(user) {
+  const safeUser = sanitizeUser(user);
+  const {
+    business,
+    staff_profile,
+    owned_businesses,
+    ...rest
+  } = safeUser;
+
+  return {
+    ...rest,
+    role: user.role || 'admin',
+    business_id: user.business_id || null,
+    staff_id: user.staff_id || null,
+    businesses: Array.isArray(owned_businesses)
+      ? owned_businesses.map(sanitizeBusiness)
+      : [],
+    staff_profile: staff_profile
+      ? {
+          id: staff_profile.id,
+          business_id: staff_profile.business_id,
+          name: staff_profile.name,
+          role: staff_profile.role,
+          current_status: staff_profile.current_status,
+        }
+      : null,
+  };
 }
 
 function sanitizeBusiness(business) {

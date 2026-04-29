@@ -10,6 +10,7 @@ async function getAll(req, res, next) {
       status,
       customer_id,
       assigned_staff_id,
+      staff_id,
       start_date,
       end_date,
       search,
@@ -17,11 +18,14 @@ async function getAll(req, res, next) {
       limit = 20,
     } = req.query;
     if (!business_id) return res.status(400).json({ error: 'business_id is required' });
+    const scopedStaffId = req.user.role === 'staff'
+      ? req.user.staff_id
+      : (staff_id || assigned_staff_id);
     const result = await quoteService.getQuotes({
       business_id,
       status,
       customer_id,
-      assigned_staff_id,
+      assigned_staff_id: scopedStaffId,
       start_date,
       end_date,
       search,
@@ -36,7 +40,10 @@ async function getById(req, res, next) {
   try {
     const quote = await quoteService.getById(req.params.id);
     if (!quote) return res.status(404).json({ error: 'Quote not found' });
-    res.json({ ...quote, data: quote });
+    const payload = req.user.role === 'staff' && quote.is_estimate_appointment
+      ? quoteService.redactFinancialFieldsForStaff(quote)
+      : quote;
+    res.json({ ...payload, data: payload });
   } catch (err) { next(err); }
 }
 
@@ -77,7 +84,25 @@ async function convert(req, res, next) {
 
 async function decline(req, res, next) {
   try {
-    const quote = await quoteService.declineQuote(req.params.id, req.body.reason);
+    const quote = await quoteService.declineQuote(
+      req.params.id,
+      req.body.reason,
+      { unassignOnDecline: req.user.role === 'staff' }
+    );
+    res.json(quote);
+  } catch (err) { next(err); }
+}
+
+async function accept(req, res, next) {
+  try {
+    const quote = await quoteService.acceptEstimateAppointment(req.params.id);
+    res.json(quote);
+  } catch (err) { next(err); }
+}
+
+async function updateSiteNotes(req, res, next) {
+  try {
+    const quote = await quoteService.updateSiteNotes(req.params.id, req.body.notes);
     res.json(quote);
   } catch (err) { next(err); }
 }
@@ -89,4 +114,4 @@ async function remove(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { getAll, getById, create, update, sendQuote, approve, convert, decline, remove };
+module.exports = { getAll, getById, create, update, sendQuote, approve, accept, convert, decline, updateSiteNotes, remove };

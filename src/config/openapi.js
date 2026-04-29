@@ -1,6 +1,8 @@
 const swaggerSpec = require('./swagger');
 const { aiPaths, extraSchemas, buildAiOpenApiSpec } = require('../../scripts/export-ai-api');
 
+const OPENAPI_JSON_PATH = '/api/docs.json';
+
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -51,6 +53,20 @@ function getOpenApiSpec() {
 
 function getAiOpenApiSpec() {
   return buildAiOpenApiSpec();
+}
+
+function getOpenApiDocumentUrl() {
+  return OPENAPI_JSON_PATH;
+}
+
+function getSwaggerUiOptions(specUrl = OPENAPI_JSON_PATH) {
+  return {
+    customSiteTitle: 'Ajicore API Docs',
+    customCss: '.swagger-ui .topbar { display: none }',
+    swaggerOptions: {
+      url: specUrl,
+    },
+  };
 }
 
 function renderScalarHtml(specUrl) {
@@ -158,5 +174,7 @@ function renderScalarHtml(specUrl) {
 module.exports = {
   getOpenApiSpec,
   getAiOpenApiSpec,
+  getOpenApiDocumentUrl,
+  getSwaggerUiOptions,
   renderScalarHtml,
 };
