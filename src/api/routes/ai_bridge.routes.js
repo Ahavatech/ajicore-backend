@@ -1,11 +1,13 @@
 /**
  * AI Bridge Routes
- * Internal API for the AI service plus provider-facing inbound webhook entrypoints.
+ * Internal API exposed to the AI service. Twilio webhooks are handled
+ * directly by the AI service at api.myajicore.com — the backend never
+ * sees inbound calls or SMS.
  *
  * @swagger
  * tags:
  *   name: AI Bridge
- *   description: Internal AI service endpoints and inbound provider webhooks
+ *   description: Internal AI service endpoints
  */
 const { Router } = require('express');
 const {
@@ -20,7 +22,6 @@ const quoteController = require('../../domains/quotes/quote.controller');
 const materialController = require('../../domains/inventory/material.controller');
 const customerController = require('../../domains/customers/customer.controller');
 const smsController = require('../../domains/communications/sms.controller');
-const aiIngressService = require('../../domains/communications/ai_ingress.service');
 const staffController = require('../../domains/team/staff.controller');
 const billingController = require('../../domains/billing/invoice.controller');
 const followUpController = require('../../domains/follow_ups/follow_up.controller');
@@ -41,15 +42,6 @@ const router = Router();
 
 function withAiAlias(primaryPath, legacyPath) {
   return legacyPath ? [primaryPath, legacyPath] : primaryPath;
-}
-
-function escapeXml(value = '') {
-  return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
 }
 
 function withInternalBusinessIdInQuery(handler) {
@@ -175,135 +167,6 @@ async function getBusinessConfig(req, res, next) {
     });
   } catch (err) { next(err); }
 }
-
-// ============================================
-// Provider-Facing Inbound Webhooks
-// ============================================
-
-/**
- * @swagger
- * /api/internal/ai/sms/incoming:
- *   post:
- *     summary: Receive inbound SMS from a provider webhook
- *     tags: [AI Bridge]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/AIBridgeInboundSmsInput'
- *     responses:
- *       200:
- *         description: Inbound SMS accepted and routed
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/AIBridgeWebhookResponse'
- */
-router.post(withAiAlias('/ai/sms/incoming', '/sms/incoming'), async (req, res, next) => {
-  try {
-    const result = await aiIngressService.handleInboundSms(req.body);
-    const isTwilioWebhook = Boolean(req.body?.Body || req.body?.From || req.body?.To);
-
-    if (isTwilioWebhook) {
-      res.set('Content-Type', 'text/xml');
-      return res.send(`
-        <Response>
-          <Message>${escapeXml(result.ai_reply)}</Message>
-        </Response>
-      `);
-    }
-
-    res.json({
-      success: true,
-      business_id: result.business.id,
-      customer_id: result.customer?.id || null,
-      reply: result.ai_reply,
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
-/**
- * @swagger
- * /api/internal/ai/calls/incoming:
- *   post:
- *     summary: Receive an inbound call event from a provider webhook
- *     tags: [AI Bridge]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/AIBridgeInboundCallInput'
- *     responses:
- *       200:
- *         description: Inbound call accepted and routed
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/AIBridgeWebhookResponse'
- */
-router.post(withAiAlias('/ai/calls/incoming', '/calls/incoming'), async (req, res, next) => {
-  try {
-    const result = await aiIngressService.handleInboundCall(req.body);
-    const isTwilioWebhook = Boolean(req.body?.CallSid || req.body?.From || req.body?.To);
-
-    if (isTwilioWebhook) {
-      res.set('Content-Type', 'text/xml');
-      return res.send(`
-        <Response>
-          <Say>${escapeXml(result.ai_response?.message || 'Please hold while we process your call.')}</Say>
-        </Response>
-      `);
-    }
-
-    res.json({
-      success: true,
-      business_id: result.business.id,
-      customer_id: result.customer?.id || null,
-      data: result.ai_response,
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
-/**
- * @swagger
- * /api/internal/ai/calls/status:
- *   post:
- *     summary: Receive call status updates from a provider webhook
- *     tags: [AI Bridge]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/AIBridgeCallStatusInput'
- *     responses:
- *       200:
- *         description: Call status accepted
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/AIBridgeWebhookResponse'
- */
-router.post(withAiAlias('/ai/calls/status', '/calls/status'), async (req, res, next) => {
-  try {
-    const result = await aiIngressService.handleCallStatus(req.body);
-    res.json({
-      success: true,
-      business_id: result.business.id,
-      customer_id: result.customer?.id || null,
-      status: result.status,
-      call_sid: result.call_sid || null,
-    });
-  } catch (err) {
-    next(err);
-  }
-});
 
 // ============================================
 // Protected Internal AI Routes
