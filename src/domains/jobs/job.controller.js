@@ -5,6 +5,14 @@
 const jobService = require('./job.service');
 const scheduleService = require('./schedule.service');
 
+function getRequestUserRole(req) {
+  return req.user?.role || null;
+}
+
+function getRequestStaffId(req) {
+  return req.user?.staff_id || null;
+}
+
 async function getAllJobs(req, res, next) {
   try {
     const {
@@ -20,8 +28,8 @@ async function getAllJobs(req, res, next) {
       page = 1,
       limit = 20,
     } = req.query;
-    const scopedStaffId = req.user.role === 'staff'
-      ? req.user.staff_id
+    const scopedStaffId = getRequestUserRole(req) === 'staff'
+      ? getRequestStaffId(req)
       : (staff_id || assigned_staff_id);
     const jobs = await jobService.getJobs({
       business_id,
