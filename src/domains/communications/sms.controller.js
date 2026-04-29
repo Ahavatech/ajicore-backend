@@ -1,37 +1,9 @@
 /**
- * SMS Controller
- * Handles incoming Twilio webhooks and outbound SMS routing.
+ * SMS Controller — outbound SMS only.
+ * Inbound SMS is handled by the AI service at api.myajicore.com.
  */
 const notificationService = require('./notification.service');
-const logger = require('../../utils/logger');
 
-/**
- * Twilio webhook handler for incoming SMS.
- * Receives the text, routes it to the AI service, and responds.
- */
-async function handleIncomingSms(req, res, next) {
-  try {
-    const { From, Body } = req.body;
-    logger.info(`Incoming SMS from ${From}: ${Body}`);
-
-    // Route to AI service for processing
-    const aiResponse = await notificationService.routeToAI(From, Body);
-
-    // Send response back via Twilio TwiML
-    res.set('Content-Type', 'text/xml');
-    res.send(`
-      <Response>
-        <Message>${aiResponse}</Message>
-      </Response>
-    `);
-  } catch (err) {
-    next(err);
-  }
-}
-
-/**
- * Send an outbound SMS notification.
- */
 async function sendSms(req, res, next) {
   try {
     const { business_id, to, message, customer_id, customer_name, job_id } = req.body;
@@ -42,4 +14,4 @@ async function sendSms(req, res, next) {
   }
 }
 
-module.exports = { handleIncomingSms, sendSms };
+module.exports = { sendSms };

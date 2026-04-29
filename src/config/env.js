@@ -67,7 +67,7 @@ const env = {
   TWILIO_MESSAGING_SERVICE_SID: process.env.TWILIO_MESSAGING_SERVICE_SID,
   TWILIO_NUMBER_COUNTRY_CODE: process.env.TWILIO_NUMBER_COUNTRY_CODE || 'US',
   TWILIO_SMS_WEBHOOK_URL: process.env.TWILIO_SMS_WEBHOOK_URL || 'https://api.myajicore.com/webhooks/sms/inbound',
-  TWILIO_VOICE_WEBHOOK_URL: process.env.TWILIO_VOICE_WEBHOOK_URL || 'https://api.myajicore.com/webhooks/call/inbound',
+  TWILIO_VOICE_WEBHOOK_URL: process.env.TWILIO_VOICE_WEBHOOK_URL || 'https://api.myajicore.com/webhooks/call/connect',
   TWILIO_STATUS_CALLBACK_URL: process.env.TWILIO_STATUS_CALLBACK_URL,
 
   // AI Service
