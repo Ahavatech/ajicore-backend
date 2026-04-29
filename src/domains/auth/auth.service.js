@@ -832,8 +832,12 @@ function getTwilioClient() {
   try {
     const twilio = require('twilio');
     return twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
-  } catch (_err) {
-    throw new ValidationError('Twilio SDK is not installed. Run npm install to add the twilio package.');
+  } catch (err) {
+    logger.error(`Twilio SDK load failed: ${err.code || 'UNKNOWN'} ${err.message}`, {
+      stack: err.stack,
+      requirePaths: require.resolve.paths('twilio'),
+    });
+    throw new ValidationError(`Twilio SDK load failed: ${err.code || err.message}`);
   }
 }
 

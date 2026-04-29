@@ -14,7 +14,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate && node -e \"try{require.resolve('twilio');console.log('[postinstall] twilio resolved at',require.resolve('twilio'))}catch(e){console.error('[postinstall] twilio NOT resolvable:',e.code,e.message)}\""
   },
   "keywords": [
     "service-business",
