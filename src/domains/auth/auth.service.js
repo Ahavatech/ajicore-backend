@@ -833,7 +833,7 @@ function getTwilioClient() {
     const twilio = require('twilio');
     return twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
   } catch (_err) {
-    throw new ValidationError('Twilio SDK is not installed. Run npm install to add the twilio package.');
+    throw new ValidationError('Twilio credentials are not configured.');
   }
 }
 
