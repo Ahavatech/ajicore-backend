@@ -3,6 +3,14 @@
  */
 const quoteService = require('./quote.service');
 
+function getRequestUserRole(req) {
+  return req.user?.role || null;
+}
+
+function getRequestStaffId(req) {
+  return req.user?.staff_id || null;
+}
+
 async function getAll(req, res, next) {
   try {
     const {
@@ -18,8 +26,9 @@ async function getAll(req, res, next) {
       limit = 20,
     } = req.query;
     if (!business_id) return res.status(400).json({ error: 'business_id is required' });
-    const scopedStaffId = req.user.role === 'staff'
-      ? req.user.staff_id
+    const role = getRequestUserRole(req);
+    const scopedStaffId = role === 'staff'
+      ? getRequestStaffId(req)
       : (staff_id || assigned_staff_id);
     const result = await quoteService.getQuotes({
       business_id,
@@ -40,7 +49,7 @@ async function getById(req, res, next) {
   try {
     const quote = await quoteService.getById(req.params.id);
     if (!quote) return res.status(404).json({ error: 'Quote not found' });
-    const payload = req.user.role === 'staff' && quote.is_estimate_appointment
+    const payload = getRequestUserRole(req) === 'staff' && quote.is_estimate_appointment
       ? quoteService.redactFinancialFieldsForStaff(quote)
       : quote;
     res.json({ ...payload, data: payload });
@@ -87,7 +96,7 @@ async function decline(req, res, next) {
     const quote = await quoteService.declineQuote(
       req.params.id,
       req.body.reason,
-      { unassignOnDecline: req.user.role === 'staff' }
+      { unassignOnDecline: getRequestUserRole(req) === 'staff' }
     );
     res.json(quote);
   } catch (err) { next(err); }
