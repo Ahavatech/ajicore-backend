@@ -25,6 +25,10 @@
   ],
   "author": "Ajicore Team",
   "license": "ISC",
+  "packageManager": "pnpm@10.15.0",
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "@google-cloud/storage": "^7.0.0",
     "@prisma/client": "^6.19.2",
