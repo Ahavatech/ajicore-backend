@@ -4,6 +4,7 @@
   "description": "A comprehensive backend platform for service businesses — scheduling, invoicing, bookkeeping, inventory, and fleet tracking.",
   "main": "src/server.js",
   "scripts": {
+    "prestart": "prisma migrate deploy",
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "jest --runInBand",
