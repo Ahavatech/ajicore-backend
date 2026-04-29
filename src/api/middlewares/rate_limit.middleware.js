@@ -78,10 +78,11 @@ function rateLimit(options = {}) {
         method: req.method,
       });
 
-      throw new RateLimitError(
+      const err = new RateLimitError(
         `Rate limit exceeded. Try again in ${retryAfter} seconds.`,
         retryAfter
       );
+      return next(err);
     }
 
     // Increment counter
