@@ -241,8 +241,11 @@ async function getAvailableNumbers({ type, city, area_code }) {
       ? await availablePhoneNumbers.tollFree.list(searchParams)
       : await availablePhoneNumbers.local.list(searchParams);
   } catch (err) {
-    logger.error(`Twilio available number lookup failed: ${err.message}`);
-    throw new ValidationError('Unable to fetch available Twilio phone numbers right now.');
+    logger.error(`Twilio available number lookup failed: code=${err.code} status=${err.status} ${err.message}`, {
+      moreInfo: err.moreInfo,
+      stack: err.stack,
+    });
+    throw new ValidationError(`Twilio lookup failed: ${err.code || err.status || 'UNKNOWN'} ${err.message}`);
   }
 
   const numbers = incomingNumbers.map((record) => ({
