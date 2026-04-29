@@ -241,8 +241,11 @@ async function getAvailableNumbers({ type, city, area_code }) {
       ? await availablePhoneNumbers.tollFree.list(searchParams)
       : await availablePhoneNumbers.local.list(searchParams);
   } catch (err) {
-    logger.error(`Twilio available number lookup failed: ${err.message}`);
-    throw new ValidationError('Unable to fetch available Twilio phone numbers right now.');
+    logger.error(`Twilio available number lookup failed: code=${err.code} status=${err.status} ${err.message}`, {
+      moreInfo: err.moreInfo,
+      stack: err.stack,
+    });
+    throw new ValidationError(`Twilio lookup failed: ${err.code || err.status || 'UNKNOWN'} ${err.message}`);
   }
 
   const numbers = incomingNumbers.map((record) => ({
@@ -825,15 +828,45 @@ function sanitizeBusiness(business) {
 }
 
 function getTwilioClient() {
-  if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN) {
+  const accountSidRaw = String(env.TWILIO_ACCOUNT_SID || '').trim();
+  const authToken = env.TWILIO_AUTH_TOKEN;
+  const apiKeySid = String(env.TWILIO_API_KEY_SID || '').trim();
+  const apiKeySecret = env.TWILIO_API_KEY_SECRET;
+
+  // Auto-detect: someone may have stored an API Key SID (SK...) under TWILIO_ACCOUNT_SID
+  // and the master Account SID under TWILIO_AUTH_TOKEN-equivalent envs. Normalize.
+  const looksLikeApiKey = (sid) => /^SK[a-zA-Z0-9]{32}$/.test(sid);
+  const looksLikeAccountSid = (sid) => /^AC[a-zA-Z0-9]{32}$/.test(sid);
+
+  let credentials;
+
+  if (apiKeySid && apiKeySecret && looksLikeAccountSid(accountSidRaw)) {
+    credentials = { sid: apiKeySid, secret: apiKeySecret, accountSid: accountSidRaw };
+  } else if (looksLikeApiKey(accountSidRaw) && authToken && looksLikeAccountSid(apiKeySid)) {
+    credentials = { sid: accountSidRaw, secret: authToken, accountSid: apiKeySid };
+  } else if (looksLikeAccountSid(accountSidRaw) && authToken) {
+    credentials = { sid: accountSidRaw, secret: authToken };
+  } else if (!accountSidRaw && !apiKeySid) {
     throw new ValidationError('Twilio credentials are not configured.');
+  } else {
+    throw new ValidationError(
+      'Twilio credentials are misconfigured. Set either '
+      + '(TWILIO_ACCOUNT_SID=AC... + TWILIO_AUTH_TOKEN) or '
+      + '(TWILIO_API_KEY_SID=SK... + TWILIO_API_KEY_SECRET + TWILIO_ACCOUNT_SID=AC...).'
+    );
   }
 
   try {
     const twilio = require('twilio');
-    return twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
-  } catch (_err) {
-    throw new ValidationError('Twilio credentials are not configured.');
+    if (credentials.accountSid) {
+      return twilio(credentials.sid, credentials.secret, { accountSid: credentials.accountSid });
+    }
+    return twilio(credentials.sid, credentials.secret);
+  } catch (err) {
+    logger.error(`Twilio SDK load failed: ${err.code || 'UNKNOWN'} ${err.message}`, {
+      stack: err.stack,
+    });
+    throw new ValidationError(`Twilio SDK load failed: ${err.code || err.message}`);
   }
 }
 

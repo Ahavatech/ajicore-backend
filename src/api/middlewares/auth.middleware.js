@@ -9,6 +9,10 @@ const logger = require('../../utils/logger');
 const { verifyToken } = require('../../domains/auth/auth.service');
 const { AuthorizationError, NotFoundError, ValidationError } = require('../../utils/errors');
 
+// TEMPORARY: hard-coded fallback for testing while Render env vars are misconfigured.
+// TODO: remove and rotate once INTERNAL_API_KEY / AI_SERVICE_API_KEY are set on Render.
+const HARDCODED_FALLBACK_API_KEY = 'k9pZ4mX7qW2vR8tL6nB1cY5sH0jF3dA';
+
 
 const resourceResolvers = {
   customer: (id) => prisma.customer.findUnique({ where: { id }, select: { id: true, business_id: true } }),
@@ -197,7 +201,7 @@ function requireInternalResourceAccess(resource, options = {}) {
  */
 function requireInternalApiKey(req, res, next) {
   const apiKey = getTokenHeader(req, 'x-api-key');
-  const expected = env.INTERNAL_API_KEY;
+  const expected = env.INTERNAL_API_KEY || HARDCODED_FALLBACK_API_KEY;
 
   if (!safeTokenMatch(expected, apiKey)) {
     logger.warn('Unauthorized internal API access attempt', {
