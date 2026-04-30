@@ -1574,6 +1574,50 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             updatedAt: { type: 'string', format: 'date-time' },
           },
         },
+        AIChatMessage: {
+          type: 'object',
+          required: ['role', 'content'],
+          properties: {
+            role: {
+              type: 'string',
+              enum: ['system', 'user', 'assistant'],
+            },
+            content: {
+              type: 'string',
+            },
+          },
+        },
+        AIChatRequest: {
+          type: 'object',
+          required: ['business_id', 'message', 'history'],
+          properties: {
+            business_id: {
+              type: 'string',
+              description: 'Business UUID used to scope database context.',
+            },
+            message: {
+              type: 'string',
+              description: 'New user message.',
+            },
+            history: {
+              type: 'array',
+              description: 'Previous chat history sent by the frontend.',
+              items: {
+                $ref: '#/components/schemas/AIChatMessage',
+              },
+            },
+          },
+        },
+        AIChatResponse: {
+          type: 'object',
+          required: ['reply'],
+          properties: {
+            reply: {
+              type: 'string',
+              description: 'Final assistant response.',
+            },
+          },
+        },
         TwilioAvailableNumber: {
           type: 'object',
           properties: {
@@ -1671,6 +1715,7 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
       { name: 'Reports', description: 'Aggregated analytics endpoints for dashboards and leaderboards' },
       { name: 'Upload', description: 'Universal file upload endpoint' },
       { name: 'Bookkeeping', description: 'Transactions, summaries, categorization, and rules' },
+      { name: 'AI', description: 'Frontend AI assistant endpoints' },
       { name: 'AI Logs', description: 'AI event log inspection and manual event creation' },
       { name: 'AI Bridge', description: 'Internal AI service API (x-api-key required; business-scoped routes also require x-business-token)' },
     ],
