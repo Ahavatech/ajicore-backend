@@ -204,6 +204,7 @@ model Business {
   twilio_phone_friendly_name String?
   ai_receptionist_name      String?
   voice_gender              VoiceGender?
+  is_phone_verified         Boolean                @default(false)
 
   // Service Configuration (Onboarding)
   ai_business_description   String?
@@ -282,6 +283,7 @@ model PriceBookItem {
   price_min                Float?
   price_max                Float?
   visit_type               VisitType @default(FreeEstimate)
+  service_cost             Float?    @default(0)
   service_call_fee         Float?
   labor_time               String?
   labor_cost               Float?
@@ -399,6 +401,7 @@ model Quote {
   title                   String?
   service_name            String?
   service_category        String?
+  custom_category_name    String?
   contract_type           Json?
   warranty_due            DateTime?
   description             String?
@@ -468,8 +471,19 @@ model Job {
   actual_start_time    DateTime?
   actual_end_time      DateTime?
   photos_urls          Json?
-  line_items           Json?    // Array of {price_book_id, quantity, price, name}
-  is_emergency         Boolean   @default(false)
+  materials            Json?           // Array of {name, qty, rate, price}
+  tools                Json?           // Array of {name, qty, rate, price}
+  labor_time           String?
+  labor_cost           Float?
+  subtotal             Float?
+  discount_percent     Float?
+  discount_amount      Float?
+  tax_percent          Float?
+  tax_amount           Float?
+  total_amount         Float?
+  notes                String?
+  line_items           Json?           // Array of {price_book_id, quantity, price, name}
+  is_emergency         Boolean         @default(false)
   source               JobSource @default(Manual)
   from_quote_id        String?
   createdAt            DateTime  @default(now())
@@ -499,6 +513,7 @@ model Invoice {
   status                InvoiceStatus @default(Draft)
   service_name          String?
   service_category      String?
+  custom_category_name  String?
   contract_type         Json?
   warranty_due          DateTime?
   description           String?
@@ -877,13 +892,18 @@ model BusinessFinanceSettings {
 model BookkeepingTransaction {
   id          String   @id @default(uuid())
   business_id String
-  source      String   // "fleet", "job", "invoice", "manual"
+  vendor      String?
+  source      String   // "fleet", "job", "invoice", "manual", "plaid", "quickbooks"
   is_income   Boolean  @default(false)
   amount      Float
-  category    String   // "Fleet & Operations", "Labor", "Materials", etc.
+  category    String?  // nullable to allow uncategorized transactions
   description String?
+  raw_description String?
   reference_id String?  // ID of related fleet repair, job, etc.
   transaction_date DateTime @default(now())
+  receipt_url String?
+  notes       String?
+  tags        Json?    // Array of {name, color}
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

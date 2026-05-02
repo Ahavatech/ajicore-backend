@@ -82,7 +82,8 @@ router.get('/:id', validateUUID('id'), requireResourceAccess('priceBookItem'), p
  *               price: {type: number}
  *               price_min: {type: number}
  *               price_max: {type: number}
- *               visit_type: {type: string, enum: [FreeEstimate, PaidServiceCall]}
+ *               visit_type: {type: string, enum: ['Free estimate', 'Paid service call'], nullable: true}
+ *               service_cost: {type: number}
  *               service_call_fee: {type: number}
  */
 router.post('/', requireFields(['business_id', 'name']), requireBusinessAccess('body'), pbController.createItem);

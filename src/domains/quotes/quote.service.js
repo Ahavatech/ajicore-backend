@@ -61,6 +61,13 @@ function parseEstimateWindow(dateValue, timeRange) {
     throw new ValidationError('scheduled_estimate_date must be a valid date.');
   }
 
+  const singleTimeMatch = String(timeRange).trim().match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  if (singleTimeMatch) {
+    const start = new Date(baseDate);
+    start.setUTCHours(Number(singleTimeMatch[1]), Number(singleTimeMatch[2]), 0, 0);
+    return { start, end: null };
+  }
+
   const [startRaw, endRaw] = String(timeRange).split('-').map((part) => part.trim());
   const endPeriod = (endRaw || '').toLowerCase().match(/\b(am|pm)\b/)?.[1];
   const startPeriod = (startRaw || '').toLowerCase().match(/\b(am|pm)\b/)?.[1] || endPeriod;
@@ -68,14 +75,14 @@ function parseEstimateWindow(dateValue, timeRange) {
   const endTime = parseTimeToken(endRaw, endPeriod || startPeriod);
 
   if (!startTime || !endTime) {
-    throw new ValidationError('scheduled_estimate_time must be a range like "10:00 - 11:00 am".');
+    throw new ValidationError('scheduled_estimate_time must be either HH:MM (24-hour) or a range like "10:00 - 11:00 am".');
   }
 
   const start = new Date(baseDate);
-  start.setHours(startTime.hour, startTime.minute, 0, 0);
+  start.setUTCHours(startTime.hour, startTime.minute, 0, 0);
   const end = new Date(baseDate);
-  end.setHours(endTime.hour, endTime.minute, 0, 0);
-  if (end <= start) end.setDate(end.getDate() + 1);
+  end.setUTCHours(endTime.hour, endTime.minute, 0, 0);
+  if (end <= start) end.setUTCDate(end.getUTCDate() + 1);
 
   return { start, end };
 }
@@ -165,7 +172,10 @@ function buildQuoteData(data, existing = null) {
   let schedule = { start: null, end: null };
   const estimateDate = data.scheduled_estimate_date ?? existing?.scheduled_estimate_date;
   const estimateTime = data.scheduled_estimate_time ?? existing?.scheduled_estimate_time;
-  if (isAppointment || data.scheduled_estimate_time !== undefined) {
+  const shouldApplySchedule = isAppointment
+    || data.scheduled_estimate_time !== undefined
+    || data.scheduled_estimate_date !== undefined;
+  if (shouldApplySchedule) {
     schedule = parseEstimateWindow(estimateDate, estimateTime);
   }
 
@@ -176,15 +186,18 @@ function buildQuoteData(data, existing = null) {
     title: data.service_name ?? data.title ?? undefined,
     service_name: data.service_name ?? undefined,
     service_category: data.service_category ?? undefined,
+    custom_category_name: data.custom_category_name ?? undefined,
     contract_type: data.contract_type ?? undefined,
     warranty_due: data.warranty_due ? new Date(data.warranty_due) : undefined,
     description: data.description ?? undefined,
     photos: data.photos ?? undefined,
     price_book_item_id: data.price_book_item_id ?? undefined,
-    scheduled_estimate_date: data.scheduled_estimate_date ? new Date(data.scheduled_estimate_date) : undefined,
-    scheduled_estimate_time: data.scheduled_estimate_time ?? undefined,
-    scheduled_start_time: schedule.start || undefined,
-    scheduled_end_time: schedule.end || undefined,
+    scheduled_estimate_date: data.scheduled_estimate_date === null
+      ? null
+      : (data.scheduled_estimate_date ? new Date(data.scheduled_estimate_date) : undefined),
+    scheduled_estimate_time: data.scheduled_estimate_time !== undefined ? data.scheduled_estimate_time : undefined,
+    scheduled_start_time: shouldApplySchedule ? schedule.start : undefined,
+    scheduled_end_time: shouldApplySchedule ? schedule.end : undefined,
     notes: data.notes ?? undefined,
     site_notes: data.site_notes ?? undefined,
     decline_reason: data.decline_reason ?? undefined,
@@ -309,7 +322,7 @@ async function create(data) {
       business_id: data.business_id,
       customer_id: data.customer_id,
       quote_number: data.quote_number || await nextQuoteNumber(data.business_id),
-      status: quoteData.status || (data.is_estimate_appointment ? 'Draft' : 'Draft'),
+      status: quoteData.status || (data.is_estimate_appointment ? 'Appointment' : 'Draft'),
       ...quoteData,
     },
     include: { customer: true, assigned_staff: true },
@@ -525,16 +538,30 @@ async function declineQuote(id, reason, options = {}) {
   return quoteListRow(quote);
 }
 
-async function updateSiteNotes(id, notes) {
+async function updateSiteNotes(id, data) {
   const quote = await prisma.quote.findUnique({
     where: { id },
     include: { customer: true, assigned_staff: true },
   });
   if (!quote) throw new NotFoundError('Quote');
 
+  // Extract notes and photos from data
+  const notes = typeof data === 'string' ? data : data.notes;
+  const photos = (typeof data === 'object' && data.photos) ? data.photos : undefined;
+
+  const updateData = {};
+  if (notes !== undefined) {
+    updateData.site_notes = notes || null;
+  }
+  if (photos !== undefined) {
+    // Staff uploads append onto the existing photo gallery for the estimate.
+    const existingPhotos = quote.photos || [];
+    updateData.photos = [...(Array.isArray(existingPhotos) ? existingPhotos : []), ...(Array.isArray(photos) ? photos : [])];
+  }
+
   const updated = await prisma.quote.update({
     where: { id },
-    data: { site_notes: notes || null },
+    data: updateData,
     include: { customer: true, assigned_staff: true },
   });
 

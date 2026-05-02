@@ -28,6 +28,7 @@ const PROFILE_FIELDS = [
   'ai_receptionist_name',
   'voice_gender',
   'ai_business_description',
+  'is_phone_verified',
   'unknown_service_handling',
   'unknown_service_call_fee',
 ];
@@ -89,6 +90,7 @@ function buildProfilePayload(business) {
       ai_receptionist_name: business.ai_receptionist_name || '',
       voice_gender: business.voice_gender || null,
       ai_business_description: business.ai_business_description || '',
+      is_phone_verified: business.is_phone_verified ?? false,
       unknown_service_handling: business.unknown_service_handling,
       unknown_service_call_fee: business.unknown_service_call_fee ?? null,
     },
@@ -140,6 +142,10 @@ async function updateProfile(data) {
     throw new ValidationError('business_id is required.');
   }
 
+  if (data.profile !== undefined && (typeof data.profile !== 'object' || data.profile === null || Array.isArray(data.profile))) {
+    throw new ValidationError('profile must be an object.');
+  }
+
   const updateData = {};
   const source = data.profile && typeof data.profile === 'object'
     ? { ...data.profile, ...data }
@@ -147,7 +153,9 @@ async function updateProfile(data) {
 
   for (const field of PROFILE_FIELDS) {
     if (source[field] !== undefined) {
-      updateData[field] = source[field];
+      updateData[field] = field === 'logo_url'
+        ? (source[field] || null)
+        : source[field];
     }
   }
 

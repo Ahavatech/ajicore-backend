@@ -76,6 +76,11 @@ router.get('/plaid/link-token', requireFields(['business_id'], 'query'), require
  *             properties:
  *               business_id:
  *                 type: string
+ *               transactions:
+ *                 type: array
+ *                 description: Optional QuickBooks transaction payloads to persist as uncategorized bookkeeping entries.
+ *                 items:
+ *                   type: object
  *     responses:
  *       200:
  *         description: QuickBooks sync queued

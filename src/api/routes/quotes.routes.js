@@ -244,12 +244,48 @@ router.post('/:id/convert', requireRole(['admin']), validateUUID('id'), requireR
  */
 router.post('/:id/decline', requireRole(['admin', 'staff']), validateUUID('id'), requireResourceAccess('quote', { allowStaff: true }), quoteController.decline);
 
+/**
+ * @swagger
+ * /api/quotes/{id}/site-notes:
+ *   patch:
+ *     summary: Update estimate site notes and append uploaded photo URLs
+ *     tags: [Quotes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               notes:
+ *                 type: string
+ *                 description: Updated site notes text.
+ *               photos:
+ *                 type: array
+ *                 description: New photo URLs to append to the current quote photo array.
+ *                 items:
+ *                   type: string
+ *                   format: uri
+ *     responses:
+ *       200:
+ *         description: Site notes updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Quote'
+ */
 router.patch(
   '/:id/site-notes',
   requireRole(['staff']),
   validateUUID('id'),
   requireResourceAccess('quote', { allowStaff: true }),
-  requireFields(['notes']),
   quoteController.updateSiteNotes
 );
 /**

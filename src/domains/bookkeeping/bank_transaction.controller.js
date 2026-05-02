@@ -42,6 +42,15 @@ async function bulkCreate(req, res, next) {
   }
 }
 
+async function importTransactions(req, res, next) {
+  try {
+    const result = await txService.importTransactionsFromFileUrl(req.body);
+    res.status(201).json({ success: true, ...result });
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function categorize(req, res, next) {
   try {
     const tx = await txService.categorize(req.params.id, req.body.category, req.body.confidence);
@@ -79,4 +88,4 @@ async function summary(req, res, next) {
   }
 }
 
-module.exports = { list, show, create, bulkCreate, categorize, update, remove, summary };
+module.exports = { list, show, create, bulkCreate, importTransactions, categorize, update, remove, summary };

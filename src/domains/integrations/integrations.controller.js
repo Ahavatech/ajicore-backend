@@ -25,7 +25,7 @@ async function getPlaidLinkToken(req, res, next) {
 
 async function syncQuickBooks(req, res, next) {
   try {
-    const result = await integrationsService.syncQuickBooks(req.body.business_id);
+    const result = await integrationsService.syncQuickBooks(req.body.business_id, req.body.transactions);
     res.json(result);
   } catch (err) {
     next(err);

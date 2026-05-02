@@ -27,9 +27,12 @@ const WEEKDAY_KEYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 's
 function buildStaffResponse(staff) {
   const activeJob = staff.active_job || null;
   const openTimesheet = Array.isArray(staff.timesheets) && staff.timesheets.length > 0 ? staff.timesheets[0] : null;
+  const split = splitName(staff.name);
 
   return {
     ...staff,
+    first_name: split.first_name || '',
+    last_name: split.last_name || '',
     has_open_timesheet: Boolean(openTimesheet),
     open_timesheet: openTimesheet,
     active_job_summary: activeJob
@@ -43,6 +46,10 @@ function buildStaffResponse(staff) {
         }
       : null,
   };
+}
+
+function shouldWrapStaffCollection(req) {
+  return !String(req.originalUrl || '').startsWith('/api/internal/');
 }
 
 function splitName(name) {
@@ -206,7 +213,8 @@ async function getAllStaff(req, res, next) {
         },
       },
     });
-    res.json(staff.map(buildStaffResponse));
+    const payload = staff.map(buildStaffResponse);
+    res.json(shouldWrapStaffCollection(req) ? { data: payload } : payload);
   } catch (err) { next(err); }
 }
 

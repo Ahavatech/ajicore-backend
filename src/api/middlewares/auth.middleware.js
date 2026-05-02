@@ -25,7 +25,21 @@ const resourceResolvers = {
   vehicle: (id) => prisma.vehicle.findUnique({ where: { id }, select: { id: true, business_id: true } }),
   serviceCategory: (id) => prisma.serviceCategory.findUnique({ where: { id }, select: { id: true, business_id: true } }),
   priceBookItem: (id) => prisma.priceBookItem.findUnique({ where: { id }, select: { id: true, business_id: true } }),
-  bankTransaction: (id) => prisma.bankTransaction.findUnique({ where: { id }, select: { id: true, business_id: true } }),
+  bankTransaction: async (id) => {
+    const bankTransaction = await prisma.bankTransaction.findUnique({
+      where: { id },
+      select: { id: true, business_id: true },
+    });
+
+    if (bankTransaction) {
+      return bankTransaction;
+    }
+
+    return prisma.bookkeepingTransaction.findUnique({
+      where: { id },
+      select: { id: true, business_id: true },
+    });
+  },
   categorizationRule: (id) => prisma.categorizationRule.findUnique({ where: { id }, select: { id: true, business_id: true } }),
   followUp: (id) => prisma.followUp.findUnique({ where: { id }, select: { id: true, business_id: true } }),
   aiEventLog: (id) => prisma.aiEventLog.findUnique({ where: { id }, select: { id: true, business_id: true } }),

@@ -431,6 +431,28 @@ router.post(
   authController.onboardingStep4
 );
 
+/**
+ * @swagger
+ * /api/auth/onboarding/step5:
+ *   post:
+ *     summary: Save the business logo URL and complete onboarding
+ *     tags: [Onboarding]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               logo_url:
+ *                 type: string
+ *                 description: Public logo URL from the upload service. Empty string clears the logo.
+ *     responses:
+ *       200:
+ *         description: Onboarding completed successfully
+ */
 // Step 5: Logo upload (optional logo_url) — marks onboarding complete
 router.post(
   '/onboarding/step5',

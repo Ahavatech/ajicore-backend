@@ -96,9 +96,12 @@ router.post(
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/StaffMember'
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/StaffMember'
  */
 router.get('/', requireRole(['admin']), requireFields(['business_id'], 'query'), requireBusinessAccess('query'), staffController.getAllStaff);
 

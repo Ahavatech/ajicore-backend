@@ -18,6 +18,23 @@ function buildCustomerName(customer) {
   return fullName || customer.company_name || 'Unknown Customer';
 }
 
+function normalizeInvoiceLine(line) {
+  if (!line) return null;
+  const quantity = Number(line.quantity ?? 1) || 1;
+  const unitPrice = Number(line.unit_price ?? line.unitPrice ?? 0) || 0;
+  const total = Number(line.total ?? (quantity * unitPrice)) || 0;
+
+  return {
+    id: line.id,
+    name: line.name || line.description || 'Line item',
+    description: line.description || line.name || 'Line item',
+    quantity,
+    unit_price: unitPrice,
+    total,
+    is_credit: Boolean(line.is_credit),
+  };
+}
+
 function getInvoiceCustomer(invoice) {
   return invoice.customer || invoice.job?.customer || null;
 }
@@ -82,6 +99,8 @@ function mapInvoiceListRow(invoice) {
     customer_name: buildCustomerName(customer),
     service_name: invoice.service_name || invoice.job?.title || invoice.job?.service_type || null,
     total_amount: invoice.total_amount ?? invoiceSubtotal(invoice),
+    line_items: Array.isArray(invoice.line_items) ? invoice.line_items.map(normalizeInvoiceLine).filter(Boolean) : [],
+    photos: Array.isArray(invoice.photos) ? invoice.photos : [],
     due_date: invoice.due_date,
     status: invoice.status,
   };
@@ -105,6 +124,7 @@ function buildInvoiceData(data, existing = null) {
     status: data.status ?? undefined,
     service_name: data.service_name ?? undefined,
     service_category: serviceCategory ?? undefined,
+    custom_category_name: data.custom_category_name ?? undefined,
     contract_type: data.contract_type ?? undefined,
     warranty_due: data.warranty_due ? new Date(data.warranty_due) : undefined,
     description: data.description ?? undefined,
@@ -202,11 +222,11 @@ async function create(data) {
 
   if (financials.line_items.length > 0) {
     await prisma.invoiceLine.createMany({
-      data: financials.line_items.map((li) => ({
-        invoice_id: invoice.id,
-        description: li.description || li.name || 'Line item',
-        quantity: li.quantity ?? 1,
-        unit_price: li.unit_price,
+        data: financials.line_items.map((li) => ({
+          invoice_id: invoice.id,
+          description: li.description || li.name || 'Line item',
+          quantity: li.quantity ?? 1,
+          unit_price: li.unit_price,
         total: li.total,
         is_credit: li.is_credit ?? false,
       })),

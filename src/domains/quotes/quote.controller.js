@@ -111,7 +111,7 @@ async function accept(req, res, next) {
 
 async function updateSiteNotes(req, res, next) {
   try {
-    const quote = await quoteService.updateSiteNotes(req.params.id, req.body.notes);
+    const quote = await quoteService.updateSiteNotes(req.params.id, req.body);
     res.json(quote);
   } catch (err) { next(err); }
 }

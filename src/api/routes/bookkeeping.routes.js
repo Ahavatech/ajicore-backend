@@ -1,8 +1,4 @@
 const { Router } = require('express');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const { randomUUID } = require('crypto');
 const txCtrl = require('../../domains/bookkeeping/bank_transaction.controller');
 const ruleCtrl = require('../../domains/bookkeeping/categorization_rule.controller');
 const receiptOcrCtrl = require('../../domains/bookkeeping/receipt_ocr.controller');
@@ -11,23 +7,6 @@ const { requireFields, validateUUID } = require('../middlewares/validate.middlew
 
 const router = Router();
 router.use(requireAuth);
-
-const uploadDir = path.join(process.cwd(), 'uploads');
-fs.mkdirSync(uploadDir, { recursive: true });
-
-const receiptUpload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, uploadDir),
-    filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname || '').slice(0, 16);
-      cb(null, `${randomUUID()}${ext}`);
-    },
-  }),
-  limits: {
-    fileSize: 15 * 1024 * 1024,
-    files: 1,
-  },
-});
 
 // Bank Transactions
 /**
@@ -115,6 +94,34 @@ router.post('/transactions/bulk', requireFields(['business_id', 'transactions'],
 
 /**
  * @swagger
+ * /api/bookkeeping/transactions/import:
+ *   post:
+ *     summary: Import bookkeeping transactions from an uploaded CSV or TSV file URL
+ *     tags: [Bookkeeping]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [business_id, file_url]
+ *             properties:
+ *               business_id:
+ *                 type: string
+ *                 format: uuid
+ *               file_url:
+ *                 type: string
+ *                 format: uri
+ *     responses:
+ *       201:
+ *         description: Transactions imported successfully
+ */
+router.post('/transactions/import', requireFields(['business_id', 'file_url'], 'body'), requireBusinessAccess('body'), txCtrl.importTransactions);
+
+/**
+ * @swagger
  * /api/bookkeeping/transactions/{id}:
  *   patch:
  *     summary: Update a bookkeeping transaction
@@ -150,24 +157,27 @@ router.delete('/transactions/:id', validateUUID('id'), requireResourceAccess('ba
  * @swagger
  * /api/bookkeeping/receipt-ocr:
  *   post:
- *     summary: Upload a receipt and extract vendor and amount
+ *     summary: Create a bookkeeping transaction from an uploaded receipt URL
  *     tags: [Bookkeeping]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
- *         multipart/form-data:
+ *         application/json:
  *           schema:
  *             type: object
- *             required: [file]
+ *             required: [business_id, file_url]
  *             properties:
- *               file:
+ *               business_id:
  *                 type: string
- *                 format: binary
+ *                 format: uuid
+ *               file_url:
+ *                 type: string
+ *                 format: uri
  *     responses:
  *       201:
- *         description: Receipt uploaded and parsed
+ *         description: Receipt parsed into an uncategorized bookkeeping transaction
  *         content:
  *           application/json:
  *             schema:
@@ -180,7 +190,7 @@ router.delete('/transactions/:id', validateUUID('id'), requireResourceAccess('ba
  *                     vendor: { type: string }
  *                     amount: { type: number }
  */
-router.post('/receipt-ocr', receiptUpload.single('file'), receiptOcrCtrl.processReceipt);
+router.post('/receipt-ocr', requireFields(['business_id', 'file_url'], 'body'), requireBusinessAccess('body'), receiptOcrCtrl.processReceipt);
 
 // Categorization Rules
 router.get('/rules', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), ruleCtrl.list);

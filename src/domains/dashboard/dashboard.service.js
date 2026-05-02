@@ -165,6 +165,32 @@ function formatTime(date, timezone) {
   }).format(date);
 }
 
+function formatCompactTime(date, timezone) {
+  if (!date) return '';
+
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  })
+    .format(date)
+    .replace(/\s+/g, '')
+    .toLowerCase();
+}
+
+function formatTimeWindow(startDate, endDate, timezone) {
+  if (!startDate) return '';
+
+  const startTime = formatCompactTime(startDate, timezone);
+  const endTime = endDate ? formatCompactTime(endDate, timezone) : '';
+
+  if (endTime) {
+    return `${startTime} - ${endTime}`;
+  }
+  return startTime || '';
+}
+
 function humanizeToken(value = '') {
   return value
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
@@ -187,6 +213,23 @@ function buildJobType(jobLike) {
 
 function buildQuoteIdentifier(quoteId) {
   return `EST-${String(quoteId || '').replace(/-/g, '').slice(0, 8).toUpperCase()}`;
+}
+
+function buildJobIdentifier(jobId) {
+  return `JOB-${String(jobId || '').replace(/-/g, '').slice(0, 8).toUpperCase()}`;
+}
+
+function normalizeTeamStatus(status) {
+  return String(status || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+function normalizePendingQuoteStatus(status) {
+  if (status === 'Sent' || status === 'Pending') return 'Pending Approval';
+  if (status === 'Appointment') return 'Estimate Appointment';
+  return humanizeToken(status);
 }
 
 function getRelativeTime(date) {
@@ -316,17 +359,28 @@ async function getTodaysJobs(businessId, timezone) {
       scheduled_start_time: { gte: start, lt: end },
     },
     include: {
-      assigned_staff: { select: { name: true } },
+      assigned_staff: { select: { name: true, role: true, current_status: true } },
+      customer: { select: { first_name: true, last_name: true, phone_number: true, email: true, address: true } },
     },
     orderBy: { scheduled_start_time: 'asc' },
   });
 
   return jobs.map((job) => ({
     id: job.id,
-    time: formatTime(job.scheduled_start_time, timezone),
-    technician: job.assigned_staff?.name || 'Unassigned',
+    jobId: buildJobIdentifier(job.id),
     jobType: buildJobType(job),
     status: humanizeToken(job.status),
+    customerName: buildCustomerName(job.customer),
+    customerPhone: job.customer?.phone_number || '',
+    customerEmail: job.customer?.email || '',
+    customerAddress: job.customer?.address || '',
+    notes: job.notes || job.job_details || '',
+    photos: job.photos_urls || [],
+    total: Number(job.total_amount || 0),
+    technician: job.assigned_staff?.name || 'Unassigned',
+    technicianRole: humanizeToken(job.assigned_staff?.role || ''),
+    technicianStatus: normalizeTeamStatus(job.assigned_staff?.current_status || 'Clocked Out'),
+    timeWindow: formatTimeWindow(job.scheduled_start_time, job.scheduled_end_time, timezone),
   }));
 }
 
@@ -334,11 +388,11 @@ async function getPendingQuotes(businessId) {
   const quotes = await prisma.quote.findMany({
     where: {
       business_id: businessId,
-      status: { in: ['EstimateScheduled', 'Draft', 'Sent'] },
+      status: { in: ['EstimateScheduled', 'Draft', 'Sent', 'Pending'] },
     },
     include: {
       customer: {
-        select: { first_name: true, last_name: true },
+        select: { first_name: true, last_name: true, phone_number: true, email: true, address: true, location_main: true, location_other: true },
       },
     },
     orderBy: { createdAt: 'desc' },
@@ -347,9 +401,16 @@ async function getPendingQuotes(businessId) {
 
   return quotes.map((quote) => ({
     id: quote.id,
-    customerName: buildCustomerName(quote.customer),
-    jobType: quote.title || quote.description || 'Service Estimate',
+    title: quote.title || quote.service_name || 'Service Quote',
+    status: normalizePendingQuoteStatus(quote.status),
     quoteId: buildQuoteIdentifier(quote.id),
+    customerName: buildCustomerName(quote.customer),
+    locationType: quote.customer?.location_main || 'Main Location',
+    address: [quote.customer?.address, quote.customer?.location_other].filter(Boolean).join('\n') || '',
+    phone: quote.customer?.phone_number || '',
+    email: quote.customer?.email || '',
+    total: Number(quote.total_amount || 0),
+    notes: quote.description || quote.site_notes || '',
   }));
 }
 

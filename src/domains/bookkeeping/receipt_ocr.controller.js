@@ -2,15 +2,14 @@ const receiptOcrService = require('./receipt_ocr.service');
 
 async function processReceipt(req, res, next) {
   try {
-    const file = (req.files && req.files[0]) || req.file;
-    if (!file) {
+    if (!req.body?.business_id || !req.body?.file_url) {
       return res.status(400).json({
         error: 'Validation Error',
-        message: 'No receipt uploaded. Attach a file in multipart/form-data.',
+        message: 'business_id and file_url are required.',
       });
     }
 
-    const result = await receiptOcrService.processReceipt(req, file);
+    const result = await receiptOcrService.processReceipt(req.body);
     res.status(201).json(result);
   } catch (err) {
     next(err);

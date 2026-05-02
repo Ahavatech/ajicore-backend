@@ -4,6 +4,7 @@
  */
 const prisma = require('../../lib/prisma');
 const { roundMoney, toNumber } = require('../../utils/financial_calculator');
+const { ValidationError } = require('../../utils/errors');
 
 const DEFAULT_MARKUP_PERCENT = 49;
 
@@ -60,6 +61,51 @@ function mapPriceBookItem(item) {
     ...item,
     notes: item.notes || item.description || null,
     category_name: item.category?.name || null,
+    visit_type: item.can_quote_phone ? null : mapVisitTypeToFrontend(item.visit_type),
+    service_cost: toNumber(item.service_cost),
+    service_call_fee: toNumber(item.service_call_fee),
+  };
+}
+
+function mapVisitTypeToFrontend(value) {
+  if (!value) return null;
+  if (value === 'FreeEstimate') return 'Free estimate';
+  if (value === 'PaidServiceCall') return 'Paid service call';
+  return value;
+}
+
+function normalizeVisitType(value) {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === 'freeestimate' || normalized === 'free estimate') return 'FreeEstimate';
+  if (normalized === 'paidservicecall' || normalized === 'paid service call') return 'PaidServiceCall';
+  throw new ValidationError('visit_type must be "Free estimate" or "Paid service call".');
+}
+
+function validateVisitConfiguration(data, existing = {}) {
+  const canQuotePhone = data.can_quote_phone ?? existing.can_quote_phone ?? false;
+  const visitType = normalizeVisitType(data.visit_type !== undefined ? data.visit_type : existing.visit_type);
+
+  if (canQuotePhone) {
+    return {
+      can_quote_phone: true,
+      visit_type: null,
+      service_cost: toNumber(data.service_cost ?? existing.service_cost),
+      service_call_fee: toNumber(data.service_call_fee ?? existing.service_call_fee),
+    };
+  }
+
+  if (!visitType) {
+    throw new ValidationError('visit_type is required when can_quote_phone is false.');
+  }
+
+  return {
+    can_quote_phone: false,
+    visit_type: visitType,
+    service_cost: toNumber(data.service_cost ?? existing.service_cost),
+    service_call_fee: toNumber(data.service_call_fee ?? existing.service_call_fee),
   };
 }
 
@@ -155,6 +201,7 @@ async function createPriceBookItem(data) {
   const categoryId = await resolveCategoryId(data);
   const markupPercent = await getMarkupPercent(data.business_id);
   const economics = calculateUnitEconomics(data, markupPercent);
+  const visitConfig = validateVisitConfiguration(data);
 
   const item = await prisma.priceBookItem.create({
     data: {
@@ -163,13 +210,14 @@ async function createPriceBookItem(data) {
       name: data.name,
       description: data.description || data.notes || null,
       notes: data.notes || data.description || null,
-      can_quote_phone: data.can_quote_phone ?? false,
+      can_quote_phone: visitConfig.can_quote_phone,
       price_type: data.price_type || 'NeedsOnsite',
       price: data.price ?? economics.flat_rate ?? null,
       price_min: data.price_min ?? null,
       price_max: data.price_max ?? null,
-      visit_type: data.visit_type || 'FreeEstimate',
-      service_call_fee: data.service_call_fee ?? null,
+      visit_type: visitConfig.visit_type || 'FreeEstimate',
+      service_cost: visitConfig.service_cost,
+      service_call_fee: visitConfig.service_call_fee ?? null,
       labor_time: data.labor_time || null,
       labor_cost: economics.labor_cost,
       materials: economics.materials,
@@ -191,19 +239,24 @@ async function createPriceBookItem(data) {
 async function updatePriceBookItem(id, data) {
   const updateData = {};
   const fields = ['name', 'description', 'can_quote_phone', 'price_type', 'price', 'price_min',
-    'price_max', 'visit_type', 'service_call_fee', 'suggested_materials', 'category_id', 'is_active',
+    'price_max', 'visit_type', 'service_cost', 'service_call_fee', 'suggested_materials', 'category_id', 'is_active',
     'notes', 'labor_time'];
   fields.forEach((f) => { if (data[f] !== undefined) updateData[f] = data[f]; });
 
+  const currentItem = await prisma.priceBookItem.findUnique({ where: { id }, select: { business_id: true, can_quote_phone: true, visit_type: true, service_cost: true, service_call_fee: true } });
+  const visitConfig = validateVisitConfiguration(data, currentItem || {});
+  updateData.can_quote_phone = visitConfig.can_quote_phone;
+  updateData.visit_type = visitConfig.visit_type || 'FreeEstimate';
+  updateData.service_cost = visitConfig.service_cost;
+  updateData.service_call_fee = visitConfig.service_call_fee ?? null;
+
   if (data.custom_category_name) {
-    const current = await prisma.priceBookItem.findUnique({ where: { id }, select: { business_id: true } });
-    updateData.category_id = await resolveCategoryId({ ...data, business_id: current.business_id });
+    updateData.category_id = await resolveCategoryId({ ...data, business_id: currentItem.business_id });
   }
 
   const economicsFields = ['labor_cost', 'materials', 'tools', 'total_materials_cost', 'total_tools_cost', 'base_cost'];
   if (economicsFields.some((field) => data[field] !== undefined)) {
-    const current = await prisma.priceBookItem.findUnique({ where: { id }, select: { business_id: true } });
-    const markupPercent = await getMarkupPercent(current.business_id);
+    const markupPercent = await getMarkupPercent(currentItem.business_id);
     Object.assign(updateData, calculateUnitEconomics(data, markupPercent));
     updateData.price = updateData.flat_rate;
   }

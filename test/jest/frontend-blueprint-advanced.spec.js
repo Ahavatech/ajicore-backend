@@ -102,6 +102,7 @@ describe('advanced frontend blueprint contracts', () => {
       business_id: 'business-1',
       name: 'Drain Cleaning',
       custom_category_name: 'General Maintenance',
+      visit_type: 'Free estimate',
       labor_cost: 85,
       materials: [{ name: 'PVC', qty: 1, rate: 15 }],
       tools: [],

@@ -6,6 +6,7 @@
 const crypto = require('crypto');
 const prisma = require('../../lib/prisma');
 const { ValidationError } = require('../../utils/errors');
+const { ingestExternalTransactions } = require('../bookkeeping/bank_transaction.service');
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const STRIPE_CLIENT_ID = process.env.STRIPE_CLIENT_ID;
@@ -115,11 +116,12 @@ async function createPlaidLinkToken(businessId) {
   };
 }
 
-async function syncQuickBooks(businessId) {
+async function syncQuickBooks(businessId, transactions = []) {
   if (!businessId) {
     throw new ValidationError('business_id is required');
   }
 
+  const importResult = await ingestExternalTransactions(businessId, transactions, 'quickbooks');
   const [invoiceCount, paymentCount, expenseCount, transactionCount] = await Promise.all([
     prisma.invoice.count({ where: { business_id: businessId } }),
     prisma.payment.count({ where: { invoice: { business_id: businessId } } }),
@@ -130,6 +132,7 @@ async function syncQuickBooks(businessId) {
   return {
     business_id: businessId,
     status: 'queued',
+    created_transactions: importResult.count,
     synced: {
       invoices: invoiceCount,
       payments: paymentCount,

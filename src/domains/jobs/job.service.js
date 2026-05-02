@@ -22,28 +22,77 @@ function buildCustomerAddress(job) {
   return job.address || job.customer?.location_main || job.customer?.address || null;
 }
 
+function normalizeCostItems(items) {
+  if (!Array.isArray(items)) return [];
+  return items.map((item) => ({
+    ...item,
+    qty: Number(item.qty ?? item.quantity ?? 0) || 0,
+    rate: Number(item.rate ?? 0) || 0,
+    price: Number(item.price ?? ((Number(item.qty ?? item.quantity ?? 0) || 0) * (Number(item.rate ?? 0) || 0))) || 0,
+  }));
+}
+
 // Transform job to include hydrated relational data
 function hydrateJob(job) {
   if (!job) return null;
 
   const photo_urls = Array.isArray(job.photos_urls)
     ? job.photos_urls
-    : (job.photos_urls ? job.photos_urls : []);
+    : (Array.isArray(job.photo_urls) ? job.photo_urls : []);
 
   const line_items = Array.isArray(job.line_items)
     ? job.line_items
     : (job.line_items ? job.line_items : []);
 
+  // Parse materials and tools from JSON fields
+  const materials = Array.isArray(job.materials)
+    ? normalizeCostItems(job.materials)
+    : normalizeCostItems(job.job_materials?.map((entry) => ({
+      name: entry.material?.name || null,
+      qty: entry.quantity_used,
+      rate: entry.unit_cost ?? entry.material?.unit_cost ?? 0,
+      price: (Number(entry.quantity_used) || 0) * (Number(entry.unit_cost ?? entry.material?.unit_cost ?? 0) || 0),
+    })));
+
+  const tools = Array.isArray(job.tools)
+    ? normalizeCostItems(job.tools)
+    : [];
+
   return {
     ...job,
     // Frontend expects these hydrated display fields (no raw UUID-only rendering)
+    id: job.id,
+    title: job.title,
+    status: job.status,
     customer_name: buildCustomerName(job.customer),
-    customer_address: buildCustomerAddress(job),
+    customer_id: job.customer_id,
     staff_name: job.assigned_staff ? job.assigned_staff.name : null,
+    address: buildCustomerAddress(job),
+    service_type: job.service_type,
+    scheduled_start_time: job.scheduled_start_time,
 
-    // Frontend naming (legacy DB field is photos_urls)
+    // Job details
+    job_details: job.job_details,
     photo_urls,
+
+    // Materials and tools breakdown
+    materials,
+    tools,
+    labor_time: job.labor_time,
+    labor_cost: job.labor_cost || 0,
+    service_call_fee: job.service_call_fee || 0,
+
+    // Financial breakdown
+    subtotal: job.subtotal || 0,
+    discount_percent: job.discount_percent || 0,
+    discount_amount: job.discount_amount || 0,
+    tax_percent: job.tax_percent || 0,
+    tax_amount: job.tax_amount || 0,
+    total_amount: job.total_amount || 0,
+
+    // Legacy fields
     line_items,
+    notes: job.notes ?? job.job_details ?? null,
   };
 }
 
@@ -158,6 +207,8 @@ async function getJobById(id) {
 
 async function createJob(data) {
   const photoUrls = data.photo_urls ?? data.photos_urls;
+  const materials = data.materials !== undefined ? normalizeCostItems(data.materials) : undefined;
+  const tools = data.tools !== undefined ? normalizeCostItems(data.tools) : undefined;
 
   const job = await prisma.job.create({
     data: {
@@ -175,6 +226,17 @@ async function createJob(data) {
       scheduled_start_time: data.scheduled_start_time ? new Date(data.scheduled_start_time) : null,
       scheduled_end_time: data.scheduled_end_time ? new Date(data.scheduled_end_time) : null,
       photos_urls: Array.isArray(photoUrls) ? photoUrls : (photoUrls ? photoUrls : null),
+      materials: materials ?? null,
+      tools: tools ?? null,
+      labor_time: data.labor_time || null,
+      labor_cost: data.labor_cost ?? null,
+      subtotal: data.subtotal ?? null,
+      discount_percent: data.discount_percent ?? null,
+      discount_amount: data.discount_amount ?? null,
+      tax_percent: data.tax_percent ?? null,
+      tax_amount: data.tax_amount ?? null,
+      total_amount: data.total_amount ?? null,
+      notes: data.notes || null,
       line_items: Array.isArray(data.line_items) ? data.line_items : (data.line_items ? data.line_items : null),
       is_emergency: data.is_emergency ?? false,
       source: data.source || 'Manual',
@@ -227,6 +289,15 @@ async function updateJob(id, data) {
     'address',
     'service_type',
     'type',
+    'labor_time',
+    'labor_cost',
+    'subtotal',
+    'discount_percent',
+    'discount_amount',
+    'tax_percent',
+    'tax_amount',
+    'total_amount',
+    'notes',
   ];
 
   scalarFields.forEach((f) => {
@@ -236,6 +307,8 @@ async function updateJob(id, data) {
   // Accept frontend naming (photo_urls) + legacy/internal naming (photos_urls)
   if (data.photo_urls !== undefined) updateData.photos_urls = data.photo_urls;
   if (data.photos_urls !== undefined) updateData.photos_urls = data.photos_urls;
+  if (data.materials !== undefined) updateData.materials = normalizeCostItems(data.materials);
+  if (data.tools !== undefined) updateData.tools = normalizeCostItems(data.tools);
 
   // Pricebook line items array
   if (data.line_items !== undefined) updateData.line_items = data.line_items;

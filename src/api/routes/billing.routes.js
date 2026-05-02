@@ -89,6 +89,45 @@ router.get('/invoices/:id/total', validateUUID('id'), requireResourceAccess('inv
  *     tags: [Billing]
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [business_id]
+ *             properties:
+ *               business_id: { type: string, format: uuid }
+ *               customer_id: { type: string, format: uuid, nullable: true }
+ *               job_id: { type: string, format: uuid, nullable: true }
+ *               service_name: { type: string, nullable: true }
+ *               service_category: { type: string, nullable: true }
+ *               custom_category_name: { type: string, nullable: true }
+ *               contract_type:
+ *                 type: object
+ *                 additionalProperties: true
+ *               warranty_due: { type: string, format: date-time, nullable: true }
+ *               description: { type: string, nullable: true }
+ *               photos:
+ *                 type: array
+ *                 items: { type: string, format: uri }
+ *               line_items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     name: { type: string, nullable: true }
+ *                     description: { type: string, nullable: true }
+ *                     unit_price: { type: number }
+ *                     total: { type: number }
+ *               manual_subtotal: { type: number, nullable: true }
+ *               discount_percent: { type: number, nullable: true }
+ *               tax_percent: { type: number, nullable: true }
+ *               deposit_percent: { type: number, nullable: true }
+ *               total_amount: { type: number, nullable: true }
+ *               deposit_amount: { type: number, nullable: true }
+ *               payment_due_terms: { type: string, nullable: true }
+ *               notes: { type: string, nullable: true }
  */
 router.post('/invoices', requireFields(['business_id']), requireBusinessAccess('body'), billingController.createInvoice);
 
@@ -100,6 +139,43 @@ router.post('/invoices', requireFields(['business_id']), requireBusinessAccess('
  *     tags: [Billing]
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               customer_id: { type: string, format: uuid, nullable: true }
+ *               job_id: { type: string, format: uuid, nullable: true }
+ *               service_name: { type: string, nullable: true }
+ *               service_category: { type: string, nullable: true }
+ *               custom_category_name: { type: string, nullable: true }
+ *               contract_type:
+ *                 type: object
+ *                 additionalProperties: true
+ *               warranty_due: { type: string, format: date-time, nullable: true }
+ *               description: { type: string, nullable: true }
+ *               photos:
+ *                 type: array
+ *                 items: { type: string, format: uri }
+ *               line_items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     name: { type: string, nullable: true }
+ *                     description: { type: string, nullable: true }
+ *                     unit_price: { type: number }
+ *                     total: { type: number }
+ *               manual_subtotal: { type: number, nullable: true }
+ *               discount_percent: { type: number, nullable: true }
+ *               tax_percent: { type: number, nullable: true }
+ *               deposit_percent: { type: number, nullable: true }
+ *               total_amount: { type: number, nullable: true }
+ *               deposit_amount: { type: number, nullable: true }
+ *               payment_due_terms: { type: string, nullable: true }
+ *               notes: { type: string, nullable: true }
  */
 router.patch('/invoices/:id', validateUUID('id'), requireResourceAccess('invoice'), billingController.updateInvoice);
 
