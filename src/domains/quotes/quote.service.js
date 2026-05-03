@@ -5,7 +5,7 @@
 const prisma = require('../../lib/prisma');
 const logger = require('../../utils/logger');
 const { logActivitySafe } = require('../ai_logs/activity_log.service');
-const { calculateFinancials } = require('../../utils/financial_calculator');
+const { calculateFinancials, normalizeLineItems } = require('../../utils/financial_calculator');
 const { NotFoundError, ValidationError } = require('../../utils/errors');
 
 const PAYMENT_DUE_TERMS = ['Upon receipt', 'Net 15', 'Net 30', 'Net 45'];
@@ -164,7 +164,23 @@ function quoteDetailPayload(quote) {
 function buildQuoteData(data, existing = null) {
   validateDueTerms(data.payment_due_terms);
 
-  const isAppointment = data.is_estimate_appointment ?? existing?.is_estimate_appointment ?? false;
+  const normalizedIncomingLineItems = data.line_items !== undefined
+    ? normalizeLineItems(data.line_items)
+    : null;
+  const effectiveLineItems = normalizedIncomingLineItems ?? (Array.isArray(existing?.line_items) ? existing.line_items : []);
+  const hasLineItems = Array.isArray(effectiveLineItems) && effectiveLineItems.length > 0;
+  const hasSchedulingInput = [
+    data.scheduled_estimate_date,
+    data.scheduled_estimate_time,
+    data.scheduled_start_time,
+    data.scheduled_end_time,
+  ].some((value) => value !== undefined && value !== null && value !== '');
+  const hasExistingSchedule = Boolean(existing?.scheduled_estimate_date || existing?.scheduled_start_time);
+  const explicitAppointment = data.is_estimate_appointment === true || data.status === 'Appointment';
+  const explicitQuote = data.is_estimate_appointment === false;
+  const inferredAppointment = !hasLineItems && (hasSchedulingInput || (existing?.is_estimate_appointment && hasExistingSchedule));
+  const isAppointment = explicitQuote ? false : (explicitAppointment || inferredAppointment);
+
   if (isAppointment && !data.assigned_staff_id && !existing?.assigned_staff_id) {
     throw new ValidationError('assigned_staff_id is required for estimate appointments.');
   }
@@ -202,7 +218,9 @@ function buildQuoteData(data, existing = null) {
     site_notes: data.site_notes ?? undefined,
     decline_reason: data.decline_reason ?? undefined,
     line_items: data.line_items !== undefined ? financials.line_items : undefined,
-    is_estimate_appointment: data.is_estimate_appointment ?? undefined,
+    is_estimate_appointment: data.is_estimate_appointment !== undefined || explicitAppointment || hasSchedulingInput
+      ? isAppointment
+      : undefined,
     is_emergency: data.is_emergency ?? undefined,
     source: data.source ?? undefined,
     manual_subtotal: data.manual_subtotal !== undefined ? financials.manual_subtotal : undefined,
@@ -317,12 +335,13 @@ async function getById(id) {
 async function create(data) {
   await assertOwnedRecords(data);
   const quoteData = buildQuoteData(data);
+  const isAppointment = quoteData.is_estimate_appointment === true;
   const quote = await prisma.quote.create({
     data: {
       business_id: data.business_id,
       customer_id: data.customer_id,
       quote_number: data.quote_number || await nextQuoteNumber(data.business_id),
-      status: quoteData.status || (data.is_estimate_appointment ? 'Appointment' : 'Draft'),
+      status: quoteData.status || (isAppointment ? 'Appointment' : 'Draft'),
       ...quoteData,
     },
     include: { customer: true, assigned_staff: true },

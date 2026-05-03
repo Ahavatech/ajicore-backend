@@ -6,11 +6,13 @@ jest.mock('../../src/lib/prisma', () => ({
     create: jest.fn(),
     createMany: jest.fn(),
     findUnique: jest.fn(),
+    update: jest.fn(),
     aggregate: jest.fn(),
     count: jest.fn(),
   },
   bankTransaction: {
     findUnique: jest.fn(),
+    update: jest.fn(),
     aggregate: jest.fn(),
     count: jest.fn(),
   },
@@ -124,5 +126,60 @@ describe('frontend payload alignment', () => {
     expect(result.visit_type).toBeNull();
     expect(result.service_cost).toBe(150);
     expect(result.service_call_fee).toBe(0);
+  });
+
+  test('bookkeeping categorization-only update works for ledger transactions', async () => {
+    prisma.bankTransaction.findUnique.mockResolvedValue(null);
+    prisma.bookkeepingTransaction.findUnique
+      .mockResolvedValueOnce({
+        id: 'ledger-1',
+        business_id: 'business-1',
+        transaction_date: new Date('2026-05-01T00:00:00.000Z'),
+        vendor: 'Home Depot',
+        amount: 150.75,
+        category: null,
+        source: 'manual',
+        is_income: false,
+        raw_description: 'Home Depot',
+        receipt_url: 'https://storage.myajicore.com/uploads/receipt.png',
+        notes: null,
+        tags: [],
+      })
+      .mockResolvedValueOnce({
+        id: 'ledger-1',
+        business_id: 'business-1',
+        transaction_date: new Date('2026-05-01T00:00:00.000Z'),
+        vendor: 'Home Depot',
+        amount: 150.75,
+        category: 'Fleet Management',
+        source: 'manual',
+        is_income: false,
+        raw_description: 'Home Depot',
+        receipt_url: 'https://storage.myajicore.com/uploads/receipt.png',
+        notes: 'Routine oil change for Truck 2.',
+        tags: [{ name: 'Fleet', color: '#F59E0B' }],
+      });
+    prisma.bookkeepingTransaction.update.mockResolvedValue({ id: 'ledger-1' });
+
+    const result = await bookkeepingService.update('ledger-1', {
+      category: 'Fleet Management',
+      notes: 'Routine oil change for Truck 2.',
+      tags: [{ name: 'Fleet', color: '#F59E0B' }],
+    });
+
+    expect(prisma.bookkeepingTransaction.update).toHaveBeenCalledWith({
+      where: { id: 'ledger-1' },
+      data: expect.objectContaining({
+        category: 'Fleet Management',
+        notes: 'Routine oil change for Truck 2.',
+        tags: [{ name: 'Fleet', color: '#F59E0B' }],
+      }),
+    });
+    expect(result).toEqual(expect.objectContaining({
+      id: 'ledger-1',
+      category: 'Fleet Management',
+      notes: 'Routine oil change for Truck 2.',
+      tags: [{ name: 'Fleet', color: '#F59E0B' }],
+    }));
   });
 });

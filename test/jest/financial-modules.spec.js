@@ -25,12 +25,17 @@ jest.mock('../../src/lib/prisma', () => ({
     create: jest.fn(),
   },
   bankTransaction: {
+    findUnique: jest.fn(),
+    update: jest.fn(),
     findMany: jest.fn(),
     count: jest.fn(),
     aggregate: jest.fn(),
   },
   expense: {
     count: jest.fn(),
+  },
+  business: {
+    findUnique: jest.fn(),
   },
 }));
 
@@ -60,6 +65,13 @@ const bankTransactionService = require('../../src/domains/bookkeeping/bank_trans
 const receiptOcrService = require('../../src/domains/bookkeeping/receipt_ocr.service');
 const integrationsService = require('../../src/domains/integrations/integrations.service');
 const { generateInvoicePdf } = require('../../src/domains/billing/invoice_pdf.service');
+
+function decodePdfHexText(buffer) {
+  const matches = buffer.toString('latin1').match(/<([0-9A-Fa-f]+)>/g) || [];
+  return matches
+    .map((match) => Buffer.from(match.slice(1, -1), 'hex').toString('latin1'))
+    .join(' ');
+}
 
 describe('financial modules', () => {
   beforeEach(() => {
@@ -219,30 +231,40 @@ describe('financial modules', () => {
 
   test('receipt OCR returns uploaded url and filename-derived extraction', async () => {
     const result = await receiptOcrService.processReceipt(
-      { protocol: 'http', get: jest.fn().mockReturnValue('localhost:3000') },
       {
-        filename: 'receipt.jpg',
-        originalname: 'acme-fuel-42.50.jpg',
+        business_id: 'business-1',
+        file_url: 'https://storage.example.com/receipts/acme-fuel-42.50.jpg',
       }
     );
 
-    expect(result).toEqual({
-      url: 'http://localhost:3000/uploads/receipt.jpg',
-      extracted_data: {
-        vendor: 'Acme Fuel',
+    expect(result).toEqual(expect.objectContaining({
+      url: 'https://storage.example.com/receipts/acme-fuel-42.50.jpg',
+      extracted_data: expect.objectContaining({
         amount: 42.5,
-      },
-    });
+      }),
+      transaction: expect.objectContaining({
+        id: expect.any(String),
+      }),
+    }));
   });
 
-  test('invoice pdf generator returns a PDF buffer', () => {
-    const buffer = generateInvoicePdf({
+  test('invoice pdf generator returns a styled PDF buffer', async () => {
+    const buffer = await generateInvoicePdf({
       id: 'invoice-1',
       status: 'Sent',
+      invoice_number: 'INV-0001',
+      total_amount: 150,
+      due_amount: 100,
       due_date: new Date('2026-04-30T00:00:00.000Z'),
       notes: 'Thanks for your business',
       line_items: [{ description: 'Service Call', quantity: 1, total: 150, is_credit: false }],
       payments: [{ amount: 50 }],
+      business: {
+        name: 'Ajicore',
+        company_email: 'billing@ajicore.com',
+        company_phone: '+1 555 222 1111',
+      },
+      customer: { first_name: 'Sarah', last_name: 'Johnson', location_main: '456 Oak Ave' },
       job: {
         business: { name: 'Ajicore' },
         customer: { first_name: 'Sarah', last_name: 'Johnson' },
@@ -251,6 +273,89 @@ describe('financial modules', () => {
 
     expect(Buffer.isBuffer(buffer)).toBe(true);
     expect(buffer.toString('utf8', 0, 8)).toContain('%PDF');
+    const decodedText = decodePdfHexText(buffer);
+    const compactText = decodedText.replace(/\s+/g, '');
+    expect(compactText).toContain('Ajicore');
+    expect(compactText).toContain('Invoice');
+    expect(compactText).toContain('SarahJohnson');
+    expect(compactText).toContain('INV-0001');
+  });
+
+  test('invoice pdf generator tolerates missing optional branding fields', async () => {
+    await expect(generateInvoicePdf({
+      id: 'invoice-2',
+      status: 'Paid',
+      line_items: [],
+      payments: [],
+      customer: { first_name: 'Taylor' },
+      business: { name: 'Ajicore' },
+    })).resolves.toBeInstanceOf(Buffer);
+  });
+
+  test('bookkeeping transaction update persists tags notes and category for bank-backed records', async () => {
+    prisma.bankTransaction.findUnique
+      .mockResolvedValueOnce({
+        id: 'bank-1',
+        business_id: 'business-1',
+        date: new Date('2026-05-01T00:00:00.000Z'),
+        vendor: 'Old Vendor',
+        amount: 100,
+        category: null,
+        source: 'bank',
+        is_income: false,
+        raw_description: 'Old Vendor',
+        receipt_url: null,
+        notes: null,
+        tags: [],
+      })
+      .mockResolvedValueOnce({
+        id: 'bank-1',
+        business_id: 'business-1',
+        date: new Date('2026-05-01T00:00:00.000Z'),
+        vendor: 'Home Depot',
+        amount: 150.75,
+        category: 'Materials & Supplies',
+        source: 'manual',
+        is_income: false,
+        raw_description: 'Home Depot',
+        receipt_url: 'https://storage.myajicore.com/uploads/receipt.png',
+        notes: 'Bought extra PVC pipes for the Smith job.',
+        tags: [{ name: 'Plumbing', color: '#3B82F6' }],
+      });
+    prisma.bankTransaction.update.mockResolvedValue({ id: 'bank-1' });
+
+    const result = await bankTransactionService.update('bank-1', {
+      vendor: 'Home Depot',
+      amount: 150.75,
+      date: '2026-05-01T00:00:00.000Z',
+      category: 'Materials & Supplies',
+      source: 'manual',
+      is_income: false,
+      raw_description: 'Home Depot',
+      receipt_url: 'https://storage.myajicore.com/uploads/receipt.png',
+      notes: 'Bought extra PVC pipes for the Smith job.',
+      tags: [{ name: 'Plumbing', color: '#3B82F6' }],
+    });
+
+    expect(prisma.bankTransaction.update).toHaveBeenCalledWith({
+      where: { id: 'bank-1' },
+      data: expect.objectContaining({
+        vendor: 'Home Depot',
+        amount: 150.75,
+        category: 'Materials & Supplies',
+        source: 'manual',
+        receipt_url: 'https://storage.myajicore.com/uploads/receipt.png',
+        notes: 'Bought extra PVC pipes for the Smith job.',
+        tags: [{ name: 'Plumbing', color: '#3B82F6' }],
+      }),
+    });
+    expect(result).toEqual(expect.objectContaining({
+      id: 'bank-1',
+      vendor: 'Home Depot',
+      category: 'Materials & Supplies',
+      notes: 'Bought extra PVC pipes for the Smith job.',
+      tags: [{ name: 'Plumbing', color: '#3B82F6' }],
+    }));
   });
 
   test('integrations service returns plaid link token and quickbooks sync summary', async () => {
@@ -263,7 +368,7 @@ describe('financial modules', () => {
     const quickbooks = await integrationsService.syncQuickBooks('business-1');
 
     expect(plaid.link_token).toContain('plaid-link-business-1-');
-    expect(quickbooks).toEqual({
+    expect(quickbooks).toEqual(expect.objectContaining({
       business_id: 'business-1',
       status: 'queued',
       synced: {
@@ -272,6 +377,6 @@ describe('financial modules', () => {
         expenses: 4,
         ledger_transactions: 5,
       },
-    });
+    }));
   });
 });

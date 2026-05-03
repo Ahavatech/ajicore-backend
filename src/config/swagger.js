@@ -52,7 +52,9 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
 
 3. Send to customer → \`POST /api/quotes/:id/send\` (status: Sent, expiry set)
 
-4. Customer approves → \`POST /api/quotes/:id/approve\` (creates Job)
+4. Customer approves → \`POST /api/quotes/:id/approve\` (status becomes Approved)
+
+5. Office converts approved quote → \`POST /api/quotes/:id/convert\` (creates Job)
 
 ### Direct Job Booking (price known)
 1. AI/manual books job → \`POST /api/jobs\`
@@ -954,8 +956,9 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             total_pay: { type: 'number' },
           },
         },
-                QuoteInput: {
+        QuoteInput: {
           type: 'object',
+          description: 'Used for both priced quotes and estimate appointments. Quote mode sends line_items. Appointment mode sends an empty line_items array plus scheduling fields and typically sets is_estimate_appointment to true.',
           required: ['business_id', 'customer_id'],
           properties: {
             business_id: { type: 'string', format: 'uuid' },
@@ -971,7 +974,7 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             photos: { type: 'array', items: { type: 'string' } },
             price_book_item_id: { type: 'string', format: 'uuid', nullable: true },
             scheduled_estimate_date: { type: 'string', format: 'date-time', nullable: true },
-            scheduled_estimate_time: { type: 'string', nullable: true },
+            scheduled_estimate_time: { type: 'string', nullable: true, description: 'Accepts HH:MM in 24-hour format for appointments, or a display range like "10:00 - 11:00 am".' },
             manual_subtotal: { type: 'number' },
             discount_percent: { type: 'number' },
             tax_percent: { type: 'number' },
@@ -983,15 +986,17 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             line_items: {
               type: 'array',
               nullable: true,
+              description: 'Quote mode includes one or more priced line items. Appointment mode can send an empty array.',
               items: { type: 'object', additionalProperties: true },
             },
             is_emergency: { type: 'boolean' },
-            is_estimate_appointment: { type: 'boolean' },
+            is_estimate_appointment: { type: 'boolean', description: 'True for estimate appointments with scheduling but no priced line items.' },
             status: { type: 'string', enum: ['EstimateScheduled', 'Draft', 'Pending', 'Appointment', 'Sent', 'Approved', 'Declined', 'Expired'] },
           },
         },
         QuoteUpdateInput: {
           type: 'object',
+          description: 'Partial update shape for both priced quotes and estimate appointments. Appointment updates may keep line_items empty and adjust schedule/staff fields only.',
           properties: {
             customer_id: { type: 'string', format: 'uuid' },
             assigned_staff_id: { type: 'string', format: 'uuid', nullable: true },
@@ -1005,7 +1010,7 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             photos: { type: 'array', items: { type: 'string' } },
             price_book_item_id: { type: 'string', format: 'uuid', nullable: true },
             scheduled_estimate_date: { type: 'string', format: 'date-time', nullable: true },
-            scheduled_estimate_time: { type: 'string', nullable: true },
+            scheduled_estimate_time: { type: 'string', nullable: true, description: 'Accepts HH:MM in 24-hour format for appointments, or a display range like "10:00 - 11:00 am".' },
             manual_subtotal: { type: 'number' },
             discount_percent: { type: 'number' },
             tax_percent: { type: 'number' },
@@ -1018,10 +1023,11 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             line_items: {
               type: 'array',
               nullable: true,
+              description: 'Can be empty when the record is being used as an estimate appointment.',
               items: { type: 'object', additionalProperties: true },
             },
             is_emergency: { type: 'boolean' },
-            is_estimate_appointment: { type: 'boolean' },
+            is_estimate_appointment: { type: 'boolean', description: 'True for estimate appointments with scheduling but no priced line items.' },
             status: { type: 'string', enum: ['EstimateScheduled', 'Draft', 'Pending', 'Appointment', 'Sent', 'Approved', 'Declined', 'Expired'] },
             expires_at: { type: 'string', format: 'date-time', nullable: true },
           },

@@ -51,8 +51,8 @@ function mapBankTransaction(transaction) {
     source: transaction.source || 'bank',
     raw_description: transaction.raw_description || null,
     receipt_url: transaction.receipt_url || null,
-    notes: null,
-    tags: [],
+    notes: transaction.notes || null,
+    tags: Array.isArray(transaction.tags) ? transaction.tags : [],
     record_type: 'bank_transaction',
   };
 }
@@ -276,16 +276,18 @@ async function categorize(id, category, confidence) {
   if (!found) throw new NotFoundError('Transaction');
 
   if (found.kind === 'bank') {
-    return prisma.bankTransaction.update({
+    await prisma.bankTransaction.update({
       where: { id },
       data: { category: normalizeCategory(category), confidence: confidence !== undefined ? toNumber(confidence) : undefined },
     });
+    return getById(id);
   }
 
-  return prisma.bookkeepingTransaction.update({
+  await prisma.bookkeepingTransaction.update({
     where: { id },
     data: { category: normalizeCategory(category) },
   });
+  return getById(id);
 }
 
 async function update(id, data) {
@@ -294,14 +296,16 @@ async function update(id, data) {
 
   if (found.kind === 'bank') {
     const updateData = {};
-    ['vendor', 'receipt_url', 'source', 'raw_description'].forEach((field) => {
+    ['vendor', 'receipt_url', 'source', 'raw_description', 'notes'].forEach((field) => {
       if (data[field] !== undefined) updateData[field] = data[field];
     });
     if (data.category !== undefined) updateData.category = normalizeCategory(data.category);
     if (data.amount !== undefined) updateData.amount = toNumber(data.amount);
     if (data.date !== undefined) updateData.date = normalizeDate(data.date);
     if (data.is_income !== undefined) updateData.is_income = normalizeBoolean(data.is_income);
-    return prisma.bankTransaction.update({ where: { id }, data: updateData });
+    if (data.tags !== undefined) updateData.tags = normalizeTags(data.tags) ?? [];
+    await prisma.bankTransaction.update({ where: { id }, data: updateData });
+    return getById(id);
   }
 
   const updateData = {};
@@ -315,7 +319,8 @@ async function update(id, data) {
   if (data.transaction_date !== undefined) updateData.transaction_date = normalizeDate(data.transaction_date);
   if (data.tags !== undefined) updateData.tags = normalizeTags(data.tags) ?? [];
   if (data.is_income !== undefined) updateData.is_income = normalizeBoolean(data.is_income);
-  return prisma.bookkeepingTransaction.update({ where: { id }, data: updateData });
+  await prisma.bookkeepingTransaction.update({ where: { id }, data: updateData });
+  return getById(id);
 }
 
 async function remove(id) {

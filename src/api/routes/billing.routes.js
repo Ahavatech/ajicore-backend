@@ -63,10 +63,25 @@ router.get('/invoices/:id', validateUUID('id'), requireResourceAccess('invoice')
  * @swagger
  * /api/billing/invoices/{id}/pdf:
  *   get:
- *     summary: Download invoice PDF
+ *     summary: Download a styled invoice or receipt PDF
  *     tags: [Billing]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Binary PDF file
+ *         content:
+ *           application/pdf:
+ *             schema:
+ *               type: string
+ *               format: binary
  */
 router.get('/invoices/:id/pdf', validateUUID('id'), requireResourceAccess('invoice'), billingController.downloadInvoicePdf);
 

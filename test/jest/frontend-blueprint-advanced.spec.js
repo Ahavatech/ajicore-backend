@@ -5,6 +5,9 @@ jest.mock('../../src/lib/prisma', () => ({
   customer: {
     findFirst: jest.fn(),
   },
+  staff: {
+    findFirst: jest.fn(),
+  },
   invoice: {
     count: jest.fn(),
     create: jest.fn(),
@@ -26,6 +29,9 @@ jest.mock('../../src/lib/prisma', () => ({
     findMany: jest.fn(),
     findUnique: jest.fn(),
     count: jest.fn(),
+  },
+  business: {
+    findUnique: jest.fn(),
   },
   quote: {
     count: jest.fn(),
@@ -181,6 +187,156 @@ describe('advanced frontend blueprint contracts', () => {
     });
   });
 
+  test('quote create accepts estimate appointment payloads with empty line_items', async () => {
+    prisma.customer.findFirst.mockResolvedValue({ id: 'customer-1' });
+    prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+    prisma.quote.count.mockResolvedValue(0);
+    prisma.quote.create.mockResolvedValue({
+      id: 'quote-appointment-1',
+      business_id: 'business-1',
+      customer_id: 'customer-1',
+      assigned_staff_id: 'staff-1',
+      service_name: 'Plumbing Assessment',
+      status: 'Appointment',
+      is_estimate_appointment: true,
+      scheduled_start_time: new Date('2026-05-15T14:30:00.000Z'),
+      scheduled_end_time: null,
+      customer: { first_name: 'Tim', last_name: 'Wilson' },
+      assigned_staff: { name: 'John Smith' },
+      createdAt: new Date('2026-05-10T00:00:00.000Z'),
+    });
+
+    const result = await quoteService.create({
+      business_id: 'business-1',
+      customer_id: 'customer-1',
+      assigned_staff_id: 'staff-1',
+      service_name: 'Plumbing Assessment',
+      service_category: 'Plumbing',
+      description: 'Customer needs someone to check a leak.',
+      line_items: [],
+      manual_subtotal: 0,
+      discount_percent: 0,
+      tax_percent: 0,
+      deposit_percent: 0,
+      total_amount: 0,
+      deposit_amount: 0,
+      scheduled_estimate_date: '2026-05-15T00:00:00.000Z',
+      scheduled_estimate_time: '14:30',
+      notes: 'Bring tall ladder.',
+      status: 'Appointment',
+      is_estimate_appointment: true,
+    });
+
+    expect(prisma.quote.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        assigned_staff_id: 'staff-1',
+        status: 'Appointment',
+        is_estimate_appointment: true,
+        line_items: [],
+        scheduled_estimate_time: '14:30',
+        scheduled_start_time: new Date('2026-05-15T14:30:00.000Z'),
+        scheduled_end_time: null,
+      }),
+    }));
+    expect(result.status).toBe('Appointment');
+  });
+
+  test('quote create accepts priced quote payloads without scheduling fields', async () => {
+    prisma.customer.findFirst.mockResolvedValue({ id: 'customer-1' });
+    prisma.quote.count.mockResolvedValue(0);
+    prisma.quote.create.mockResolvedValue({
+      id: 'quote-priced-1',
+      business_id: 'business-1',
+      customer_id: 'customer-1',
+      assigned_staff_id: null,
+      service_name: 'Kitchen Pipe Replacement',
+      status: 'Pending',
+      total_amount: 437.4,
+      line_items: [{ description: 'Under-Sink Piping', quantity: 1, unit_price: 450, total: 450 }],
+      customer: { first_name: 'Tim', last_name: 'Wilson', phone_number: '(555) 456-7890', email: 'tom.wilson@gmail.com' },
+      assigned_staff: null,
+      createdAt: new Date('2026-05-10T00:00:00.000Z'),
+    });
+
+    const result = await quoteService.create({
+      business_id: 'business-1',
+      customer_id: 'customer-1',
+      assigned_staff_id: null,
+      service_name: 'Kitchen Pipe Replacement',
+      service_category: 'Plumbing',
+      description: 'Full replacement of under-sink PVC.',
+      line_items: [
+        {
+          name: 'Under-Sink Piping',
+          description: 'Includes removal of old metal pipes, installing new PVC, and sealing all joints.',
+          unit_price: 450,
+          total: 450,
+        },
+      ],
+      discount_percent: 10,
+      tax_percent: 8,
+      deposit_percent: 50,
+      total_amount: 437.4,
+      deposit_amount: 218.7,
+      status: 'Pending',
+      is_estimate_appointment: false,
+    });
+
+    expect(prisma.quote.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        status: 'Pending',
+        is_estimate_appointment: false,
+      }),
+    }));
+    expect(result.total_amount).toBe(437.4);
+  });
+
+  test('quote update accepts appointment-only edits without priced line items', async () => {
+    prisma.quote.findUnique.mockResolvedValueOnce({
+      id: 'quote-1',
+      business_id: 'business-1',
+      customer_id: 'customer-1',
+      assigned_staff_id: 'staff-1',
+      is_estimate_appointment: true,
+      scheduled_estimate_date: new Date('2026-05-15T00:00:00.000Z'),
+      scheduled_estimate_time: '14:30',
+      line_items: [],
+    });
+    prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+    prisma.quote.update.mockResolvedValue({
+      id: 'quote-1',
+      business_id: 'business-1',
+      customer_id: 'customer-1',
+      assigned_staff_id: 'staff-1',
+      status: 'Appointment',
+      is_estimate_appointment: true,
+      scheduled_start_time: new Date('2026-05-16T15:45:00.000Z'),
+      scheduled_end_time: null,
+      customer: { first_name: 'Tim', last_name: 'Wilson' },
+      assigned_staff: { name: 'John Smith' },
+      createdAt: new Date('2026-05-10T00:00:00.000Z'),
+    });
+
+    const result = await quoteService.update('quote-1', {
+      assigned_staff_id: 'staff-1',
+      line_items: [],
+      scheduled_estimate_date: '2026-05-16T00:00:00.000Z',
+      scheduled_estimate_time: '15:45',
+      status: 'Appointment',
+    });
+
+    expect(prisma.quote.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'quote-1' },
+      data: expect.objectContaining({
+        line_items: [],
+        is_estimate_appointment: true,
+        scheduled_start_time: new Date('2026-05-16T15:45:00.000Z'),
+        scheduled_end_time: null,
+      }),
+    }));
+    expect(result.status).toBe('Appointment');
+  });
+
   test('customer billing and schedule return frontend shapes', async () => {
     prisma.invoice.findMany.mockResolvedValue([
       {
@@ -229,6 +385,18 @@ describe('advanced frontend blueprint contracts', () => {
       customer: { first_name: 'Emily', last_name: 'Brown' },
       job: null,
       edit_logs: [],
+    });
+    prisma.business.findUnique.mockResolvedValue({
+      id: 'business-1',
+      name: 'Ajicore',
+      company_email: 'billing@ajicore.com',
+      company_phone: '+1 555 222 1111',
+      street: '789 Industrial Pkwy',
+      city: 'Dallas',
+      postal_code: '75001',
+      country: 'USA',
+      logo_url: null,
+      communication_settings: null,
     });
 
     const result = await invoiceService.create({

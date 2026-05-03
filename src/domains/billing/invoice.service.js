@@ -189,12 +189,34 @@ async function getById(id) {
     },
   });
 
+  if (!invoice) {
+    return null;
+  }
+
+  if (!invoice.job?.business && invoice.business_id) {
+    invoice.business = await prisma.business.findUnique({
+      where: { id: invoice.business_id },
+      select: {
+        id: true,
+        name: true,
+        company_email: true,
+        company_phone: true,
+        street: true,
+        city: true,
+        postal_code: true,
+        country: true,
+        logo_url: true,
+        communication_settings: true,
+      },
+    });
+  }
+
   if (invoice?.job?.business) {
     const { internal_api_token, ...safeBusiness } = invoice.job.business;
     invoice.job.business = safeBusiness;
   }
 
-  return invoice ? mapInvoiceListRow(invoice) : null;
+  return mapInvoiceListRow(invoice);
 }
 
 async function getByJobId(jobId) {

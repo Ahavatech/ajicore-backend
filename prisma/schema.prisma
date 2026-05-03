@@ -760,6 +760,8 @@ model BankTransaction {
   source            String?
   is_income         Boolean  @default(false)
   receipt_url       String?
+  notes             String?
+  tags              Json?
   raw_description   String?
   normalized_vendor String?
   createdAt         DateTime @default(now())

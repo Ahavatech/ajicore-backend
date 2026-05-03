@@ -96,6 +96,7 @@ router.get('/:id', validateUUID('id'), requireResourceAccess('quote', { allowSta
  *     tags: [Quotes]
  *     security:
  *       - bearerAuth: []
+ *     description: Quote mode sends priced line items. Appointment mode sends an empty line_items array with scheduling fields such as scheduled_estimate_date and scheduled_estimate_time.
  *     requestBody:
  *       required: true
  *       content:
@@ -119,6 +120,7 @@ router.post('/', requireRole(['admin']), requireFields(['business_id', 'customer
  *     tags: [Quotes]
  *     security:
  *       - bearerAuth: []
+ *     description: Supports updating either a priced quote or an estimate appointment. Appointment updates can keep line_items empty and edit only staff and scheduling details.
  *     parameters:
  *       - in: path
  *         name: id
@@ -167,7 +169,7 @@ router.post('/:id/send', requireRole(['admin']), validateUUID('id'), requireReso
  * @swagger
  * /api/quotes/{id}/approve:
  *   post:
- *     summary: Approve a quote and convert it to a job
+ *     summary: Approve a quote
  *     tags: [Quotes]
  *     security:
  *       - bearerAuth: []
@@ -182,14 +184,7 @@ router.post('/:id/send', requireRole(['admin']), validateUUID('id'), requireReso
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 message: { type: string, example: Approved }
- *                 converted_to_job_id: { type: string, format: uuid }
- *                 quote:
- *                   $ref: '#/components/schemas/Quote'
- *                 job:
- *                   $ref: '#/components/schemas/Job'
+ *               $ref: '#/components/schemas/Quote'
  */
 router.post('/:id/approve', requireRole(['admin']), validateUUID('id'), requireResourceAccess('quote'), quoteController.approve);
 

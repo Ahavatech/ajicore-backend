@@ -128,6 +128,39 @@ router.post('/transactions/import', requireFields(['business_id', 'file_url'], '
  *     tags: [Bookkeeping]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             description: Partial updates are supported for both bank-backed and manual bookkeeping transactions.
+ *             properties:
+ *               business_id: { type: string, format: uuid }
+ *               vendor: { type: string }
+ *               amount: { type: number }
+ *               date: { type: string, format: date-time }
+ *               category: { type: string, nullable: true }
+ *               source: { type: string }
+ *               is_income: { type: boolean }
+ *               raw_description: { type: string, nullable: true }
+ *               receipt_url: { type: string, format: uri, nullable: true }
+ *               notes: { type: string, nullable: true }
+ *               tags:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     name: { type: string }
+ *                     color: { type: string, nullable: true }
+ *     responses:
+ *       200:
+ *         description: Updated transaction
  */
 router.patch('/transactions/:id', validateUUID('id'), requireResourceAccess('bankTransaction'), txCtrl.update);
 
