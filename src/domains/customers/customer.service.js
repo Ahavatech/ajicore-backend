@@ -51,6 +51,13 @@ function buildCustomerName(customer) {
   return fullName || customer.company_name || 'Unknown Customer';
 }
 
+function normalizeNullableString(value) {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  const trimmed = String(value).trim();
+  return trimmed === '' ? null : trimmed;
+}
+
 function getCustomerAddress(customer) {
   return customer?.location_main || customer?.address || null;
 }
@@ -92,12 +99,22 @@ function mapCustomerListRow(customer) {
   });
 }
 
-function validateCustomerPayload(data, { partial = false } = {}) {
-  if (!partial || data.customer_type !== undefined) {
-    const type = data.customer_type || 'Individual';
-    if (!CUSTOMER_TYPES.includes(type)) {
-      throw new ValidationError('customer_type must be Individual or Company.');
-    }
+function validateCustomerPayload(data, { partial = false, existing = null } = {}) {
+  const merged = partial && existing ? { ...existing, ...data } : data;
+  const type = merged.customer_type || 'Individual';
+  if (!CUSTOMER_TYPES.includes(type)) {
+    throw new ValidationError('customer_type must be Individual or Company.');
+  }
+
+  const firstName = normalizeNullableString(merged.first_name);
+  const companyName = normalizeNullableString(merged.company_name);
+
+  if (type === 'Individual' && !firstName) {
+    throw new ValidationError('first_name is required when customer_type is Individual.');
+  }
+
+  if (type === 'Company' && !companyName) {
+    throw new ValidationError('company_name is required when customer_type is Company.');
   }
 }
 
@@ -179,50 +196,61 @@ async function findByPhone(businessId, phoneNumber) {
 
 async function create(data) {
   validateCustomerPayload(data);
+  const customerType = data.customer_type || 'Individual';
+  const firstName = customerType === 'Individual'
+    ? normalizeNullableString(data.first_name)
+    : normalizeNullableString(data.first_name);
+  const lastName = normalizeNullableString(data.last_name);
+  const companyName = normalizeNullableString(data.company_name);
+  const pocName = normalizeNullableString(data.poc_name);
+  const locationMain = normalizeNullableString(data.location_main) ?? normalizeNullableString(data.address);
+
   const customer = await prisma.customer.create({
     data: {
       business_id: data.business_id,
-      first_name: data.first_name,
-      last_name: data.last_name,
-      customer_type: data.customer_type || 'Individual',
-      company_name: data.company_name || null,
-      poc_name: data.poc_name || null,
-      phone_number: data.phone_number || null,
-      email: data.email || null,
-      address: data.location_main || data.address || null,
-      zip_code: data.zip_code || null,
-      location_main: data.location_main || data.address || null,
-      location_other: data.location_other || null,
+      first_name: firstName,
+      last_name: lastName,
+      customer_type: customerType,
+      company_name: companyName,
+      poc_name: pocName,
+      phone_number: normalizeNullableString(data.phone_number),
+      email: normalizeNullableString(data.email),
+      address: locationMain,
+      zip_code: normalizeNullableString(data.zip_code),
+      location_main: locationMain,
+      location_other: normalizeNullableString(data.location_other),
       warranty_enabled: data.warranty_enabled ?? false,
       warranty_due: data.warranty_due ? new Date(data.warranty_due) : null,
-      profile_image_url: data.profile_image_url || null,
-      notes: data.notes || null,
+      profile_image_url: normalizeNullableString(data.profile_image_url),
+      notes: normalizeNullableString(data.notes),
     },
   });
   return withComputedName(customer);
 }
 
 async function update(id, data) {
-  validateCustomerPayload(data, { partial: true });
+  const existing = await prisma.customer.findUnique({ where: { id } });
+  if (!existing) {
+    throw new ValidationError('Customer not found.');
+  }
+
+  validateCustomerPayload(data, { partial: true, existing });
   const updateData = {};
-  const fields = [
-    'first_name',
-    'last_name',
-    'customer_type',
-    'company_name',
-    'poc_name',
-    'phone_number',
-    'email',
-    'address',
-    'zip_code',
-    'location_main',
-    'location_other',
-    'warranty_enabled',
-    'profile_image_url',
-    'notes',
-  ];
-  fields.forEach((f) => { if (data[f] !== undefined) updateData[f] = data[f]; });
-  if (data.location_main !== undefined && data.address === undefined) updateData.address = data.location_main;
+  if (data.first_name !== undefined) updateData.first_name = normalizeNullableString(data.first_name);
+  if (data.last_name !== undefined) updateData.last_name = normalizeNullableString(data.last_name);
+  if (data.customer_type !== undefined) updateData.customer_type = data.customer_type;
+  if (data.company_name !== undefined) updateData.company_name = normalizeNullableString(data.company_name);
+  if (data.poc_name !== undefined) updateData.poc_name = normalizeNullableString(data.poc_name);
+  if (data.phone_number !== undefined) updateData.phone_number = normalizeNullableString(data.phone_number);
+  if (data.email !== undefined) updateData.email = normalizeNullableString(data.email);
+  if (data.address !== undefined) updateData.address = normalizeNullableString(data.address);
+  if (data.zip_code !== undefined) updateData.zip_code = normalizeNullableString(data.zip_code);
+  if (data.location_main !== undefined) updateData.location_main = normalizeNullableString(data.location_main);
+  if (data.location_other !== undefined) updateData.location_other = normalizeNullableString(data.location_other);
+  if (data.warranty_enabled !== undefined) updateData.warranty_enabled = data.warranty_enabled;
+  if (data.profile_image_url !== undefined) updateData.profile_image_url = normalizeNullableString(data.profile_image_url);
+  if (data.notes !== undefined) updateData.notes = normalizeNullableString(data.notes);
+  if (data.location_main !== undefined && data.address === undefined) updateData.address = normalizeNullableString(data.location_main);
   if (data.warranty_due !== undefined) updateData.warranty_due = data.warranty_due ? new Date(data.warranty_due) : null;
   const customer = await prisma.customer.update({ where: { id }, data: updateData });
   return withComputedName(customer);

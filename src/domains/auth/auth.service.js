@@ -67,13 +67,14 @@ async function signup({ email, password }) {
   });
 
   const userContext = await resolveUserContextById(user.id);
-  const token = generateToken(userContext);
+  const responseUser = userContext || user;
+  const token = generateToken(responseUser);
   logger.info(`New user registered (email): ${user.email}`);
 
   return {
     message: 'Account created successfully.',
     token,
-    user: buildUserResponse(userContext),
+    user: buildUserResponse(responseUser),
     onboarding_step: 2,
   };
 }
@@ -94,13 +95,14 @@ async function googleSignup({ google_id, email, first_name, last_name }) {
   if (user) {
     // Existing Google user — sign them in
     const userContext = await resolveUserContextById(user.id);
-    const token = generateToken(userContext);
+    const responseUser = userContext || user;
+    const token = generateToken(responseUser);
     logger.info(`Google user signed in: ${user.email}`);
     return {
       message: 'Signed in successfully.',
       token,
-      user: buildUserResponse(userContext),
-      onboarding_step: userContext.onboarding_step,
+      user: buildUserResponse(responseUser),
+      onboarding_step: responseUser.onboarding_step,
       is_new: false,
     };
   }
@@ -125,13 +127,14 @@ async function googleSignup({ google_id, email, first_name, last_name }) {
   });
 
   const userContext = await resolveUserContextById(user.id);
-  const token = generateToken(userContext);
+  const responseUser = userContext || user;
+  const token = generateToken(responseUser);
   logger.info(`New user registered (Google): ${user.email}`);
 
   return {
     message: 'Account created successfully.',
     token,
-    user: buildUserResponse(userContext),
+    user: buildUserResponse(responseUser),
     onboarding_step: 2,
     is_new: true,
   };
@@ -243,7 +246,7 @@ async function getAvailableNumbers({ type, city, area_code }) {
   if (type === 'city') {
     const normalizedCity = String(city || '').trim();
     if (!normalizedCity) throw new ValidationError('city is required when type is city.');
-    searchParams.inRegion = normalizedCity;
+    searchParams.inLocality = normalizedCity;
   }
 
   let incomingNumbers;
@@ -257,7 +260,7 @@ async function getAvailableNumbers({ type, city, area_code }) {
       moreInfo: err.moreInfo,
       stack: err.stack,
     });
-    throw new ValidationError(`Twilio lookup failed: ${err.code || err.status || 'UNKNOWN'} ${err.message}`);
+    throw new ValidationError('Unable to fetch available Twilio phone numbers right now.');
   }
 
   const numbers = incomingNumbers.map((record) => ({
@@ -265,15 +268,11 @@ async function getAvailableNumbers({ type, city, area_code }) {
     friendly_name: record.friendlyName || record.phoneNumber,
     locality: record.locality || null,
     region: record.region || null,
-    postal_code: record.postalCode || null,
-    country: record.isoCountry || countryCode,
     capabilities: {
       voice: Boolean(record.capabilities?.voice),
       sms: Boolean(record.capabilities?.sms),
       mms: Boolean(record.capabilities?.mms),
     },
-    type: type === 'toll_free' ? 'toll_free' : 'local',
-    area_code: extractAreaCode(record.phoneNumber),
   }));
 
   return {
@@ -355,12 +354,17 @@ async function onboardingStep3(userId, data) {
   }
 
   const { user, updatedBusiness } = transactionResult;
+  const userContext = await resolveUserContextById(user.id);
+  const responseUser = userContext || user;
 
   logger.info(`Onboarding step 3 completed for user: ${user.email}, AI number: ${provisionedNumber.phoneNumber}`);
 
   return {
     message: 'AI business number provisioned.',
-    user: buildUserResponse(await resolveUserContextById(user.id)),
+    user: buildUserResponse({
+      ...responseUser,
+      onboarding_step: 4,
+    }),
     business: sanitizeBusiness(updatedBusiness),
     ai_phone_number: provisionedNumber.phoneNumber,
     twilio_phone_sid: provisionedNumber.sid,
@@ -509,15 +513,16 @@ async function signin({ email, password }) {
   }
 
   const userContext = await resolveUserContextById(user.id);
-  const token = generateToken(userContext);
+  const responseUser = userContext || user;
+  const token = generateToken(responseUser);
   logger.info(`User signed in: ${user.email}`);
 
   return {
     message: 'Signed in successfully.',
     token,
-    user: buildUserResponse(userContext),
-    onboarding_step: userContext.onboarding_step,
-    onboarding_completed: userContext.onboarding_completed,
+    user: buildUserResponse(responseUser),
+    onboarding_step: responseUser.onboarding_step,
+    onboarding_completed: responseUser.onboarding_completed,
   };
 }
 
@@ -832,6 +837,7 @@ function generateToken(user) {
 }
 
 function sanitizeUser(user) {
+  if (!user) return null;
   const { password_hash, phone_otp, phone_otp_expires_at, ...safe } = user;
   return safe;
 }
@@ -865,6 +871,7 @@ async function resolveUserContextById(id) {
 }
 
 function buildUserResponse(user) {
+  if (!user) return null;
   const safeUser = sanitizeUser(user);
   const {
     business,
@@ -907,8 +914,8 @@ function getTwilioClient() {
 
   // Auto-detect: someone may have stored an API Key SID (SK...) under TWILIO_ACCOUNT_SID
   // and the master Account SID under TWILIO_AUTH_TOKEN-equivalent envs. Normalize.
-  const looksLikeApiKey = (sid) => /^SK[a-zA-Z0-9]{32}$/.test(sid);
-  const looksLikeAccountSid = (sid) => /^AC[a-zA-Z0-9]{32}$/.test(sid);
+  const looksLikeApiKey = (sid) => /^SK[a-zA-Z0-9]+$/.test(sid);
+  const looksLikeAccountSid = (sid) => /^AC[a-zA-Z0-9]+$/.test(sid);
 
   let credentials;
 

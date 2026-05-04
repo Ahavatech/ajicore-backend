@@ -63,6 +63,33 @@ async function getCommunication(req, res, next) {
   }
 }
 
+async function getDashboardSummary(req, res, next) {
+  try {
+    const result = await businessService.getDashboardSummary(req.params.business_id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getAiStatus(req, res, next) {
+  try {
+    const result = await businessService.getAiStatus(req.query.business_id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function toggleAiStatus(req, res, next) {
+  try {
+    const result = await businessService.toggleAiStatus(req.body);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function updateCommunication(req, res, next) {
   try {
     const result = await businessService.updateCommunication(req.body);
@@ -121,6 +148,9 @@ module.exports = {
   updateAutomation,
   getCommunication,
   updateCommunication,
+  getDashboardSummary,
+  getAiStatus,
+  toggleAiStatus,
   getFinanceSettings,
   updateFinanceSettings,
   getFinanceSettingsById,

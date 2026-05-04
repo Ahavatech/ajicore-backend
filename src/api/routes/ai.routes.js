@@ -11,11 +11,79 @@
 
 const { Router } = require('express');
 const aiChatController = require('../../domains/ai/ai_chat.controller');
+const businessController = require('../../domains/business/business.controller');
 const { requireAuth, requireBusinessAccess } = require('../middlewares/auth.middleware');
 const { requireFields } = require('../middlewares/validate.middleware');
 
 const router = Router();
 router.use(requireAuth);
+
+/**
+ * @swagger
+ * /api/ai/status:
+ *   get:
+ *     tags: [AI]
+ *     summary: Get AI call center status
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: business_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Current AI status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AiStatusResponse'
+ */
+router.get(
+  '/status',
+  requireFields(['business_id'], 'query'),
+  requireBusinessAccess('query'),
+  businessController.getAiStatus
+);
+
+/**
+ * @swagger
+ * /api/ai/toggle-status:
+ *   post:
+ *     tags: [AI]
+ *     summary: Toggle AI call center status
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [business_id, status]
+ *             properties:
+ *               business_id:
+ *                 type: string
+ *                 format: uuid
+ *               status:
+ *                 type: string
+ *                 enum: [active, paused]
+ *     responses:
+ *       200:
+ *         description: Updated AI status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AiStatusResponse'
+ */
+router.post(
+  '/toggle-status',
+  requireFields(['business_id', 'status']),
+  requireBusinessAccess('body'),
+  businessController.toggleAiStatus
+);
 
 /**
  * @swagger

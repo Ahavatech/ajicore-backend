@@ -45,6 +45,18 @@ router.get('/metrics', requireFields(['business_id'], 'query'), requireBusinessA
  *     tags: [Customers]
  *     security:
  *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Customers list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Customer'
  */
 router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), customerController.getAll);
 
@@ -64,7 +76,7 @@ router.get('/:id', validateUUID('id'), requireResourceAccess('customer'), custom
  *     security:
  *       - bearerAuth: []
  */
-router.get('/:id/history', validateUUID('id'), requireResourceAccess('customer'), customerController.getHistory);
+router.get('/:id/history', validateUUID('id'), requireFields(['business_id'], 'query'), requireBusinessAccess('query'), requireResourceAccess('customer'), customerController.getHistory);
 
 
 /**
@@ -76,7 +88,7 @@ router.get('/:id/history', validateUUID('id'), requireResourceAccess('customer')
  *     security:
  *       - bearerAuth: []
  */
-router.get('/:id/billing', validateUUID('id'), requireResourceAccess('customer'), customerController.getBilling);
+router.get('/:id/billing', validateUUID('id'), requireFields(['business_id'], 'query'), requireBusinessAccess('query'), requireResourceAccess('customer'), customerController.getBilling);
 
 
 /**
@@ -88,11 +100,47 @@ router.get('/:id/billing', validateUUID('id'), requireResourceAccess('customer')
  *     security:
  *       - bearerAuth: []
  */
-router.get('/:id/schedule', validateUUID('id'), requireResourceAccess('customer'), customerController.getSchedule);
+router.get('/:id/schedule', validateUUID('id'), requireFields(['business_id'], 'query'), requireBusinessAccess('query'), requireResourceAccess('customer'), customerController.getSchedule);
 
+/**
+ * @swagger
+ * /api/customers:
+ *   post:
+ *     summary: Create a customer
+ *     tags: [Customers]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CustomerInput'
+ */
+router.post('/', requireFields(['business_id']), requireBusinessAccess('body'), customerController.create);
 
-router.post('/', requireFields(['business_id', 'first_name', 'last_name']), requireBusinessAccess('body'), customerController.create);
-
+/**
+ * @swagger
+ * /api/customers/{id}:
+ *   patch:
+ *     summary: Update a customer
+ *     tags: [Customers]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CustomerUpdateInput'
+ */
 router.patch('/:id', validateUUID('id'), requireResourceAccess('customer'), customerController.update);
 
 

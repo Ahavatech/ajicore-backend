@@ -53,6 +53,7 @@ const DEFAULT_COMMUNICATION_SETTINGS = {
   send_job_updates: true,
   send_invoice_reminders: true,
   missed_call_text_back: true,
+  ai_status: 'active',
 };
 
 function sanitizeBusiness(business) {
@@ -284,6 +285,60 @@ async function updateCommunication(data) {
   };
 }
 
+async function getDashboardSummary(businessId) {
+  const business = await prisma.business.findUnique({
+    where: { id: businessId },
+    select: {
+      id: true,
+      name: true,
+      ai_phone_number: true,
+    },
+  });
+
+  if (!business) {
+    throw new NotFoundError('Business');
+  }
+
+  return {
+    data: business,
+  };
+}
+
+async function getAiStatus(businessId) {
+  const business = await getBusinessRecord(businessId);
+  const settings = mergeSettings(DEFAULT_COMMUNICATION_SETTINGS, business.communication_settings);
+  return {
+    status: settings.ai_status || 'active',
+  };
+}
+
+async function toggleAiStatus(data) {
+  if (!data.business_id) {
+    throw new ValidationError('business_id is required.');
+  }
+
+  if (!['active', 'paused'].includes(data.status)) {
+    throw new ValidationError('status must be active or paused.');
+  }
+
+  const business = await getBusinessRecord(data.business_id);
+  const settings = mergeSettings(DEFAULT_COMMUNICATION_SETTINGS, business.communication_settings, {
+    ai_status: data.status,
+  });
+
+  const updated = await prisma.business.update({
+    where: { id: data.business_id },
+    data: {
+      communication_settings: settings,
+    },
+  });
+
+  const updatedSettings = mergeSettings(DEFAULT_COMMUNICATION_SETTINGS, updated.communication_settings);
+  return {
+    status: updatedSettings.ai_status || 'active',
+  };
+}
+
 // ============================================
 // Finance Settings
 // ============================================
@@ -443,6 +498,9 @@ module.exports = {
   updateAutomation,
   getCommunication,
   updateCommunication,
+  getDashboardSummary,
+  getAiStatus,
+  toggleAiStatus,
   getFinanceSettings,
   updateFinanceSettings,
 };

@@ -40,7 +40,7 @@ function calculateUnitEconomics(data, markupPercent) {
     : toNumber(laborCost) + totalMaterialsCost + totalToolsCost;
   const flatRate = roundMoney(baseCost * (1 + (markupPercent / 100)));
   const marginAmount = roundMoney(flatRate - baseCost);
-  const marginPercent = flatRate > 0 ? Math.round((marginAmount / flatRate) * 100) : 0;
+  const marginPercent = flatRate > 0 ? Math.round(((marginAmount / flatRate) * 100) * 10) / 10 : 0;
 
   return {
     materials,

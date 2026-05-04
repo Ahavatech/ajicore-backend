@@ -40,7 +40,7 @@ async function getItems(req, res, next) {
     const { business_id, category_id, search, can_quote_phone, page = 1, limit = 50 } = req.query;
     if (!business_id) return res.status(400).json({ error: 'business_id is required' });
     const result = await pbService.getPriceBookItems({ business_id, category_id, search, can_quote_phone, page: +page, limit: +limit });
-    res.json(result);
+    res.json({ data: result.data });
   } catch (err) { next(err); }
 }
 
@@ -66,6 +66,18 @@ async function updateItem(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function updateItemByBodyId(req, res, next) {
+  try {
+    const itemId = req.body?.id;
+    if (!itemId) {
+      return res.status(400).json({ error: 'id is required' });
+    }
+
+    const item = await pbService.updatePriceBookItem(itemId, req.body);
+    res.json(item);
+  } catch (err) { next(err); }
+}
+
 async function deleteItem(req, res, next) {
   try {
     await pbService.deletePriceBookItem(req.params.id);
@@ -82,4 +94,16 @@ async function getSuggestions(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { getCategories, createCategory, updateCategory, deleteCategory, getItems, getItemById, createItem, updateItem, deleteItem, getSuggestions };
+module.exports = {
+  getCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  getItems,
+  getItemById,
+  createItem,
+  updateItem,
+  updateItemByBodyId,
+  deleteItem,
+  getSuggestions,
+};

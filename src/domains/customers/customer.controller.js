@@ -7,7 +7,7 @@ async function getAll(req, res, next) {
   try {
     const { business_id, search, page = 1, limit = 20 } = req.query;
     const result = await customerService.getCustomers({ business_id, search, page: +page, limit: +limit });
-    res.json(result);
+    res.json({ data: result.data });
   } catch (err) { next(err); }
 }
 

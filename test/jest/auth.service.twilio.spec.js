@@ -98,10 +98,44 @@ describe('auth.service Twilio provisioning', () => {
       expect.objectContaining({
         phone_number: '+12125550123',
         friendly_name: '(212) 555-0123',
-        area_code: '212',
         capabilities: { voice: true, sms: true, mms: false },
       }),
     ]);
+  });
+
+  test('getAvailableNumbers uses city search and returns the strict frontend number shape', async () => {
+    twilio.__mocks.localList.mockResolvedValue([
+      {
+        phoneNumber: '+14045551234',
+        friendlyName: '(404) 555-1234',
+        locality: 'Atlanta',
+        region: 'GA',
+        isoCountry: 'US',
+        capabilities: { voice: true, sms: true, mms: false },
+      },
+    ]);
+
+    const result = await authService.getAvailableNumbers({ type: 'city', city: 'Atlanta' });
+
+    expect(twilio.__mocks.localList).toHaveBeenCalledWith({ inLocality: 'Atlanta', limit: 5 });
+    expect(result).toEqual({
+      type: 'city',
+      country: 'US',
+      count: 1,
+      numbers: [
+        {
+          phone_number: '+14045551234',
+          friendly_name: '(404) 555-1234',
+          locality: 'Atlanta',
+          region: 'GA',
+          capabilities: {
+            voice: true,
+            sms: true,
+            mms: false,
+          },
+        },
+      ],
+    });
   });
 
   test('onboardingStep3 provisions and stores a Twilio number', async () => {

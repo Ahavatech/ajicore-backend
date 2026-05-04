@@ -362,8 +362,8 @@ model Timesheet {
 model Customer {
   id             String   @id @default(uuid())
   business_id    String
-  first_name     String
-  last_name      String
+  first_name     String?
+  last_name      String?
   customer_type  String?  @default("Individual") // "Individual" | "Company"
   company_name   String?
   poc_name       String?
@@ -468,6 +468,7 @@ model Job {
   created_by           String?
   scheduled_start_time DateTime?
   scheduled_end_time   DateTime?
+  estimated_time       String?
   actual_start_time    DateTime?
   actual_end_time      DateTime?
   photos_urls          Json?

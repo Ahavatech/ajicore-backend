@@ -208,7 +208,8 @@ router.get('/:id', validateUUID('id'), requireResourceAccess('job', { allowStaff
  *               service_type: { type: string }
  *               address: { type: string }
  *               scheduled_start_time: { type: string, format: date-time }
-  *               scheduled_end_time: { type: string, format: date-time }
+ *               scheduled_end_time: { type: string, format: date-time }
+ *               estimated_time: { type: string }
  *               service_call_fee: { type: number }
  *               is_emergency: { type: boolean }
  *               status: { type: string }
@@ -223,8 +224,17 @@ router.get('/:id', validateUUID('id'), requireResourceAccess('job', { allowStaff
  *                   type: object
  *                   properties:
  *                     price_book_id: { type: string, format: uuid }
- *                     quantity: { type: number }
+ *                     name: { type: string, nullable: true }
+ *                     description: { type: string, nullable: true }
  *                     price: { type: number }
+ *                     labor_cost: { type: number, nullable: true }
+ *                     labor_time: { type: string, nullable: true }
+ *                     materials:
+ *                       type: array
+ *                       items: { type: object }
+ *                     tools:
+ *                       type: array
+ *                       items: { type: object }
  *     responses:
  *       201:
  *         description: Job created successfully
@@ -256,7 +266,8 @@ router.post('/', requireRole(['admin']), requireFields(['business_id', 'customer
  *               service_type: { type: string }
  *               address: { type: string }
  *               scheduled_start_time: { type: string, format: date-time }
-  *               scheduled_end_time: { type: string, format: date-time }
+ *               scheduled_end_time: { type: string, format: date-time }
+ *               estimated_time: { type: string }
  *               service_call_fee: { type: number }
  *               is_emergency: { type: boolean }
  *               status: { type: string }
@@ -271,8 +282,17 @@ router.post('/', requireRole(['admin']), requireFields(['business_id', 'customer
  *                   type: object
  *                   properties:
  *                     price_book_id: { type: string, format: uuid }
- *                     quantity: { type: number }
+ *                     name: { type: string, nullable: true }
+ *                     description: { type: string, nullable: true }
  *                     price: { type: number }
+ *                     labor_cost: { type: number, nullable: true }
+ *                     labor_time: { type: string, nullable: true }
+ *                     materials:
+ *                       type: array
+ *                       items: { type: object }
+ *                     tools:
+ *                       type: array
+ *                       items: { type: object }
  *     responses:
  *       200:
  *         description: Job updated successfully

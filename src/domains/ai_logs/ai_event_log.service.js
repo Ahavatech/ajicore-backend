@@ -4,6 +4,25 @@
  */
 const prisma = require('../../lib/prisma');
 
+function mapAiLogEntry(entry) {
+  if (!entry) return null;
+  const details = entry.details && typeof entry.details === 'object' ? entry.details : {};
+  const customerName = entry.customer
+    ? [entry.customer.first_name, entry.customer.last_name].filter(Boolean).join(' ').trim()
+    : null;
+
+  return {
+    id: entry.id,
+    business_id: entry.business_id,
+    event_type: entry.event_type,
+    actor: entry.actor || 'AI Receptionist',
+    title: details.title || customerName || entry.event_type,
+    message: details.message || null,
+    timestamp: entry.timestamp,
+    details,
+  };
+}
+
 async function getLogs({ business_id, event_type, job_id, customer_id, page = 1, limit = 50 }) {
   const parsedPage = Math.max(1, parseInt(page) || 1);
   const parsedLimit = Math.min(200, Math.max(1, parseInt(limit) || 50));
@@ -63,4 +82,4 @@ async function getEventTypes(business_id) {
   return results.map((r) => ({ event_type: r.event_type, count: r._count.event_type }));
 }
 
-module.exports = { getLogs, getById, log, getEventTypes };
+module.exports = { getLogs, getById, log, getEventTypes, mapAiLogEntry };

@@ -101,7 +101,7 @@ describe('advanced frontend blueprint contracts', () => {
       base_cost: 100,
       flat_rate: 149,
       margin_amount: 49,
-      margin_percent: 33,
+      margin_percent: 32.9,
     });
 
     const result = await pricebookService.createPriceBookItem({
@@ -123,7 +123,7 @@ describe('advanced frontend blueprint contracts', () => {
         base_cost: 100,
         flat_rate: 149,
         margin_amount: 49,
-        margin_percent: 33,
+        margin_percent: 32.9,
       }),
     }));
     expect(result.category_name).toBe('General Maintenance');

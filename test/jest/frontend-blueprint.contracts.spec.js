@@ -2,7 +2,10 @@ jest.mock('../../src/lib/prisma', () => {
   const prisma = {
     customer: {
       count: jest.fn(),
+      create: jest.fn(),
+      findUnique: jest.fn(),
       findMany: jest.fn(),
+      update: jest.fn(),
     },
     job: {
       count: jest.fn(),
@@ -206,9 +209,12 @@ describe('frontend blueprint service contracts', () => {
       title: 'HVAC Repair',
       source: 'Manual',
       scheduled_start_time: new Date('2026-04-21T09:00:00.000Z'),
+      scheduled_end_time: new Date('2026-04-21T11:00:00.000Z'),
+      estimated_time: '3 hours',
+      address: '123 Main St, Atlanta GA',
       photos_urls: ['https://example.com/photo.jpg'],
       line_items: [{ name: 'Diagnostic', price: 150, quantity: 1 }],
-      customer: { first_name: 'Sarah', last_name: 'Johnson' },
+      customer: { first_name: 'Sarah', last_name: 'Johnson', location_main: '123 Main St, Atlanta GA' },
       assigned_staff: { name: 'David Brown' },
     });
 
@@ -229,7 +235,9 @@ describe('frontend blueprint service contracts', () => {
     }));
     expect(result).toEqual(expect.objectContaining({
       customer_name: 'Sarah Johnson',
+      customer_address: '123 Main St, Atlanta GA',
       staff_name: 'David Brown',
+      estimated_time: '3 hours',
       photo_urls: ['https://example.com/photo.jpg'],
       line_items: [{ name: 'Diagnostic', price: 150, quantity: 1 }],
     }));
@@ -268,6 +276,64 @@ describe('frontend blueprint service contracts', () => {
       photo_urls: ['https://example.com/new-photo.jpg'],
       line_items: [{ price_book_id: 'item-1', price: 200, quantity: 2 }],
     }));
+  });
+
+  test('customers enforce Individual vs Company validation rules', async () => {
+    prisma.customer.create.mockResolvedValueOnce({
+      id: 'customer-1',
+      business_id: 'business-1',
+      customer_type: 'Individual',
+      first_name: 'John',
+      last_name: null,
+      company_name: null,
+      poc_name: null,
+    });
+    prisma.customer.create.mockResolvedValueOnce({
+      id: 'customer-2',
+      business_id: 'business-1',
+      customer_type: 'Company',
+      first_name: null,
+      last_name: null,
+      company_name: 'Acme Corp LLC',
+      poc_name: 'Jane Smith',
+    });
+
+    const individual = await customerService.create({
+      business_id: 'business-1',
+      customer_type: 'Individual',
+      first_name: 'John',
+      last_name: '',
+      company_name: '',
+      poc_name: '',
+      email: 'john@example.com',
+    });
+
+    const company = await customerService.create({
+      business_id: 'business-1',
+      customer_type: 'Company',
+      company_name: 'Acme Corp LLC',
+      poc_name: 'Jane Smith',
+      first_name: '',
+      last_name: '',
+      email: 'billing@acmecorp.com',
+    });
+
+    await expect(customerService.create({
+      business_id: 'business-1',
+      customer_type: 'Individual',
+      first_name: '',
+    })).rejects.toThrow('first_name is required when customer_type is Individual.');
+
+    await expect(customerService.create({
+      business_id: 'business-1',
+      customer_type: 'Company',
+      company_name: '',
+    })).rejects.toThrow('company_name is required when customer_type is Company.');
+
+    expect(individual.first_name).toBe('John');
+    expect(individual.company_name).toBeNull();
+    expect(company.company_name).toBe('Acme Corp LLC');
+    expect(company.first_name).toBeNull();
   });
 
   test('global search maps all categories into generic frontend cards', async () => {

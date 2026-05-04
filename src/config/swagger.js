@@ -244,11 +244,7 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             friendly_name: { type: 'string', example: 'US/United States' },
             locality: { type: 'string', example: 'Washington', nullable: true },
             region: { type: 'string', example: 'DC', nullable: true },
-            postal_code: { type: 'string', example: '20001', nullable: true },
-            country: { type: 'string', example: 'US', description: 'ISO country code' },
             capabilities: { $ref: '#/components/schemas/PhoneNumberCapabilities' },
-            type: { type: 'string', enum: ['local', 'toll_free'], example: 'local' },
-            area_code: { type: 'string', example: '202', nullable: true },
           },
         },
         GetAvailableNumbersQuery: {
@@ -388,8 +384,8 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
                     customer_type: { type: 'string', enum: ['Individual', 'Company'], default: 'Individual' },
                     company_name: { type: 'string', nullable: true },
                     poc_name: { type: 'string', nullable: true },
-                    first_name: { type: 'string' },
-                    last_name: { type: 'string' },
+                    first_name: { type: 'string', nullable: true },
+                    last_name: { type: 'string', nullable: true },
                     // Convenience field returned by API services (computed from first/last)
                     name: { type: 'string', description: 'Computed display name' },
                     phone_number: { type: 'string', nullable: true },
@@ -407,6 +403,44 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
                     notes: { type: 'string', nullable: true },
                     createdAt: { type: 'string', format: 'date-time' },
                     updatedAt: { type: 'string', format: 'date-time' },
+                  },
+                },
+                CustomerInput: {
+                  type: 'object',
+                  required: ['business_id', 'customer_type'],
+                  properties: {
+                    business_id: { type: 'string', format: 'uuid' },
+                    customer_type: { type: 'string', enum: ['Individual', 'Company'] },
+                    first_name: { type: 'string', nullable: true },
+                    last_name: { type: 'string', nullable: true },
+                    company_name: { type: 'string', nullable: true },
+                    poc_name: { type: 'string', nullable: true },
+                    email: { type: 'string', format: 'email', nullable: true },
+                    phone_number: { type: 'string', nullable: true },
+                    location_main: { type: 'string', nullable: true },
+                    location_other: { type: 'string', nullable: true },
+                    warranty_enabled: { type: 'boolean', nullable: true },
+                    warranty_due: { type: 'string', format: 'date-time', nullable: true },
+                    notes: { type: 'string', nullable: true },
+                    profile_image_url: { type: 'string', nullable: true },
+                  },
+                },
+                CustomerUpdateInput: {
+                  type: 'object',
+                  properties: {
+                    customer_type: { type: 'string', enum: ['Individual', 'Company'] },
+                    first_name: { type: 'string', nullable: true },
+                    last_name: { type: 'string', nullable: true },
+                    company_name: { type: 'string', nullable: true },
+                    poc_name: { type: 'string', nullable: true },
+                    email: { type: 'string', format: 'email', nullable: true },
+                    phone_number: { type: 'string', nullable: true },
+                    location_main: { type: 'string', nullable: true },
+                    location_other: { type: 'string', nullable: true },
+                    warranty_enabled: { type: 'boolean', nullable: true },
+                    warranty_due: { type: 'string', format: 'date-time', nullable: true },
+                    notes: { type: 'string', nullable: true },
+                    profile_image_url: { type: 'string', nullable: true },
                   },
                 },
                 CustomerMetrics: {
@@ -440,6 +474,7 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
 
             scheduled_start_time: { type: 'string', format: 'date-time', nullable: true },
             scheduled_end_time: { type: 'string', format: 'date-time', nullable: true },
+            estimated_time: { type: 'string', nullable: true },
             actual_start_time: { type: 'string', format: 'date-time', nullable: true },
             actual_end_time: { type: 'string', format: 'date-time', nullable: true },
 
@@ -492,9 +527,19 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
                 type: 'object',
                 properties: {
                   price_book_id: { type: 'string', format: 'uuid' },
-                  quantity: { type: 'number' },
-                  price: { type: 'number' },
                   name: { type: 'string', nullable: true },
+                  description: { type: 'string', nullable: true },
+                  price: { type: 'number' },
+                  labor_cost: { type: 'number', nullable: true },
+                  labor_time: { type: 'string', nullable: true },
+                  materials: {
+                    type: 'array',
+                    items: { type: 'object', additionalProperties: true },
+                  },
+                  tools: {
+                    type: 'array',
+                    items: { type: 'object', additionalProperties: true },
+                  },
                 },
               },
             },
@@ -1037,6 +1082,7 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
           properties: {
             id: { type: 'string' },
             name: { type: 'string' },
+            category_id: { type: 'string', format: 'uuid', nullable: true },
             can_quote_phone: { type: 'boolean' },
             price_type: { type: 'string', enum: ['Fixed', 'Range', 'NeedsOnsite'] },
             price: { type: 'number', nullable: true },
@@ -1055,6 +1101,16 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             flat_rate: { type: 'number', nullable: true },
             margin_amount: { type: 'number', nullable: true },
             margin_percent: { type: 'number', nullable: true },
+            materials: {
+              type: 'array',
+              nullable: true,
+              items: { type: 'object', additionalProperties: true },
+            },
+            tools: {
+              type: 'array',
+              nullable: true,
+              items: { type: 'object', additionalProperties: true },
+            },
           },
         },
         DashboardChartPoint: {
@@ -1713,8 +1769,6 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             friendly_name: { type: 'string' },
             locality: { type: 'string', nullable: true },
             region: { type: 'string', nullable: true },
-            postal_code: { type: 'string', nullable: true },
-            country: { type: 'string' },
             capabilities: {
               type: 'object',
               properties: {
@@ -1723,8 +1777,6 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
                 mms: { type: 'boolean' },
               },
             },
-            type: { type: 'string' },
-            area_code: { type: 'string', nullable: true },
           },
         },
         AvailableNumbersResponse: {
@@ -1751,6 +1803,51 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
           type: 'object',
           properties: {
             message: { type: 'string' },
+          },
+        },
+        BusinessDashboardSummaryResponse: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                name: { type: 'string' },
+                ai_phone_number: { type: 'string', nullable: true },
+              },
+            },
+          },
+        },
+        AiLogEntry: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            business_id: { type: 'string', format: 'uuid' },
+            event_type: { type: 'string' },
+            actor: { type: 'string', nullable: true },
+            title: { type: 'string', nullable: true },
+            message: { type: 'string', nullable: true },
+            timestamp: { type: 'string', format: 'date-time' },
+            details: {
+              type: 'object',
+              additionalProperties: true,
+              nullable: true,
+            },
+          },
+        },
+        AiLogsListResponse: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/AiLogEntry' },
+            },
+          },
+        },
+        AiStatusResponse: {
+          type: 'object',
+          properties: {
+            status: { type: 'string', enum: ['active', 'paused'] },
           },
         },
 
@@ -1794,6 +1891,7 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
       { name: 'Follow-Ups', description: 'Automated reminders and follow-up management' },
       { name: 'Dashboard', description: 'Analytics and reporting' },
       { name: 'Business Profile', description: 'Company profile, service area, and general business settings' },
+      { name: 'Businesses', description: 'Lightweight business summary endpoints' },
       { name: 'Alerts', description: 'Alert preference settings for missed calls, invoices, and check-ins' },
       { name: 'Automation', description: 'Automation settings for reminders, expiries, and check-in defaults' },
       { name: 'Communication', description: 'Messaging defaults, AI receptionist settings, and communication behavior' },

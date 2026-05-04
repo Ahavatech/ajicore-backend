@@ -8,7 +8,7 @@ async function list(req, res, next) {
   try {
     const { business_id, event_type, job_id, customer_id, page, limit } = req.query;
     const result = await logService.getLogs({ business_id, event_type, job_id, customer_id, page, limit });
-    res.json({ success: true, ...result });
+    res.json({ data: result.data.map(logService.mapAiLogEntry) });
   } catch (err) {
     next(err);
   }
@@ -16,9 +16,9 @@ async function list(req, res, next) {
 
 async function show(req, res, next) {
   try {
-    const entry = await logService.getById(req.params.id);
+    const entry = await logService.getById(req.params.log_id);
     if (!entry) return res.status(404).json({ error: 'Log entry not found' });
-    res.json({ success: true, data: entry });
+    res.json(logService.mapAiLogEntry(entry));
   } catch (err) {
     next(err);
   }

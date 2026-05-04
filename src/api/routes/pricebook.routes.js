@@ -41,6 +41,18 @@ router.delete('/categories/:id', validateUUID('id'), requireResourceAccess('serv
  *       - in: query
  *         name: can_quote_phone
  *         schema: {type: boolean}
+ *     responses:
+ *       200:
+ *         description: Price book items
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/PriceBookItem'
  */
 router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), pbController.getItems);
 router.get('/suggestions', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), pbController.getSuggestions);
@@ -87,6 +99,26 @@ router.get('/:id', validateUUID('id'), requireResourceAccess('priceBookItem'), p
  *               service_call_fee: {type: number}
  */
 router.post('/', requireFields(['business_id', 'name']), requireBusinessAccess('body'), pbController.createItem);
+/**
+ * @swagger
+ * /api/price-book:
+ *   patch:
+ *     summary: Update a price book item using the item id in the request body
+ *     tags: [PriceBook]
+ *     security: [{bearerAuth: []}]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             allOf:
+ *               - $ref: '#/components/schemas/PriceBookItem'
+ *               - type: object
+ *                 required: [id]
+ *                 properties:
+ *                   id: { type: string, format: uuid }
+ */
+router.patch('/', requireFields(['id'], 'body'), requireBusinessAccess('body'), pbController.updateItemByBodyId);
 router.patch('/:id', validateUUID('id'), requireResourceAccess('priceBookItem'), pbController.updateItem);
 router.delete('/:id', validateUUID('id'), requireResourceAccess('priceBookItem'), pbController.deleteItem);
 
