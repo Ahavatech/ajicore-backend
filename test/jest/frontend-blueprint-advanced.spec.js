@@ -337,6 +337,68 @@ describe('advanced frontend blueprint contracts', () => {
     expect(result.status).toBe('Appointment');
   });
 
+  test('quote update clears staff and scheduling when frontend switches to quote mode', async () => {
+    prisma.quote.findUnique.mockResolvedValueOnce({
+      id: 'quote-2',
+      business_id: 'business-1',
+      customer_id: 'customer-1',
+      assigned_staff_id: 'staff-1',
+      is_estimate_appointment: true,
+      scheduled_estimate_date: new Date('2026-05-15T00:00:00.000Z'),
+      scheduled_estimate_time: '14:30',
+      scheduled_start_time: new Date('2026-05-15T14:30:00.000Z'),
+      scheduled_end_time: null,
+      line_items: [],
+    });
+    prisma.quote.update.mockResolvedValue({
+      id: 'quote-2',
+      business_id: 'business-1',
+      customer_id: 'customer-1',
+      assigned_staff_id: null,
+      status: 'Pending',
+      is_estimate_appointment: false,
+      scheduled_estimate_date: null,
+      scheduled_estimate_time: null,
+      scheduled_start_time: null,
+      scheduled_end_time: null,
+      line_items: [{ name: 'Under-Sink Piping', unit_price: 450, total: 450 }],
+      customer: { first_name: 'Tim', last_name: 'Wilson' },
+      assigned_staff: null,
+      createdAt: new Date('2026-05-10T00:00:00.000Z'),
+    });
+
+    const result = await quoteService.update('quote-2', {
+      assigned_staff_id: null,
+      line_items: [
+        {
+          name: 'Under-Sink Piping',
+          description: 'Includes removal of old metal pipes, installing new PVC, and sealing all joints.',
+          unit_price: 450,
+          total: 450,
+        },
+      ],
+      scheduled_estimate_date: null,
+      scheduled_estimate_time: null,
+      status: 'Pending',
+      is_estimate_appointment: false,
+    });
+
+    expect(prisma.quote.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'quote-2' },
+      data: expect.objectContaining({
+        assigned_staff_id: null,
+        is_estimate_appointment: false,
+        scheduled_estimate_date: null,
+        scheduled_estimate_time: null,
+        scheduled_start_time: null,
+        scheduled_end_time: null,
+        status: 'Pending',
+      }),
+    }));
+    expect(result.assigned_staff_id).toBeNull();
+    expect(result.scheduled_start_time).toBeNull();
+  });
+
   test('customer billing and schedule return frontend shapes', async () => {
     prisma.invoice.findMany.mockResolvedValue([
       {

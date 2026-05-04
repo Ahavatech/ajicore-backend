@@ -39,6 +39,10 @@ function validateDueTerms(value) {
   }
 }
 
+function hasOwn(data, key) {
+  return Object.prototype.hasOwnProperty.call(data || {}, key);
+}
+
 function parseTimeToken(token, fallbackPeriod) {
   const match = String(token || '').trim().toLowerCase().match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
   if (!match) return null;
@@ -181,42 +185,57 @@ function buildQuoteData(data, existing = null) {
   const inferredAppointment = !hasLineItems && (hasSchedulingInput || (existing?.is_estimate_appointment && hasExistingSchedule));
   const isAppointment = explicitQuote ? false : (explicitAppointment || inferredAppointment);
 
-  if (isAppointment && !data.assigned_staff_id && !existing?.assigned_staff_id) {
+  const assignedStaffProvided = hasOwn(data, 'assigned_staff_id');
+  const scheduledDateProvided = hasOwn(data, 'scheduled_estimate_date');
+  const scheduledTimeProvided = hasOwn(data, 'scheduled_estimate_time');
+  const warrantyDueProvided = hasOwn(data, 'warranty_due');
+  const customCategoryProvided = hasOwn(data, 'custom_category_name');
+  const contractTypeProvided = hasOwn(data, 'contract_type');
+  const photosProvided = hasOwn(data, 'photos');
+  const notesProvided = hasOwn(data, 'notes');
+  const siteNotesProvided = hasOwn(data, 'site_notes');
+  const paymentTermsProvided = hasOwn(data, 'payment_due_terms');
+  const declineReasonProvided = hasOwn(data, 'decline_reason');
+  const priceBookItemProvided = hasOwn(data, 'price_book_item_id');
+
+  const effectiveAssignedStaffId = assignedStaffProvided ? data.assigned_staff_id : existing?.assigned_staff_id;
+
+  if (isAppointment && !effectiveAssignedStaffId) {
     throw new ValidationError('assigned_staff_id is required for estimate appointments.');
   }
 
   let schedule = { start: null, end: null };
-  const estimateDate = data.scheduled_estimate_date ?? existing?.scheduled_estimate_date;
-  const estimateTime = data.scheduled_estimate_time ?? existing?.scheduled_estimate_time;
+  const estimateDate = scheduledDateProvided ? data.scheduled_estimate_date : existing?.scheduled_estimate_date;
+  const estimateTime = scheduledTimeProvided ? data.scheduled_estimate_time : existing?.scheduled_estimate_time;
   const shouldApplySchedule = isAppointment
-    || data.scheduled_estimate_time !== undefined
-    || data.scheduled_estimate_date !== undefined;
+    || scheduledTimeProvided
+    || scheduledDateProvided;
   if (shouldApplySchedule) {
     schedule = parseEstimateWindow(estimateDate, estimateTime);
   }
 
   const financials = calculateFinancials(data);
   const updateData = {
-    assigned_staff_id: data.assigned_staff_id ?? undefined,
+    assigned_staff_id: assignedStaffProvided ? (data.assigned_staff_id || null) : undefined,
     status: data.status ? normalizeStatus(data.status) : undefined,
     title: data.service_name ?? data.title ?? undefined,
     service_name: data.service_name ?? undefined,
     service_category: data.service_category ?? undefined,
-    custom_category_name: data.custom_category_name ?? undefined,
-    contract_type: data.contract_type ?? undefined,
-    warranty_due: data.warranty_due ? new Date(data.warranty_due) : undefined,
+    custom_category_name: customCategoryProvided ? (data.custom_category_name || null) : undefined,
+    contract_type: contractTypeProvided ? (data.contract_type || null) : undefined,
+    warranty_due: warrantyDueProvided ? (data.warranty_due ? new Date(data.warranty_due) : null) : undefined,
     description: data.description ?? undefined,
-    photos: data.photos ?? undefined,
-    price_book_item_id: data.price_book_item_id ?? undefined,
-    scheduled_estimate_date: data.scheduled_estimate_date === null
-      ? null
-      : (data.scheduled_estimate_date ? new Date(data.scheduled_estimate_date) : undefined),
-    scheduled_estimate_time: data.scheduled_estimate_time !== undefined ? data.scheduled_estimate_time : undefined,
+    photos: photosProvided ? (Array.isArray(data.photos) ? data.photos : []) : undefined,
+    price_book_item_id: priceBookItemProvided ? (data.price_book_item_id || null) : undefined,
+    scheduled_estimate_date: scheduledDateProvided
+      ? (data.scheduled_estimate_date ? new Date(data.scheduled_estimate_date) : null)
+      : undefined,
+    scheduled_estimate_time: scheduledTimeProvided ? (data.scheduled_estimate_time || null) : undefined,
     scheduled_start_time: shouldApplySchedule ? schedule.start : undefined,
     scheduled_end_time: shouldApplySchedule ? schedule.end : undefined,
-    notes: data.notes ?? undefined,
-    site_notes: data.site_notes ?? undefined,
-    decline_reason: data.decline_reason ?? undefined,
+    notes: notesProvided ? (data.notes || null) : undefined,
+    site_notes: siteNotesProvided ? (data.site_notes || null) : undefined,
+    decline_reason: declineReasonProvided ? (data.decline_reason || null) : undefined,
     line_items: data.line_items !== undefined ? financials.line_items : undefined,
     is_estimate_appointment: data.is_estimate_appointment !== undefined || explicitAppointment || hasSchedulingInput
       ? isAppointment
@@ -233,7 +252,7 @@ function buildQuoteData(data, existing = null) {
     deposit_amount: data.deposit_percent !== undefined || data.line_items !== undefined || data.manual_subtotal !== undefined ? financials.deposit_amount : undefined,
     total_amount: data.line_items !== undefined || data.manual_subtotal !== undefined || data.total_amount !== undefined ? financials.total_amount : undefined,
     due_amount: data.line_items !== undefined || data.manual_subtotal !== undefined || data.deposit_percent !== undefined ? financials.due_amount : undefined,
-    payment_due_terms: data.payment_due_terms ?? undefined,
+    payment_due_terms: paymentTermsProvided ? (data.payment_due_terms || null) : undefined,
   };
 
   Object.keys(updateData).forEach((key) => updateData[key] === undefined && delete updateData[key]);
