@@ -194,6 +194,7 @@ function buildQuoteData(data, existing = null) {
   const paymentTermsProvided = hasOwn(data, 'payment_due_terms');
   const declineReasonProvided = hasOwn(data, 'decline_reason');
   const priceBookItemProvided = hasOwn(data, 'price_book_item_id');
+  const forceQuoteMode = hasLineItems;
 
   const effectiveAssignedStaffId = assignedStaffProvided ? data.assigned_staff_id : existing?.assigned_staff_id;
 
@@ -204,16 +205,20 @@ function buildQuoteData(data, existing = null) {
   let schedule = { start: null, end: null };
   const estimateDate = scheduledDateProvided ? data.scheduled_estimate_date : existing?.scheduled_estimate_date;
   const estimateTime = scheduledTimeProvided ? data.scheduled_estimate_time : existing?.scheduled_estimate_time;
-  const shouldApplySchedule = isAppointment
+  const shouldApplySchedule = !forceQuoteMode && (
+    isAppointment
     || scheduledTimeProvided
-    || scheduledDateProvided;
+    || scheduledDateProvided
+  );
   if (shouldApplySchedule) {
     schedule = parseEstimateWindow(estimateDate, estimateTime);
   }
 
   const financials = calculateFinancials(data);
   const updateData = {
-    assigned_staff_id: assignedStaffProvided ? (data.assigned_staff_id || null) : undefined,
+    assigned_staff_id: forceQuoteMode
+      ? null
+      : (assignedStaffProvided ? (data.assigned_staff_id || null) : undefined),
     status: data.status ? normalizeStatus(data.status) : undefined,
     title: data.service_name ?? data.title ?? undefined,
     service_name: data.service_name ?? undefined,
@@ -224,12 +229,18 @@ function buildQuoteData(data, existing = null) {
     description: data.description ?? undefined,
     photos: photosProvided ? (Array.isArray(data.photos) ? data.photos : []) : undefined,
     price_book_item_id: priceBookItemProvided ? (data.price_book_item_id || null) : undefined,
-    scheduled_estimate_date: scheduledDateProvided
-      ? (data.scheduled_estimate_date ? new Date(data.scheduled_estimate_date) : null)
-      : undefined,
-    scheduled_estimate_time: scheduledTimeProvided ? (data.scheduled_estimate_time || null) : undefined,
-    scheduled_start_time: shouldApplySchedule ? schedule.start : undefined,
-    scheduled_end_time: shouldApplySchedule ? schedule.end : undefined,
+    scheduled_estimate_date: forceQuoteMode
+      ? null
+      : (
+        scheduledDateProvided
+          ? (data.scheduled_estimate_date ? new Date(data.scheduled_estimate_date) : null)
+          : undefined
+      ),
+    scheduled_estimate_time: forceQuoteMode
+      ? null
+      : (scheduledTimeProvided ? (data.scheduled_estimate_time || null) : undefined),
+    scheduled_start_time: forceQuoteMode ? null : (shouldApplySchedule ? schedule.start : undefined),
+    scheduled_end_time: forceQuoteMode ? null : (shouldApplySchedule ? schedule.end : undefined),
     notes: notesProvided ? (data.notes || null) : undefined,
     site_notes: siteNotesProvided ? (data.site_notes || null) : undefined,
     decline_reason: declineReasonProvided ? (data.decline_reason || null) : undefined,

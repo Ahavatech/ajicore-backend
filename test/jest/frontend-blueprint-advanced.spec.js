@@ -447,6 +447,60 @@ describe('advanced frontend blueprint contracts', () => {
     expect(result.scheduled_start_time).toBeNull();
   });
 
+  test('quote create ignores scheduling fields when priced line_items are present', async () => {
+    prisma.customer.findFirst.mockResolvedValue({ id: 'customer-1' });
+    prisma.quote.count.mockResolvedValue(0);
+    prisma.quote.create.mockResolvedValue({
+      id: 'quote-priced-2',
+      business_id: 'business-1',
+      customer_id: 'customer-1',
+      assigned_staff_id: null,
+      service_name: 'Kitchen Pipe Replacement',
+      status: 'Pending',
+      is_estimate_appointment: false,
+      scheduled_estimate_date: null,
+      scheduled_estimate_time: null,
+      scheduled_start_time: null,
+      scheduled_end_time: null,
+      line_items: [{ name: 'Under-Sink Piping', unit_price: 450, total: 450 }],
+      customer: { first_name: 'Tim', last_name: 'Wilson' },
+      assigned_staff: null,
+      createdAt: new Date('2026-05-10T00:00:00.000Z'),
+    });
+
+    const result = await quoteService.create({
+      business_id: 'business-1',
+      customer_id: 'customer-1',
+      assigned_staff_id: 'staff-1',
+      service_name: 'Kitchen Pipe Replacement',
+      service_category: 'Plumbing',
+      description: 'Full replacement of under-sink PVC.',
+      line_items: [
+        {
+          name: 'Under-Sink Piping',
+          description: 'Includes removal of old metal pipes, installing new PVC, and sealing all joints.',
+          unit_price: 450,
+          total: 450,
+        },
+      ],
+      scheduled_estimate_date: '2026-05-15T00:00:00.000Z',
+      scheduled_estimate_time: '14:30',
+      status: 'Pending',
+    });
+
+    expect(prisma.quote.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        assigned_staff_id: null,
+        is_estimate_appointment: false,
+        scheduled_estimate_date: null,
+        scheduled_estimate_time: null,
+        scheduled_start_time: null,
+        scheduled_end_time: null,
+      }),
+    }));
+    expect(result.assigned_staff_id).toBeNull();
+  });
+
   test('customer billing and schedule return frontend shapes', async () => {
     prisma.invoice.findMany.mockResolvedValue([
       {
