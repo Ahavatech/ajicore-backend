@@ -241,6 +241,54 @@ describe('advanced frontend blueprint contracts', () => {
     expect(result.status).toBe('Appointment');
   });
 
+  test('quote create infers estimate appointment mode from empty line_items when flag is omitted', async () => {
+    prisma.customer.findFirst.mockResolvedValue({ id: 'customer-1' });
+    prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+    prisma.quote.count.mockResolvedValue(0);
+    prisma.quote.create.mockResolvedValue({
+      id: 'quote-appointment-2',
+      business_id: 'business-1',
+      customer_id: 'customer-1',
+      assigned_staff_id: 'staff-1',
+      service_name: 'Leak Inspection',
+      status: 'Appointment',
+      is_estimate_appointment: true,
+      scheduled_start_time: new Date('2026-05-15T14:30:00.000Z'),
+      scheduled_end_time: null,
+      customer: { first_name: 'Tim', last_name: 'Wilson' },
+      assigned_staff: { name: 'John Smith' },
+      createdAt: new Date('2026-05-10T00:00:00.000Z'),
+    });
+
+    const result = await quoteService.create({
+      business_id: 'business-1',
+      customer_id: 'customer-1',
+      assigned_staff_id: 'staff-1',
+      service_name: 'Leak Inspection',
+      service_category: 'Plumbing',
+      description: 'Need someone to inspect a leak.',
+      line_items: [],
+      manual_subtotal: 0,
+      discount_percent: 0,
+      tax_percent: 0,
+      deposit_percent: 0,
+      total_amount: 0,
+      deposit_amount: 0,
+      scheduled_estimate_date: '2026-05-15T00:00:00.000Z',
+      scheduled_estimate_time: '14:30',
+      notes: 'Call on arrival.',
+      status: 'Appointment',
+    });
+
+    expect(prisma.quote.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        is_estimate_appointment: true,
+        line_items: [],
+      }),
+    }));
+    expect(result.status).toBe('Appointment');
+  });
+
   test('quote create accepts priced quote payloads without scheduling fields', async () => {
     prisma.customer.findFirst.mockResolvedValue({ id: 'customer-1' });
     prisma.quote.count.mockResolvedValue(0);

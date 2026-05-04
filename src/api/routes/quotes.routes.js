@@ -96,7 +96,7 @@ router.get('/:id', validateUUID('id'), requireResourceAccess('quote', { allowSta
  *     tags: [Quotes]
  *     security:
  *       - bearerAuth: []
- *     description: Quote mode sends priced line items. Appointment mode sends an empty line_items array with scheduling fields such as scheduled_estimate_date and scheduled_estimate_time.
+ *     description: If is_estimate_appointment is provided, backend honors it. If omitted, backend infers mode from line_items. Populated line_items means quote mode. Empty line_items means estimate appointment mode.
  *     requestBody:
  *       required: true
  *       content:
@@ -120,7 +120,7 @@ router.post('/', requireRole(['admin']), requireFields(['business_id', 'customer
  *     tags: [Quotes]
  *     security:
  *       - bearerAuth: []
- *     description: Supports updating either a priced quote or an estimate appointment. Appointment updates can keep line_items empty and edit only staff and scheduling details.
+ *     description: Supports updating either a priced quote or an estimate appointment. If is_estimate_appointment is provided, backend honors it. If omitted, backend infers mode from line_items. Appointment updates can keep line_items empty and edit only staff and scheduling details.
  *     parameters:
  *       - in: path
  *         name: id

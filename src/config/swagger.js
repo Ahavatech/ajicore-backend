@@ -1003,7 +1003,7 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
         },
         QuoteInput: {
           type: 'object',
-          description: 'Used for both priced quotes and estimate appointments. Quote mode sends line_items. Appointment mode sends an empty line_items array plus scheduling fields and typically sets is_estimate_appointment to true.',
+          description: 'Used for both priced quotes and estimate appointments. If is_estimate_appointment is provided, the backend honors it. If it is omitted, the backend infers mode from line_items: empty line_items means estimate appointment, populated line_items means quote.',
           required: ['business_id', 'customer_id'],
           properties: {
             business_id: { type: 'string', format: 'uuid' },
@@ -1035,13 +1035,13 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
               items: { type: 'object', additionalProperties: true },
             },
             is_emergency: { type: 'boolean' },
-            is_estimate_appointment: { type: 'boolean', description: 'True for estimate appointments with scheduling but no priced line items.' },
+            is_estimate_appointment: { type: 'boolean', description: 'Optional explicit mode flag. If provided, backend honors it. If omitted, backend infers mode from line_items.' },
             status: { type: 'string', enum: ['EstimateScheduled', 'Draft', 'Pending', 'Appointment', 'Sent', 'Approved', 'Declined', 'Expired'] },
           },
         },
         QuoteUpdateInput: {
           type: 'object',
-          description: 'Partial update shape for both priced quotes and estimate appointments. Appointment updates may keep line_items empty and adjust schedule/staff fields only.',
+          description: 'Partial update shape for both priced quotes and estimate appointments. If is_estimate_appointment is provided, the backend honors it. If omitted, the backend infers mode from line_items: empty line_items means estimate appointment, populated line_items means quote.',
           properties: {
             customer_id: { type: 'string', format: 'uuid' },
             assigned_staff_id: { type: 'string', format: 'uuid', nullable: true },
@@ -1072,7 +1072,7 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
               items: { type: 'object', additionalProperties: true },
             },
             is_emergency: { type: 'boolean' },
-            is_estimate_appointment: { type: 'boolean', description: 'True for estimate appointments with scheduling but no priced line items.' },
+            is_estimate_appointment: { type: 'boolean', description: 'Optional explicit mode flag. If provided, backend honors it. If omitted, backend infers mode from line_items.' },
             status: { type: 'string', enum: ['EstimateScheduled', 'Draft', 'Pending', 'Appointment', 'Sent', 'Approved', 'Declined', 'Expired'] },
             expires_at: { type: 'string', format: 'date-time', nullable: true },
           },

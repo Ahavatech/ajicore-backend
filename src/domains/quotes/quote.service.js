@@ -173,17 +173,14 @@ function buildQuoteData(data, existing = null) {
     : null;
   const effectiveLineItems = normalizedIncomingLineItems ?? (Array.isArray(existing?.line_items) ? existing.line_items : []);
   const hasLineItems = Array.isArray(effectiveLineItems) && effectiveLineItems.length > 0;
+  const estimateFlagProvided = hasOwn(data, 'is_estimate_appointment');
   const hasSchedulingInput = [
     data.scheduled_estimate_date,
     data.scheduled_estimate_time,
     data.scheduled_start_time,
     data.scheduled_end_time,
   ].some((value) => value !== undefined && value !== null && value !== '');
-  const hasExistingSchedule = Boolean(existing?.scheduled_estimate_date || existing?.scheduled_start_time);
-  const explicitAppointment = data.is_estimate_appointment === true || data.status === 'Appointment';
-  const explicitQuote = data.is_estimate_appointment === false;
-  const inferredAppointment = !hasLineItems && (hasSchedulingInput || (existing?.is_estimate_appointment && hasExistingSchedule));
-  const isAppointment = explicitQuote ? false : (explicitAppointment || inferredAppointment);
+  const isAppointment = estimateFlagProvided ? data.is_estimate_appointment === true : !hasLineItems;
 
   const assignedStaffProvided = hasOwn(data, 'assigned_staff_id');
   const scheduledDateProvided = hasOwn(data, 'scheduled_estimate_date');
@@ -237,7 +234,7 @@ function buildQuoteData(data, existing = null) {
     site_notes: siteNotesProvided ? (data.site_notes || null) : undefined,
     decline_reason: declineReasonProvided ? (data.decline_reason || null) : undefined,
     line_items: data.line_items !== undefined ? financials.line_items : undefined,
-    is_estimate_appointment: data.is_estimate_appointment !== undefined || explicitAppointment || hasSchedulingInput
+    is_estimate_appointment: estimateFlagProvided || data.line_items !== undefined
       ? isAppointment
       : undefined,
     is_emergency: data.is_emergency ?? undefined,
