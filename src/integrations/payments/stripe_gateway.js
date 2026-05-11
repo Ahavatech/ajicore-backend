@@ -4,6 +4,7 @@
  */
 const env = require('../../config/env');
 const logger = require('../../utils/logger');
+const { ValidationError } = require('../../utils/errors');
 
 let stripe = null;
 
@@ -56,8 +57,15 @@ async function createPaymentIntent(params) {
 
 async function handleWebhook(payload, signature) {
   const client = getStripe();
-  if (!client) throw new Error('Stripe is not configured.');
-  const event = client.webhooks.constructEvent(payload, signature, env.STRIPE_WEBHOOK_SECRET);
+  if (!client) throw new ValidationError('Stripe is not configured on this server.');
+  if (!env.STRIPE_WEBHOOK_SECRET) {
+    throw new ValidationError('Stripe webhook secret is not configured on this server.');
+  }
+  if (!signature) {
+    throw new ValidationError('Missing Stripe-Signature header.');
+  }
+  const rawPayload = Buffer.isBuffer(payload) ? payload : Buffer.from(payload);
+  const event = client.webhooks.constructEvent(rawPayload, signature, env.STRIPE_WEBHOOK_SECRET);
   logger.info(`Stripe webhook received: ${event.type}`);
   return event;
 }

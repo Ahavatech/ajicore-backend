@@ -58,6 +58,29 @@ function requireFields(fields, sourceOrOptions = {}, options = {}) {
   };
 }
 
+function requireOneOfFields(fields, source = 'body', options = {}) {
+  const { allowEmptyStrings = false } = options;
+
+  return (req, res, next) => {
+    const sourceObj = source === 'body' ? req.body : source === 'query' ? req.query : req.params;
+    const hasAny = fields.some((field) => {
+      const value = getNestedValue(sourceObj, field);
+      if (value === undefined || value === null) return false;
+      if (typeof value === 'string' && !allowEmptyStrings) return value.trim() !== '';
+      return true;
+    });
+
+    if (!hasAny) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: `At least one of these fields is required: ${fields.join(', ')}`,
+      });
+    }
+
+    next();
+  };
+}
+
 /**
  * Validates that a UUID parameter is properly formatted.
  * @param {string} paramName - The URL parameter name to validate.
@@ -218,6 +241,7 @@ function getNestedValue(obj, path) {
 
 module.exports = {
   requireFields,
+  requireOneOfFields,
   validateUUID,
   validateEmail,
   validatePhone,

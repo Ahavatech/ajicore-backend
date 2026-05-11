@@ -109,8 +109,9 @@ const standardModules = [
     name: 'billing.routes',
     routeModulePath: 'src/api/routes/billing.routes.js',
     basePath: '/api/billing',
-    controllerModules: [{ modulePath: 'src/domains/billing/invoice.controller.js', handlers: ['getAll', 'getInvoicesByJob', 'getById', 'downloadInvoicePdf', 'getTotal', 'createInvoice', 'updateInvoice', 'sendInvoice', 'voidInvoice', 'refundInvoice', 'processPayment', 'getExpenses', 'createExpense', 'updateExpense', 'deleteExpense'] }],
+    controllerModules: [{ modulePath: 'src/domains/billing/invoice.controller.js', handlers: ['getStripeConfig', 'getAll', 'getInvoicesByJob', 'getById', 'downloadInvoicePdf', 'getTotal', 'createInvoice', 'updateInvoice', 'sendInvoice', 'voidInvoice', 'refundInvoice', 'processPayment', 'getExpenses', 'createExpense', 'updateExpense', 'deleteExpense'] }],
     routes: [
+      { method: 'get', path: '/stripe-config', handler: 'getStripeConfig', skipFailure: true },
       { method: 'get', path: '/invoices', handler: 'getAll', query: { business_id: BUSINESS_ID }, invalidQuery: {}, failureAuth: 'requireAuth' },
       { method: 'get', path: `/invoices/job/${VALID_UUID}`, handler: 'getInvoicesByJob', invalidPath: '/invoices/job/bad-uuid', failureAuth: 'requireAuth' },
       { method: 'get', path: `/invoices/${VALID_UUID}`, handler: 'getById', invalidPath: '/invoices/bad-uuid', failureAuth: 'requireAuth' },
@@ -297,6 +298,27 @@ const standardModules = [
     ],
   },
   {
+    name: 'subscriptions.routes',
+    routeModulePath: 'src/api/routes/subscriptions.routes.js',
+    basePath: '/api/subscriptions',
+    controllerModules: [{ modulePath: 'src/domains/subscriptions/subscription.controller.js', handlers: ['getStatus', 'start', 'cancel', 'resume'] }],
+    routes: [
+      { method: 'get', path: '/status', handler: 'getStatus', query: { business_id: BUSINESS_ID }, invalidQuery: {}, failureAuth: 'requireAuth' },
+      { method: 'post', path: '/start', handler: 'start', body: { business_id: BUSINESS_ID }, invalidBody: {}, failureAuth: 'requireAuth' },
+      { method: 'post', path: '/cancel', handler: 'cancel', body: { business_id: BUSINESS_ID }, invalidBody: {}, failureAuth: 'requireAuth' },
+      { method: 'post', path: '/resume', handler: 'resume', body: { business_id: BUSINESS_ID }, invalidBody: {}, failureAuth: 'requireAuth' },
+    ],
+  },
+  {
+    name: 'webhooks.routes',
+    routeModulePath: 'src/api/routes/webhooks.routes.js',
+    basePath: '/api/webhooks',
+    controllerModules: [{ modulePath: 'src/domains/webhooks/stripe_webhook.controller.js', handlers: ['handleStripeWebhook'] }],
+    routes: [
+      { method: 'post', path: '/stripe', handler: 'handleStripeWebhook', body: { id: 'evt_123', type: 'customer.subscription.updated' }, skipFailure: true },
+    ],
+  },
+  {
     name: 'ai_logs.routes',
     routeModulePath: 'src/api/routes/ai_logs.routes.js',
     basePath: '/api/ai-logs',
@@ -374,6 +396,9 @@ describe('standard API route modules', () => {
     });
 
     test.each(moduleConfig.routes)('$method $path failure', async (routeConfig) => {
+      if (routeConfig.skipFailure) {
+        return;
+      }
       harness.authState.fail = null;
 
       const response = await harness.request({
@@ -433,6 +458,9 @@ describe('app-level endpoints', () => {
 
     expect(response.status).toBe(200);
     expect(payload.paths['/api/auth/signin']).toBeDefined();
+    expect(payload.paths['/api/billing/stripe-config']).toBeDefined();
+    expect(payload.paths['/api/subscriptions/start']).toBeDefined();
+    expect(payload.paths['/api/webhooks/stripe']).toBeDefined();
     expect(payload.paths['/api/internal/ai/business-by-phone']).toBeDefined();
     expect(payload.components.schemas.AuthSignupInput.properties.email.format).toBe('email');
     expect(payload.components.schemas.AuthSignupInput.properties.password.minLength).toBe(8);
@@ -441,6 +469,9 @@ describe('app-level endpoints', () => {
     expect(payload.components.schemas.AuthSigninInput.properties.email.description).toContain('signup');
     expect(payload.components.schemas.AuthSigninInput.properties.password.minLength).toBe(1);
     expect(payload.components.schemas.AuthSigninInput.properties.password.description).toContain('exact password');
+    expect(payload.components.schemas.StripeConfigResponse.properties.publishable_key).toBeDefined();
+    expect(payload.components.schemas.SubscriptionStatusResponse.properties.subscription).toBeDefined();
+    expect(payload.components.schemas.Customer.properties.display_name).toBeDefined();
   });
 
   test('GET /api/reference returns Scalar HTML', async () => {

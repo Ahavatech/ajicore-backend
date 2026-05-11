@@ -7,6 +7,13 @@ const { generateInvoicePdf } = require('./invoice_pdf.service');
 const paymentService = require('./payment.service');
 const expenseService = require('./expense.service');
 
+async function getStripeConfig(req, res, next) {
+  try {
+    const result = paymentService.getPublicStripeConfig();
+    res.json(result);
+  } catch (err) { next(err); }
+}
+
 async function getAll(req, res, next) {
   try {
     const { business_id, job_id, status, page = 1, limit = 20 } = req.query;
@@ -121,6 +128,7 @@ async function deleteExpense(req, res, next) {
 }
 
 module.exports = {
+  getStripeConfig,
   getAll, getById, getInvoicesByJob, createInvoice, updateInvoice, sendInvoice,
   voidInvoice, refundInvoice, getTotal, processPayment,
   downloadInvoicePdf,

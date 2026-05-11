@@ -56,11 +56,37 @@ router.get('/metrics', requireFields(['business_id'], 'query'), requireBusinessA
  *                 data:
  *                   type: array
  *                   items:
- *                     $ref: '#/components/schemas/Customer'
+ *                     $ref: '#/components/schemas/CustomerSearchResult'
  */
 router.get('/', requireFields(['business_id'], 'query'), requireBusinessAccess('query'), customerController.getAll);
 
-
+/**
+ * @swagger
+ * /api/customers/lookup:
+ *   get:
+ *     summary: Lookup customer by phone number
+ *     tags: [Customers]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: business_id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *       - in: query
+ *         name: phone
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Matched customer or null
+ *         content:
+ *           application/json:
+ *             schema:
+ *               oneOf:
+ *                 - $ref: '#/components/schemas/CustomerSearchResult'
+ *                 - type: 'null'
+ */
 router.get('/lookup', requireFields(['business_id', 'phone'], 'query'), requireBusinessAccess('query'), customerController.findByPhone);
 
 

@@ -48,7 +48,7 @@
  *                     data:
  *                       type: array
  *                       items:
- *                         $ref: '#/components/schemas/Customer'
+ *                         $ref: '#/components/schemas/CustomerSearchResult'
  */
 
 /**
@@ -78,7 +78,7 @@
  *             schema:
  *               nullable: true
  *               allOf:
- *                 - $ref: '#/components/schemas/Customer'
+ *                 - $ref: '#/components/schemas/CustomerSearchResult'
  */
 
 /**
@@ -101,7 +101,7 @@
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Customer'
+ *               $ref: '#/components/schemas/CustomerSearchResult'
  *       404:
  *         description: Customer not found
  *         content:

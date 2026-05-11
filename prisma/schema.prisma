@@ -77,6 +77,17 @@ enum AuthProvider {
   Google
 }
 
+enum SubscriptionStatus {
+  incomplete
+  incomplete_expired
+  trialing
+  active
+  past_due
+  canceled
+  unpaid
+  paused
+}
+
 enum UnknownServiceHandling {
   FreeEstimate
   PaidServiceCall
@@ -155,6 +166,10 @@ model User {
   password_hash        String?
   phone_otp            String?
   phone_otp_expires_at DateTime?
+  password_reset_code        String?
+  password_reset_expires_at  DateTime?
+  password_reset_used_at     DateTime?
+  password_reset_channel     String?
   first_name           String?
   last_name            String?
   role                 UserRole     @default(admin)
@@ -251,6 +266,8 @@ model Business {
   payroll_records      PayrollRecord[]
   finance_settings     BusinessFinanceSettings?
   bookkeeping_transactions BookkeepingTransaction[]
+  subscriptions        BusinessSubscription[]
+  subscription_events  SubscriptionPaymentEvent[]
 
   @@map("businesses")
 }
@@ -914,5 +931,52 @@ model BookkeepingTransaction {
 
   @@map("bookkeeping_transactions")
   @@index([business_id, transaction_date])
+}
+
+model BusinessSubscription {
+  id                      String             @id @default(uuid())
+  business_id             String
+  stripe_customer_id      String?
+  stripe_subscription_id  String?            @unique
+  stripe_price_id         String?
+  status                  SubscriptionStatus @default(incomplete)
+  trial_start             DateTime?
+  trial_end               DateTime?
+  current_period_start    DateTime?
+  current_period_end      DateTime?
+  cancel_at_period_end    Boolean            @default(false)
+  canceled_at             DateTime?
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+
+  business Business @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  events   SubscriptionPaymentEvent[]
+
+  @@index([business_id, status])
+  @@map("business_subscriptions")
+}
+
+model SubscriptionPaymentEvent {
+  id                     String   @id @default(uuid())
+  business_id            String?
+  business_subscription_id String?
+  stripe_event_id        String   @unique
+  stripe_customer_id     String?
+  stripe_subscription_id String?
+  stripe_invoice_id      String?
+  stripe_payment_intent_id String?
+  event_type             String
+  status                 String?
+  payload                Json?
+  occurred_at            DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  business             Business?             @relation(fields: [business_id], references: [id], onDelete: SetNull)
+  businessSubscription BusinessSubscription? @relation(fields: [business_subscription_id], references: [id], onDelete: SetNull)
+
+  @@index([business_id, event_type])
+  @@index([stripe_subscription_id])
+  @@map("subscription_payment_events")
 }
 

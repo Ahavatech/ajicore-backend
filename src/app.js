@@ -39,8 +39,10 @@ const searchRoutes = require('./api/routes/search.routes');
 const reportsRoutes = require('./api/routes/reports.routes');
 const uploadRoutes = require('./api/routes/upload.routes');
 const integrationsRoutes = require('./api/routes/integrations.routes');
+const subscriptionsRoutes = require('./api/routes/subscriptions.routes');
 const usersRoutes = require('./api/routes/users.routes');
 const aiRoutes = require('./api/routes/ai.routes');
+const webhooksRoutes = require('./api/routes/webhooks.routes');
 
 
 // Middleware imports
@@ -143,6 +145,9 @@ if (process.env.NODE_ENV === 'production') {
     }
   });
 }
+
+// Stripe webhook must receive the raw body before JSON parsing.
+app.use('/api/webhooks', webhooksRoutes);
 
 // Secure request size limits
 app.use(express.json({
@@ -248,6 +253,7 @@ app.use('/api/search', searchRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/integrations', integrationsRoutes);
+app.use('/api/subscriptions', subscriptionsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/ai', aiRoutes);
 

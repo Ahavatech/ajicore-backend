@@ -9,6 +9,21 @@
 
 /**
  * @swagger
+ * /api/billing/stripe-config:
+ *   get:
+ *     summary: Get safe Stripe frontend configuration
+ *     tags: [Billing]
+ *     responses:
+ *       200:
+ *         description: Public Stripe config
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StripeConfigResponse'
+ */
+
+/**
+ * @swagger
  * /api/billing/invoices:
  *   get:
  *     summary: Get all invoices

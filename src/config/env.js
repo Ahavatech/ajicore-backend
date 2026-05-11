@@ -38,6 +38,30 @@ if (process.env.NODE_ENV === 'production') {
   }
 }
 
+function parseBoolean(value, defaultValue = false) {
+  if (value === undefined || value === null || value === '') return defaultValue;
+  if (typeof value === 'boolean') return value;
+  return ['true', '1', 'yes', 'on'].includes(String(value).trim().toLowerCase());
+}
+
+function parseInteger(value, defaultValue) {
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : defaultValue;
+}
+
+function validateStripeKeyPair(secretKey, publishableKey) {
+  if (!secretKey || !publishableKey) return;
+
+  const secretMode = secretKey.startsWith('sk_live_') ? 'live' : secretKey.startsWith('sk_test_') ? 'test' : null;
+  const publishableMode = publishableKey.startsWith('pk_live_') ? 'live' : publishableKey.startsWith('pk_test_') ? 'test' : null;
+
+  if (secretMode && publishableMode && secretMode !== publishableMode) {
+    throw new Error('Stripe key mode mismatch: do not mix live and test Stripe keys.');
+  }
+}
+
+validateStripeKeyPair(process.env.STRIPE_SECRET_KEY, process.env.STRIPE_PUBLISHABLE_KEY);
+
 const env = {
   // Server
   PORT: parseInt(process.env.PORT, 10) || 3000,
@@ -56,7 +80,13 @@ const env = {
 
   // Stripe
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+  STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY,
   STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+  STRIPE_CURRENCY: (process.env.STRIPE_CURRENCY || 'usd').toLowerCase(),
+  STRIPE_SUBSCRIPTION_PRICE_ID: process.env.STRIPE_SUBSCRIPTION_PRICE_ID,
+  STRIPE_SUBSCRIPTION_PRICE_AMOUNT: parseInteger(process.env.STRIPE_SUBSCRIPTION_PRICE_AMOUNT, null),
+  STRIPE_SUBSCRIPTION_TRIAL_DAYS: parseInteger(process.env.STRIPE_SUBSCRIPTION_TRIAL_DAYS, 21),
+  STRIPE_SUBSCRIPTION_PRODUCT_NAME: process.env.STRIPE_SUBSCRIPTION_PRODUCT_NAME || 'Ajicore Business Subscription',
 
   // Twilio
   TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID,
@@ -75,6 +105,25 @@ const env = {
 
   // Internal API Key
   INTERNAL_API_KEY: process.env.INTERNAL_API_KEY,
+
+  // Mail / SMTP
+  MAIL_PROVIDER: process.env.MAIL_PROVIDER || null,
+  SMTP_HOST: process.env.SMTP_HOST || null,
+  SMTP_PORT: parseInteger(process.env.SMTP_PORT, null),
+  SMTP_SECURE: parseBoolean(process.env.SMTP_SECURE, false),
+  SMTP_USER: process.env.SMTP_USER || null,
+  SMTP_PASS: process.env.SMTP_PASS || null,
+  MAIL_FROM_NAME: process.env.MAIL_FROM_NAME || 'Ajicore',
+  MAIL_FROM_EMAIL: process.env.MAIL_FROM_EMAIL || null,
+
+  // Password reset
+  PASSWORD_RESET_CODE_TTL_MINUTES: parseInteger(process.env.PASSWORD_RESET_CODE_TTL_MINUTES, 10),
+  PASSWORD_RESET_CODE_LENGTH: parseInteger(process.env.PASSWORD_RESET_CODE_LENGTH, 5),
+  PASSWORD_RESET_ALLOW_EMAIL: parseBoolean(process.env.PASSWORD_RESET_ALLOW_EMAIL, true),
+  PASSWORD_RESET_ALLOW_SMS: parseBoolean(process.env.PASSWORD_RESET_ALLOW_SMS, true),
+
+  // Frontend / redirects
+  APP_FRONTEND_URL: process.env.APP_FRONTEND_URL || process.env.FRONTEND_URL || 'http://localhost:3000',
 
   // Uploads / Cloudinary (optional mirror for local uploads)
   BACKEND_URL: process.env.BACKEND_URL,

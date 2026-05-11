@@ -134,6 +134,63 @@
 
 /**
  * @swagger
+ * /api/auth/forgot-password:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Request a password reset code by email or phone
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AuthForgotPasswordInput'
+ *     responses:
+ *       200:
+ *         description: Generic response to avoid account enumeration
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AuthForgotPasswordResponse'
+ *
+ * /api/auth/verify-reset-code:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Verify a password reset code by email or phone
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AuthVerifyResetCodeInput'
+ *     responses:
+ *       200:
+ *         description: Reset code is valid
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AuthVerifyResetCodeResponse'
+ *
+ * /api/auth/reset-password:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Reset password with a verified email or phone code
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AuthResetPasswordInput'
+ *     responses:
+ *       200:
+ *         description: Password reset completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AuthResetPasswordResponse'
+ */
+
+/**
+ * @swagger
  * /api/auth/me:
  *   get:
  *     tags: [Auth]

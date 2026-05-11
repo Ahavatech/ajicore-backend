@@ -148,7 +148,7 @@ async function getMe(req, res, next) {
 
 async function forgotPassword(req, res, next) {
   try {
-    const result = await authService.forgotPassword(req.body.email);
+    const result = await authService.forgotPassword(req.body);
     res.json(result);
   } catch (err) {
     next(err);
@@ -157,7 +157,7 @@ async function forgotPassword(req, res, next) {
 
 async function verifyResetCode(req, res, next) {
   try {
-    const result = await authService.verifyResetCode(req.body.email, req.body.code);
+    const result = await authService.verifyResetCode(req.body);
     res.json(result);
   } catch (err) {
     next(err);
@@ -166,7 +166,7 @@ async function verifyResetCode(req, res, next) {
 
 async function resetPassword(req, res, next) {
   try {
-    const result = await authService.resetPassword(req.body.email, req.body.code, req.body.new_password);
+    const result = await authService.resetPassword(req.body);
     res.json(result);
   } catch (err) {
     next(err);

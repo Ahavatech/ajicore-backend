@@ -12,9 +12,19 @@ const UNPAID_INVOICE_STATUSES = ['Draft', 'Sent', 'Pending', 'Overdue', 'Partial
 function withComputedName(customer) {
   if (!customer) return customer;
   if (Array.isArray(customer)) return customer.map(withComputedName);
+  const customerType = customer.customer_type || 'Individual';
+  const fullName = `${customer.first_name || ''} ${customer.last_name || ''}`.trim();
+  const name = fullName || customer.company_name || '';
+  const contact = customer.email || customer.phone_number || null;
+  const displayName = customerType === 'Company'
+    ? (customer.email || customer.phone_number || customer.company_name || 'Unknown Customer')
+    : (name || customer.email || customer.phone_number || 'Unknown Customer');
   return {
     ...customer,
-    name: `${customer.first_name || ''} ${customer.last_name || ''}`.trim(),
+    name,
+    display_name: displayName,
+    contact,
+    type: customerType,
   };
 }
 

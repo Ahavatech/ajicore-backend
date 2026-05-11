@@ -17,11 +17,11 @@ const { randomUUID } = require('crypto');
 const prisma = require('../../lib/prisma');
 const env = require('../../config/env');
 const logger = require('../../utils/logger');
+const emailService = require('../communications/email.service');
 const { ValidationError, ConflictError, AuthenticationError, NotFoundError } = require('../../utils/errors');
 
 const SALT_ROUNDS = 12;
 const OTP_EXPIRY_MINUTES = 10;
-const RESET_CODE_EXPIRY_MINUTES = 10;
 const TWILIO_AVAILABLE_NUMBER_LIMIT = 5;
 
 // ============================================
@@ -535,76 +535,85 @@ async function getUserById(id) {
   return buildUserResponse(user);
 }
 
-async function forgotPassword(email) {
-  if (!email) {
-    throw new ValidationError('Email is required.');
-  }
-
-  const normalizedEmail = email.toLowerCase().trim();
-  const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
-  let dev_reset_code = null;
+async function forgotPassword(input) {
+  const identifier = normalizeResetIdentifier(input);
+  const user = await findUserForPasswordReset(identifier);
+  let devResetCode = null;
 
   if (user && user.auth_provider !== 'Google') {
-    const code = Math.floor(10000 + Math.random() * 90000).toString();
-    const expires = new Date(Date.now() + RESET_CODE_EXPIRY_MINUTES * 60 * 1000);
+    const code = generateNumericCode(env.PASSWORD_RESET_CODE_LENGTH);
+    const expires = new Date(Date.now() + env.PASSWORD_RESET_CODE_TTL_MINUTES * 60 * 1000);
+    const channel = identifier.type === 'email' ? 'email' : 'sms';
 
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        phone_otp: code,
-        phone_otp_expires_at: expires,
+        password_reset_code: code,
+        password_reset_expires_at: expires,
+        password_reset_used_at: null,
+        password_reset_channel: channel,
       },
     });
 
-    if (!env.isProduction) {
-      dev_reset_code = code;
+    if (identifier.type === 'email') {
+      if (env.PASSWORD_RESET_ALLOW_EMAIL && user.email) {
+        try {
+          await emailService.sendPasswordResetOtpEmail({
+            to: user.email,
+            code,
+            expiresInMinutes: env.PASSWORD_RESET_CODE_TTL_MINUTES,
+            userName: buildPersonName(user.first_name, user.last_name),
+          });
+        } catch (err) {
+          logger.warn(`Password reset email send failed for ${user.email}: ${err.message}`);
+        }
+      }
+    } else if (env.PASSWORD_RESET_ALLOW_SMS && user.phone_number) {
+      try {
+        await sendResetCodeSms(user.phone_number, code);
+      } catch (err) {
+        logger.warn(`Password reset SMS send failed for ${user.phone_number}: ${err.message}`);
+      }
     }
 
-    logger.info(`Password reset code generated for user: ${user.email}`);
+    if (!env.isProduction) {
+      devResetCode = code;
+    }
+
+    logger.info(`Password reset code generated for user: ${user.email || user.id}`);
   }
 
-    const response = {
-    // Keep the response generic to avoid account enumeration.
-    message: 'Code sent',
+  const response = {
+    message: 'If an account exists, a reset code has been sent.',
   };
 
-  if (dev_reset_code) {
-    response.dev_reset_code = dev_reset_code;
+  if (devResetCode) {
+    response.dev_reset_code = devResetCode;
   }
 
   return response;
 }
 
-async function verifyResetCode(email, code) {
-  if (!email || !code) {
-    throw new ValidationError('Email and code are required.');
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { email: email.toLowerCase().trim() },
-  });
+async function verifyResetCode(input, codeArg) {
+  const { identifier, code } = normalizeResetVerificationInput(input, codeArg);
+  const user = await findUserForPasswordReset(identifier);
 
   validateStoredResetCode(user, code);
 
-    return {
+  return {
     message: 'Valid',
     valid: true,
   };
 }
 
-async function resetPassword(email, code, newPassword) {
-  if (!email || !code || !newPassword) {
-    throw new ValidationError('Email, code, and new_password are required.');
-  }
+async function resetPassword(input, codeArg, newPasswordArg) {
+  const { identifier, code, newPassword } = normalizeResetPasswordInput(input, codeArg, newPasswordArg);
 
   if (newPassword.length < 8) {
     throw new ValidationError('New password must be at least 8 characters long.');
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email: email.toLowerCase().trim() },
-  });
-
+  const user = await findUserForPasswordReset(identifier);
   validateStoredResetCode(user, code);
 
   const password_hash = await bcrypt.hash(newPassword, SALT_ROUNDS);
@@ -612,8 +621,10 @@ async function resetPassword(email, code, newPassword) {
     where: { id: user.id },
     data: {
       password_hash,
-      phone_otp: null,
-      phone_otp_expires_at: null,
+      password_reset_code: null,
+      password_reset_expires_at: null,
+      password_reset_used_at: new Date(),
+      password_reset_channel: null,
     },
   });
 
@@ -711,7 +722,7 @@ async function sendOtp(userId, { phone_number }) {
   await Promise.all([
     prisma.user.update({
       where: { id: userId },
-      data: { phone_otp: otp, phone_otp_expires_at: expires },
+      data: { phone_otp: otp, phone_otp_expires_at: expires, phone_number },
     }),
     business
       ? prisma.business.update({
@@ -970,6 +981,116 @@ function buildBusinessPhoneFriendlyName(businessName, phoneNumber) {
   return `${baseName} - ${phoneNumber}`.slice(0, 64);
 }
 
+function buildPersonName(firstName, lastName) {
+  return [firstName, lastName].filter(Boolean).join(' ').trim();
+}
+
+function generateNumericCode(length) {
+  const safeLength = Math.max(4, Math.min(8, Number(length) || 5));
+  let result = '';
+  while (result.length < safeLength) {
+    result += Math.floor(Math.random() * 10).toString();
+  }
+  return result.slice(0, safeLength);
+}
+
+function normalizePhoneNumberForLookup(phoneNumber) {
+  return String(phoneNumber || '').trim();
+}
+
+function normalizeResetIdentifier(input) {
+  if (typeof input === 'string') {
+    return parseIdentifier(input);
+  }
+
+  const candidate = input?.identifier || input?.email || input?.phone_number;
+  if (!candidate) {
+    throw new ValidationError('email, phone_number, or identifier is required.');
+  }
+
+  return parseIdentifier(candidate);
+}
+
+function parseIdentifier(rawIdentifier) {
+  const raw = String(rawIdentifier || '').trim();
+  if (!raw) {
+    throw new ValidationError('email, phone_number, or identifier is required.');
+  }
+
+  if (raw.includes('@')) {
+    if (!isValidEmail(raw)) {
+      throw new ValidationError('Please enter a valid email address.');
+    }
+    return { type: 'email', value: raw.toLowerCase() };
+  }
+
+  return { type: 'phone', value: normalizePhoneNumberForLookup(raw) };
+}
+
+async function findUserForPasswordReset(identifier) {
+  if (identifier.type === 'email') {
+    return prisma.user.findUnique({ where: { email: identifier.value } });
+  }
+
+  return prisma.user.findFirst({
+    where: { phone_number: identifier.value },
+  });
+}
+
+function normalizeResetVerificationInput(input, codeArg) {
+  if (typeof input === 'string') {
+    return {
+      identifier: parseIdentifier(input),
+      code: codeArg,
+    };
+  }
+
+  return {
+    identifier: normalizeResetIdentifier(input),
+    code: input?.code,
+  };
+}
+
+function normalizeResetPasswordInput(input, codeArg, newPasswordArg) {
+  if (typeof input === 'string') {
+    return {
+      identifier: parseIdentifier(input),
+      code: codeArg,
+      newPassword: newPasswordArg,
+    };
+  }
+
+  return {
+    identifier: normalizeResetIdentifier(input),
+    code: input?.code,
+    newPassword: input?.new_password,
+  };
+}
+
+async function sendResetCodeSms(phoneNumber, code) {
+  const hasTwilio = env.TWILIO_ACCOUNT_SID
+    && env.TWILIO_AUTH_TOKEN
+    && (env.TWILIO_MESSAGING_SERVICE_SID || env.TWILIO_PHONE_NUMBER);
+
+  if (!hasTwilio) {
+    throw new ValidationError('SMS delivery is not configured on this server.');
+  }
+
+  const client = getTwilioClient();
+  const messagePayload = {
+    body: `Your Ajicore password reset code is: ${code}. It expires in ${env.PASSWORD_RESET_CODE_TTL_MINUTES} minutes.`,
+    to: phoneNumber,
+  };
+
+  if (env.TWILIO_MESSAGING_SERVICE_SID) {
+    messagePayload.messagingServiceSid = env.TWILIO_MESSAGING_SERVICE_SID;
+  } else {
+    messagePayload.from = env.TWILIO_PHONE_NUMBER;
+  }
+
+  return client.messages.create(messagePayload);
+}
+
 function buildIncomingPhoneNumberPayload({ phoneNumber, friendlyName }) {
   const payload = {
     phoneNumber,
@@ -1057,15 +1178,15 @@ function validateStoredResetCode(user, code) {
     throw new ValidationError('Invalid or expired reset code.');
   }
 
-  if (!user.phone_otp || !user.phone_otp_expires_at) {
+  if (!user.password_reset_code || !user.password_reset_expires_at || user.password_reset_used_at) {
     throw new ValidationError('Invalid or expired reset code.');
   }
 
-  if (new Date() > new Date(user.phone_otp_expires_at)) {
+  if (new Date() > new Date(user.password_reset_expires_at)) {
     throw new ValidationError('Invalid or expired reset code.');
   }
 
-  if (String(user.phone_otp).trim() !== String(code).trim()) {
+  if (String(user.password_reset_code).trim() !== String(code).trim()) {
     throw new ValidationError('Invalid or expired reset code.');
   }
 }

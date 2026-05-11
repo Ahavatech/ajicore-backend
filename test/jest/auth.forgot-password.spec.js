@@ -40,9 +40,9 @@ describe('forgot password production contract', () => {
   test('does not expose dev_reset_code in production', async () => {
     const authService = require('../../src/domains/auth/auth.service');
 
-    const result = await authService.forgotPassword('user@example.com');
+    const result = await authService.forgotPassword({ email: 'user@example.com' });
 
-    expect(result).toEqual({ message: 'Code sent' });
+    expect(result).toEqual({ message: 'If an account exists, a reset code has been sent.' });
     expect(result.dev_reset_code).toBeUndefined();
   });
 });

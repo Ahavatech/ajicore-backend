@@ -4,6 +4,7 @@
  */
 const prisma = require('../../lib/prisma');
 const stripeGateway = require('../../integrations/payments/stripe_gateway');
+const env = require('../../config/env');
 const logger = require('../../utils/logger');
 const { logActivitySafe } = require('../ai_logs/activity_log.service');
 const { recordLedgerTransaction } = require('../bookkeeping/ledger.service');
@@ -122,4 +123,15 @@ async function getPaymentsByInvoice(invoiceId) {
   return prisma.payment.findMany({ where: { invoice_id: invoiceId }, orderBy: { paid_at: 'desc' } });
 }
 
-module.exports = { processPayment, getPaymentsByInvoice };
+function getPublicStripeConfig() {
+  if (!env.STRIPE_PUBLISHABLE_KEY) {
+    throw new ValidationError('Stripe publishable key is not configured on this server.');
+  }
+
+  return {
+    publishable_key: env.STRIPE_PUBLISHABLE_KEY,
+    currency: env.STRIPE_CURRENCY,
+  };
+}
+
+module.exports = { processPayment, getPaymentsByInvoice, getPublicStripeConfig };

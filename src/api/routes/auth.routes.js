@@ -2,7 +2,7 @@
 const { Router } = require('express');
 const authController = require('../../domains/auth/auth.controller');
 const { requireAuth, requireBusinessAccess } = require('../middlewares/auth.middleware');
-const { requireFields } = require('../middlewares/validate.middleware');
+const { requireFields, requireOneOfFields } = require('../middlewares/validate.middleware');
 
 const router = Router();
 
@@ -53,7 +53,7 @@ router.post(
  */
 router.post(
   '/forgot-password',
-  requireFields(['email']),
+  requireOneOfFields(['email', 'phone_number', 'identifier']),
   authController.forgotPassword
 );
 
@@ -79,7 +79,8 @@ router.post(
  */
 router.post(
   '/verify-reset-code',
-  requireFields(['email', 'code']),
+  requireOneOfFields(['email', 'phone_number', 'identifier']),
+  requireFields(['code']),
   authController.verifyResetCode
 );
 
@@ -105,7 +106,8 @@ router.post(
  */
 router.post(
   '/reset-password',
-  requireFields(['email', 'code', 'new_password']),
+  requireOneOfFields(['email', 'phone_number', 'identifier']),
+  requireFields(['code', 'new_password']),
   authController.resetPassword
 );
 

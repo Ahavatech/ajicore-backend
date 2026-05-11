@@ -16,6 +16,25 @@ const { requireAuth, requireBusinessAccess, requireResourceAccess } = require('.
 const { requireFields, validateUUID } = require('../middlewares/validate.middleware');
 
 const router = Router();
+
+/**
+ * @swagger
+ * /api/billing/stripe-config:
+ *   get:
+ *     summary: Get safe Stripe frontend configuration
+ *     tags: [Billing]
+ *     responses:
+ *       200:
+ *         description: Public Stripe config for frontend billing setup
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StripeConfigResponse'
+ *       400:
+ *         description: Stripe publishable key is not configured
+ */
+router.get('/stripe-config', billingController.getStripeConfig);
+
 router.use(requireAuth);
 
 // --- Invoices ---
