@@ -356,11 +356,40 @@ router.post(withAiAlias('/ai/events', '/events'), requireFields(['business_id', 
   } catch (err) { next(err); }
 });
 
-router.get(withAiAlias('/ai/conversations', '/conversations'), requireFields(['business_id'], 'query'), requireInternalBusinessAccess('query'), conversationController.list);
+// ============================================
+// Conversations — AI write path + internal reads
+// ============================================
+// Public dashboard reads live at /api/conversations (see conversations.routes.js).
+// These mirror the same data for AI-side bookkeeping/debugging plus the three
+// write endpoints that the AI call/SMS/web webhooks use to persist transcripts.
+
 router.get(
-  withAiAlias('/ai/conversations/:customer_id', '/conversations/:customer_id'),
-  requireInternalResourceAccess('customer', { source: 'params', field: 'customer_id', notFoundLabel: 'customer' }),
-  withInternalBusinessIdInQuery(conversationController.show)
+  withAiAlias('/ai/conversations', '/conversations'),
+  requireFields(['business_id'], 'query'),
+  requireInternalBusinessAccess('query'),
+  conversationController.list,
+);
+router.post(
+  withAiAlias('/ai/conversations', '/conversations'),
+  requireFields(['business_id', 'channel'], 'body'),
+  requireInternalBusinessAccess('body'),
+  conversationController.startInternal,
+);
+router.get(
+  withAiAlias('/ai/conversations/:id', '/conversations/:id'),
+  withInternalBusinessIdInQuery(conversationController.show),
+);
+router.patch(
+  withAiAlias('/ai/conversations/:id', '/conversations/:id'),
+  requireFields(['business_id'], 'body'),
+  requireInternalBusinessAccess('body'),
+  conversationController.finalizeInternal,
+);
+router.post(
+  withAiAlias('/ai/conversations/:id/messages', '/conversations/:id/messages'),
+  requireFields(['business_id', 'turn_index', 'role', 'text'], 'body'),
+  requireInternalBusinessAccess('body'),
+  conversationController.appendInternal,
 );
 
 // ============================================

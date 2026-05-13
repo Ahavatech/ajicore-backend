@@ -145,6 +145,27 @@ enum VoiceGender {
   Neutral
 }
 
+enum ConversationChannel {
+  Call
+  Sms
+  Web
+}
+
+enum ConversationStatus {
+  InProgress
+  Completed
+  Escalated
+  Failed
+  Abandoned
+}
+
+enum MessageRole {
+  caller
+  agent
+  system
+  tool
+}
+
 // ============================================
 // Models
 // ============================================
@@ -250,6 +271,7 @@ model Business {
   payroll_records      PayrollRecord[]
   finance_settings     BusinessFinanceSettings?
   bookkeeping_transactions BookkeepingTransaction[]
+  conversations        Conversation[]
 
   @@map("businesses")
 }
@@ -384,6 +406,7 @@ model Customer {
   invoices      Invoice[]
   follow_ups    FollowUp[]
   ai_event_logs AiEventLog[]
+  conversations Conversation[]
 
   @@map("customers")
 }
@@ -891,5 +914,83 @@ model BookkeepingTransaction {
 
   @@map("bookkeeping_transactions")
   @@index([business_id, transaction_date])
+}
+
+// ============================================
+// Conversation history (call / SMS / web chat)
+//
+// One Conversation per logical session, many ConversationMessage rows
+// per session in strict turn order. Replaces the ai_event_logs shim
+// that previously tried to fake conversations by event_type prefix.
+// ============================================
+
+model Conversation {
+  id                String              @id @default(uuid())
+  business_id       String
+  customer_id       String?
+  channel           ConversationChannel
+  external_id       String?             // Twilio CallSid, SMS thread key, web session id
+
+  caller_phone      String?
+  caller_name       String?
+
+  started_at        DateTime            @default(now())
+  ended_at          DateTime?
+  duration_seconds  Int?
+
+  status            ConversationStatus  @default(InProgress)
+  outcome           String?             // booked | quoted | info | escalated | abandoned
+  intent            String?             // NEW_BOOKING | PRICING_INQUIRY | ...
+  job_id            String?
+  quote_id          String?
+  escalated         Boolean             @default(false)
+  escalation_reason String?
+  threat_level      String?             // clean | suspicious | malicious
+
+  message_count     Int                 @default(0)
+  audio_url         String?             // call recording (Twilio) if available
+  meta              Json?
+
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  business          Business              @relation(fields: [business_id], references: [id], onDelete: Cascade)
+  customer          Customer?             @relation(fields: [customer_id], references: [id], onDelete: SetNull)
+  messages          ConversationMessage[]
+
+  @@index([business_id, started_at(sort: Desc)])
+  @@index([business_id, channel, started_at(sort: Desc)])
+  @@index([business_id, customer_id])
+  @@index([business_id, external_id])
+  @@map("conversations")
+}
+
+model ConversationMessage {
+  id              String       @id @default(uuid())
+  conversation_id String
+  business_id     String                          // denormalized for tenant-scoped queries
+
+  turn_index      Int                             // 0, 1, 2, ... strict order
+
+  role            MessageRole
+  text            String
+
+  audio_url       String?                         // per-chunk audio (voice)
+  twilio_sid      String?                         // Twilio Message SID (SMS)
+
+  latency_ms      Int?
+  model           String?                         // when role=agent
+  tokens_in       Int?
+  tokens_out      Int?
+
+  meta            Json?
+  createdAt       DateTime     @default(now())
+
+  conversation    Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+
+  @@unique([conversation_id, turn_index])
+  @@index([conversation_id, turn_index])
+  @@index([business_id, createdAt(sort: Desc)])
+  @@map("conversation_messages")
 }
 
