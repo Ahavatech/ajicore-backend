@@ -863,6 +863,7 @@ function generateToken(user) {
       email: user.email,
       role: user.role || 'admin',
       business_id: user.business_id || null,
+      business_name: user.business_name || null,
       staff_id: user.staff_id || null,
     },
     env.JWT_SECRET,
@@ -881,7 +882,7 @@ async function resolveUserContextById(id) {
     where: { id },
     include: {
       business: true,
-      staff_profile: true,
+      staff_profile: { include: { business: true } },
       owned_businesses: true,
     },
   });
@@ -893,6 +894,13 @@ async function resolveUserContextById(id) {
     || user.staff_profile?.business_id
     || user.owned_businesses?.[0]?.id
     || null;
+  // Resolve the business *name* alongside the id so the frontend dashboard
+  // sidebar / breadcrumb / header doesn't fall back to "My Company" the moment
+  // a user lands. Mirrors the same precedence chain as derivedBusinessId.
+  const derivedBusinessName = user.business?.name
+    || user.staff_profile?.business?.name
+    || user.owned_businesses?.[0]?.name
+    || null;
   const derivedStaffId = user.staff_id || user.staff_profile?.id || null;
   const derivedRole = user.role || (derivedStaffId ? 'staff' : 'admin');
 
@@ -900,6 +908,7 @@ async function resolveUserContextById(id) {
     ...user,
     role: derivedRole,
     business_id: derivedBusinessId,
+    business_name: derivedBusinessName,
     staff_id: derivedStaffId,
   };
 }
@@ -918,6 +927,7 @@ function buildUserResponse(user) {
     ...rest,
     role: user.role || 'admin',
     business_id: user.business_id || null,
+    business_name: user.business_name || null,
     staff_id: user.staff_id || null,
     businesses: Array.isArray(owned_businesses)
       ? owned_businesses.map(sanitizeBusiness)
