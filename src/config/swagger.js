@@ -191,11 +191,6 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
           type: 'object',
           properties: {
             message: { type: 'string', example: 'If an account exists, a reset code has been sent.' },
-            dev_reset_code: {
-              type: 'string',
-              nullable: true,
-              description: 'Development and non-production only. Never returned in production.',
-            },
           },
         },
         AuthVerifyResetCodeInput: {
@@ -495,10 +490,26 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
           type: 'object',
           properties: {
             has_subscription: { type: 'boolean' },
+            payment_method_ready: { type: 'boolean' },
+            default_payment_method: {
+              allOf: [{ $ref: '#/components/schemas/SubscriptionPaymentMethodSummary' }],
+              nullable: true,
+            },
             subscription: {
               allOf: [{ $ref: '#/components/schemas/SubscriptionStatusRecord' }],
               nullable: true,
             },
+          },
+        },
+        SubscriptionPaymentMethodSummary: {
+          type: 'object',
+          nullable: true,
+          properties: {
+            id: { type: 'string', example: 'pm_123' },
+            brand: { type: 'string', example: 'visa' },
+            last4: { type: 'string', example: '4242' },
+            exp_month: { type: 'integer', example: 12 },
+            exp_year: { type: 'integer', example: 2030 },
           },
         },
         StartSubscriptionRequest: {
@@ -518,8 +529,40 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
             already_active: { type: 'boolean' },
             client_secret: { type: 'string', nullable: true, description: 'Returned when Stripe creates a payment intent requiring client-side confirmation.' },
             has_subscription: { type: 'boolean' },
+            payment_method_ready: { type: 'boolean' },
+            default_payment_method: {
+              allOf: [{ $ref: '#/components/schemas/SubscriptionPaymentMethodSummary' }],
+              nullable: true,
+            },
             subscription: {
               $ref: '#/components/schemas/SubscriptionStatusRecord',
+            },
+          },
+        },
+        SubscriptionSetupIntentResponse: {
+          type: 'object',
+          properties: {
+            client_secret: { type: 'string' },
+            setup_intent_id: { type: 'string' },
+            stripe_customer_id: { type: 'string' },
+          },
+        },
+        SubscriptionPaymentMethodRequest: {
+          type: 'object',
+          required: ['business_id', 'payment_method_id'],
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            payment_method_id: { type: 'string', example: 'pm_123' },
+          },
+        },
+        SubscriptionPaymentMethodResponse: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            stripe_customer_id: { type: 'string' },
+            payment_method: {
+              allOf: [{ $ref: '#/components/schemas/SubscriptionPaymentMethodSummary' }],
+              nullable: true,
             },
           },
         },
@@ -527,6 +570,11 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
           type: 'object',
           properties: {
             has_subscription: { type: 'boolean' },
+            payment_method_ready: { type: 'boolean' },
+            default_payment_method: {
+              allOf: [{ $ref: '#/components/schemas/SubscriptionPaymentMethodSummary' }],
+              nullable: true,
+            },
             subscription: {
               $ref: '#/components/schemas/SubscriptionStatusRecord',
             },
@@ -536,6 +584,11 @@ Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fl
           type: 'object',
           properties: {
             has_subscription: { type: 'boolean' },
+            payment_method_ready: { type: 'boolean' },
+            default_payment_method: {
+              allOf: [{ $ref: '#/components/schemas/SubscriptionPaymentMethodSummary' }],
+              nullable: true,
+            },
             subscription: {
               $ref: '#/components/schemas/SubscriptionStatusRecord',
             },

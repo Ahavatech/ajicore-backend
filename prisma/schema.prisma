@@ -170,6 +170,8 @@ model User {
   password_reset_expires_at  DateTime?
   password_reset_used_at     DateTime?
   password_reset_channel     String?
+  trial_started_at     DateTime?
+  trial_ends_at        DateTime?
   first_name           String?
   last_name            String?
   role                 UserRole     @default(admin)

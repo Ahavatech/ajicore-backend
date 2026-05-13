@@ -21,7 +21,7 @@
  * /api/auth/onboarding/skip-otp:
  *   post:
  *     tags: [Onboarding]
- *     summary: Skip phone verification and advance to step 3
+ *     summary: Skip phone verification and advance to step 3 (non-production only)
  *     security:
  *       - bearerAuth: []
  *     responses:

@@ -18,11 +18,18 @@ const prisma = require('../../lib/prisma');
 const env = require('../../config/env');
 const logger = require('../../utils/logger');
 const emailService = require('../communications/email.service');
-const { ValidationError, ConflictError, AuthenticationError, NotFoundError } = require('../../utils/errors');
+const {
+  ValidationError,
+  ConflictError,
+  AuthenticationError,
+  NotFoundError,
+  AuthorizationError,
+} = require('../../utils/errors');
 
 const SALT_ROUNDS = 12;
 const OTP_EXPIRY_MINUTES = 10;
 const TWILIO_AVAILABLE_NUMBER_LIMIT = 5;
+const TRIAL_DURATION_MS = env.STRIPE_SUBSCRIPTION_TRIAL_DAYS * 24 * 60 * 60 * 1000;
 
 // ============================================
 // Step 1: Account Creation
@@ -55,6 +62,7 @@ async function signup({ email, password }) {
   }
 
   const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
+  const trialWindow = buildTrialWindow();
 
   const user = await prisma.user.create({
     data: {
@@ -63,6 +71,8 @@ async function signup({ email, password }) {
       role: 'admin',
       auth_provider: 'Email',
       onboarding_step: 2,
+      trial_started_at: trialWindow.trial_started_at,
+      trial_ends_at: trialWindow.trial_ends_at,
     },
   });
 
@@ -114,6 +124,7 @@ async function googleSignup({ google_id, email, first_name, last_name }) {
   }
 
   // Create new Google user
+  const trialWindow = buildTrialWindow();
   user = await prisma.user.create({
     data: {
       email: email.toLowerCase(),
@@ -123,6 +134,8 @@ async function googleSignup({ google_id, email, first_name, last_name }) {
       role: 'admin',
       auth_provider: 'Google',
       onboarding_step: 2,
+      trial_started_at: trialWindow.trial_started_at,
+      trial_ends_at: trialWindow.trial_ends_at,
     },
   });
 
@@ -204,6 +217,11 @@ async function onboardingStep2(userId, data) {
     });
 
     return { user, business };
+  });
+
+  await ensureBusinessTrialSubscription({
+    userId: result.user.id,
+    businessId: result.business.id,
   });
 
   logger.info(`Onboarding step 2 completed for user: ${result.user.email}`);
@@ -538,12 +556,23 @@ async function getUserById(id) {
 async function forgotPassword(input) {
   const identifier = normalizeResetIdentifier(input);
   const user = await findUserForPasswordReset(identifier);
-  let devResetCode = null;
 
   if (user && user.auth_provider !== 'Google') {
+    const deliverableEmail = normalizeDeliverableEmail(user.email);
+    if (!deliverableEmail || !env.PASSWORD_RESET_ALLOW_EMAIL) {
+      logger.warn('Password reset requested but no deliverable email is available.', {
+        userId: user.id,
+        identifierType: identifier.type,
+        hasEmail: Boolean(user.email),
+      });
+
+      return {
+        message: 'If an account exists, a reset code has been sent.',
+      };
+    }
+
     const code = generateNumericCode(env.PASSWORD_RESET_CODE_LENGTH);
     const expires = new Date(Date.now() + env.PASSWORD_RESET_CODE_TTL_MINUTES * 60 * 1000);
-    const channel = identifier.type === 'email' ? 'email' : 'sms';
 
     await prisma.user.update({
       where: { id: user.id },
@@ -551,24 +580,22 @@ async function forgotPassword(input) {
         password_reset_code: code,
         password_reset_expires_at: expires,
         password_reset_used_at: null,
-        password_reset_channel: channel,
+        password_reset_channel: 'email',
       },
     });
 
-    if (identifier.type === 'email') {
-      if (env.PASSWORD_RESET_ALLOW_EMAIL && user.email) {
-        try {
-          await emailService.sendPasswordResetOtpEmail({
-            to: user.email,
-            code,
-            expiresInMinutes: env.PASSWORD_RESET_CODE_TTL_MINUTES,
-            userName: buildPersonName(user.first_name, user.last_name),
-          });
-        } catch (err) {
-          logger.warn(`Password reset email send failed for ${user.email}: ${err.message}`);
-        }
-      }
-    } else if (env.PASSWORD_RESET_ALLOW_SMS && user.phone_number) {
+    try {
+      await emailService.sendPasswordResetOtpEmail({
+        to: deliverableEmail,
+        code,
+        expiresInMinutes: env.PASSWORD_RESET_CODE_TTL_MINUTES,
+        userName: buildPersonName(user.first_name, user.last_name),
+      });
+    } catch (err) {
+      logger.warn(`Password reset email send failed for ${deliverableEmail}: ${err.message}`);
+    }
+
+    if (!env.isProduction && !env.PASSWORD_RESET_ALLOW_EMAIL && env.PASSWORD_RESET_ALLOW_SMS && user.phone_number) {
       try {
         await sendResetCodeSms(user.phone_number, code);
       } catch (err) {
@@ -576,22 +603,12 @@ async function forgotPassword(input) {
       }
     }
 
-    if (!env.isProduction) {
-      devResetCode = code;
-    }
-
     logger.info(`Password reset code generated for user: ${user.email || user.id}`);
   }
 
-  const response = {
+  return {
     message: 'If an account exists, a reset code has been sent.',
   };
-
-  if (devResetCode) {
-    response.dev_reset_code = devResetCode;
-  }
-
-  return response;
 }
 
 async function verifyResetCode(input, codeArg) {
@@ -703,8 +720,9 @@ function verifyToken(token) {
  * Generate a 5-digit OTP, save it on the user with a 10-minute expiry,
  * store the phone number on the business, and send the OTP via SMS.
  *
- * In development (no Twilio credentials), the OTP is logged and returned
- * in the response so the flow can be tested without a real Twilio account.
+ * In production, OTP delivery requires a working Twilio configuration.
+ * In non-production, missing Twilio configuration is logged so local flows
+ * can still proceed without exposing the OTP in the API response.
  */
 async function sendOtp(userId, { phone_number }) {
   if (!phone_number) throw new ValidationError('phone_number is required.');
@@ -736,7 +754,6 @@ async function sendOtp(userId, { phone_number }) {
   const hasTwilio = env.TWILIO_ACCOUNT_SID
     && env.TWILIO_AUTH_TOKEN
     && (env.TWILIO_MESSAGING_SERVICE_SID || env.TWILIO_PHONE_NUMBER);
-  let otpForDev = null;
 
   if (hasTwilio) {
     try {
@@ -756,19 +773,21 @@ async function sendOtp(userId, { phone_number }) {
       logger.info(`OTP sent via SMS to ${phone_number} for user: ${user.email}`);
     } catch (err) {
       logger.warn(`Twilio SDK unavailable or SMS send failed for ${user.email}: ${err.message}`);
-      if (env.isDevelopment) otpForDev = otp;
+      if (env.isProduction) {
+        throw new ValidationError('Unable to send OTP right now. Please try again.');
+      }
     }
   } else {
-    logger.warn(`Twilio not configured — OTP for ${user.email}: ${otp}`);
-    if (env.isDevelopment) otpForDev = otp;
+    if (env.isProduction) {
+      throw new ValidationError('OTP delivery is not configured on this server.');
+    }
+    logger.warn(`Twilio not configured for OTP delivery to ${user.email}.`);
   }
 
-  const response = {
+  return {
     message: `A 5-digit OTP has been sent to ${maskPhone(phone_number)}. It expires in ${OTP_EXPIRY_MINUTES} minutes.`,
     phone_number: maskPhone(phone_number),
   };
-  if (otpForDev) response.dev_otp = otpForDev;
-  return response;
 }
 
 /**
@@ -815,6 +834,10 @@ async function verifyOtp(userId, { otp }) {
  * Skip phone OTP verification and advance to step 3.
  */
 async function skipOtp(userId) {
+  if (env.isProduction) {
+    throw new AuthorizationError('Phone verification cannot be skipped in production.');
+  }
+
   const user = await prisma.user.update({
     where: { id: userId },
     data: { phone_otp: null, phone_otp_expires_at: null, onboarding_step: 3 },
@@ -985,6 +1008,13 @@ function buildPersonName(firstName, lastName) {
   return [firstName, lastName].filter(Boolean).join(' ').trim();
 }
 
+function buildTrialWindow(now = new Date()) {
+  return {
+    trial_started_at: now,
+    trial_ends_at: new Date(now.getTime() + TRIAL_DURATION_MS),
+  };
+}
+
 function generateNumericCode(length) {
   const safeLength = Math.max(4, Math.min(8, Number(length) || 5));
   let result = '';
@@ -996,6 +1026,11 @@ function generateNumericCode(length) {
 
 function normalizePhoneNumberForLookup(phoneNumber) {
   return String(phoneNumber || '').trim();
+}
+
+function normalizeDeliverableEmail(email) {
+  if (!email || !isValidEmail(email)) return null;
+  return String(email).trim().toLowerCase();
 }
 
 function normalizeResetIdentifier(input) {
@@ -1035,6 +1070,19 @@ async function findUserForPasswordReset(identifier) {
   return prisma.user.findFirst({
     where: { phone_number: identifier.value },
   });
+}
+
+function getSubscriptionService() {
+  return require('../subscriptions/subscription.service');
+}
+
+async function ensureBusinessTrialSubscription({ userId, businessId }) {
+  try {
+    await getSubscriptionService().ensureTrialSubscriptionForBusiness({ userId, businessId });
+  } catch (err) {
+    logger.error(`Failed to provision trial subscription for business ${businessId}: ${err.message}`);
+    throw err;
+  }
 }
 
 function normalizeResetVerificationInput(input, codeArg) {

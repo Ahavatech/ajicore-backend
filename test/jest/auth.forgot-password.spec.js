@@ -12,6 +12,12 @@ describe('forgot password production contract', () => {
       TWILIO_ACCOUNT_SID: 'ACtest',
       TWILIO_AUTH_TOKEN: 'twilio-token',
       INTERNAL_API_KEY: 'internal-key',
+      MAIL_PROVIDER: 'smtp',
+      SMTP_HOST: 'smtp.example.com',
+      SMTP_PORT: '587',
+      SMTP_USER: 'smtp-user',
+      SMTP_PASS: 'smtp-pass',
+      MAIL_FROM_EMAIL: 'noreply@example.com',
     };
 
     jest.doMock('../../src/lib/prisma', () => ({
@@ -29,12 +35,16 @@ describe('forgot password production contract', () => {
       warn: jest.fn(),
       error: jest.fn(),
     }));
+    jest.doMock('../../src/domains/communications/email.service', () => ({
+      sendPasswordResetOtpEmail: jest.fn().mockResolvedValue({ messageId: 'mail-1' }),
+    }));
   });
 
   afterEach(() => {
     process.env = originalEnv;
     jest.dontMock('../../src/lib/prisma');
     jest.dontMock('../../src/utils/logger');
+    jest.dontMock('../../src/domains/communications/email.service');
   });
 
   test('does not expose dev_reset_code in production', async () => {

@@ -464,7 +464,12 @@ test('auth reset flow verifies codes and allows sign-in with the new password', 
 
   assert.equal(forgotResponse.status, 200);
   assert.ok(forgotResponse.body.message.includes('If an account exists'));
-  assert.ok(forgotResponse.body.dev_reset_code);
+
+  const refreshedUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { password_reset_code: true },
+  });
+  assert.ok(refreshedUser.password_reset_code);
 
   const verifyFailResponse = await requestJson('/api/auth/verify-reset-code', {
     method: 'POST',
@@ -475,7 +480,7 @@ test('auth reset flow verifies codes and allows sign-in with the new password', 
 
   const verifyResponse = await requestJson('/api/auth/verify-reset-code', {
     method: 'POST',
-    body: { email: user.email, code: forgotResponse.body.dev_reset_code },
+    body: { email: user.email, code: refreshedUser.password_reset_code },
   });
 
   assert.equal(verifyResponse.status, 200);
@@ -485,7 +490,7 @@ test('auth reset flow verifies codes and allows sign-in with the new password', 
     method: 'POST',
     body: {
       email: user.email,
-      code: forgotResponse.body.dev_reset_code,
+      code: refreshedUser.password_reset_code,
       new_password: 'BrandNewPass123',
     },
   });

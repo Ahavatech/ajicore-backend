@@ -1,9 +1,9 @@
-const nodemailer = require('nodemailer');
 const env = require('../../config/env');
 const logger = require('../../utils/logger');
 const { ValidationError } = require('../../utils/errors');
 
 let transporter;
+let nodemailerClient;
 
 function getBrandName() {
   return String(env.MAIL_FROM_NAME || 'Ajicore').trim() || 'Ajicore';
@@ -23,7 +23,14 @@ function getTransporter() {
   ensureMailConfigured();
 
   if (!transporter) {
-    transporter = nodemailer.createTransport({
+    if (!nodemailerClient) {
+      // Lazy-load so modules that merely import auth do not require the mail driver immediately.
+      // This keeps non-email code paths and tests lightweight while preserving runtime behavior.
+      // eslint-disable-next-line global-require
+      nodemailerClient = require('nodemailer');
+    }
+
+    transporter = nodemailerClient.createTransport({
       host: env.SMTP_HOST,
       port: env.SMTP_PORT,
       secure: env.SMTP_SECURE,

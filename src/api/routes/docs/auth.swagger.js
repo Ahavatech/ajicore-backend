@@ -332,8 +332,8 @@
  *       Generates a 5-digit OTP valid for 10 minutes, saves the phone number
  *       to the business record, and sends the code via SMS (Twilio).
  *
- *       **Development mode:** When Twilio credentials are not configured, the
- *       OTP is returned in `dev_otp` for testing — never present in production.
+ *       In production, OTP delivery requires a working Twilio configuration.
+ *       The response never exposes the underlying OTP.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -361,9 +361,6 @@
  *                 phone_number:
  *                   type: string
  *                   description: Masked phone number for display
- *                 dev_otp:
- *                   type: string
- *                   description: "Dev only: the actual OTP for testing"
  *       400:
  *         description: phone_number is required
  */
@@ -414,7 +411,8 @@
  *     tags: [Onboarding]
  *     summary: "OTP: Skip phone verification and advance to step 3"
  *     description: |
- *       The user can skip phone verification. Advances onboarding_step to 3.
+ *       The user can skip phone verification in non-production environments.
+ *       Production environments reject this endpoint.
  *     security:
  *       - bearerAuth: []
  *     responses:

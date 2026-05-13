@@ -56,6 +56,7 @@ function createAuthModuleMock(state) {
     requireAuth: direct('requireAuth', (req) => {
       req.user = { id: 'user-123', email: 'test@example.com' };
     }),
+    requireRole: factory('requireRole'),
     requireInternalApiKey: direct('requireInternalApiKey', (req) => {
       req.headers['x-api-key'] = req.headers['x-api-key'] || 'internal-key';
     }),

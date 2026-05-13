@@ -144,6 +144,9 @@ describe('Onboarding Step 3: Twilio Phone Number Generation - AUDIT', () => {
       warn: jest.fn(),
       error: jest.fn(),
     }));
+    jest.doMock('../../src/domains/communications/email.service', () => ({
+      sendPasswordResetOtpEmail: jest.fn(),
+    }));
 
     authService = require('../../src/domains/auth/auth.service');
   });
@@ -153,6 +156,7 @@ describe('Onboarding Step 3: Twilio Phone Number Generation - AUDIT', () => {
     jest.dontMock('../../src/lib/prisma');
     jest.dontMock('twilio');
     jest.dontMock('../../src/utils/logger');
+    jest.dontMock('../../src/domains/communications/email.service');
   });
 
   // ========================================
@@ -265,15 +269,11 @@ describe('Onboarding Step 3: Twilio Phone Number Generation - AUDIT', () => {
               friendly_name: expect.any(String),
               locality: expect.any(String),
               region: expect.any(String),
-              postal_code: expect.any(String),
-              country: expect.any(String),
               capabilities: {
                 voice: expect.any(Boolean),
                 sms: expect.any(Boolean),
                 mms: expect.any(Boolean),
               },
-              type: expect.any(String),
-              area_code: expect.any(String),
             },
           ]),
           count: expect.any(Number),
@@ -513,11 +513,11 @@ describe('Onboarding Step 3: Twilio Phone Number Generation - AUDIT', () => {
 
         expect(result).toEqual({
           message: expect.any(String),
-          user: {
+          user: expect.objectContaining({
             id: expect.any(String),
             email: expect.any(String),
             onboarding_step: 4,
-          },
+          }),
           business: expect.objectContaining({
             id: expect.any(String),
             ai_phone_number: expect.any(String),

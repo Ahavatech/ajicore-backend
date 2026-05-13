@@ -18,6 +18,27 @@ async function start(req, res, next) {
   }
 }
 
+async function createSetupIntent(req, res, next) {
+  try {
+    const result = await subscriptionService.createSetupIntent(req.body.business_id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function savePaymentMethod(req, res, next) {
+  try {
+    const result = await subscriptionService.savePaymentMethod(
+      req.body.business_id,
+      req.body.payment_method_id
+    );
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function cancel(req, res, next) {
   try {
     const result = await subscriptionService.cancelSubscription(req.body.business_id);
@@ -39,6 +60,8 @@ async function resume(req, res, next) {
 module.exports = {
   getStatus,
   start,
+  createSetupIntent,
+  savePaymentMethod,
   cancel,
   resume,
 };

@@ -57,6 +57,9 @@ jest.mock('twilio', () => {
 
 const prisma = require('../../src/lib/prisma');
 const twilio = require('twilio');
+jest.mock('../../src/domains/communications/email.service', () => ({
+  sendPasswordResetOtpEmail: jest.fn(),
+}));
 process.env.JWT_SECRET = 'test-secret';
 process.env.DATABASE_URL = 'postgres://localhost:5432/test';
 process.env.NODE_ENV = 'test';

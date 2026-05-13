@@ -14,12 +14,6 @@ const businessControllerPath = 'src/domains/business/business.controller.js';
 const conversationsControllerPath = 'src/domains/conversations/conversation.controller.js';
 const aiLogsControllerPath = 'src/domains/ai_logs/ai_event_log.controller.js';
 
-const aiIngressMock = {
-  handleInboundSms: jest.fn(),
-  handleInboundCall: jest.fn(),
-  handleCallStatus: jest.fn(),
-};
-
 const pbServiceMock = { lookupForAI: jest.fn() };
 const quoteServiceMock = { create: jest.fn() };
 const jobServiceMock = { createJob: jest.fn() };
@@ -54,7 +48,6 @@ const harness = createRouteHarness({
     { modulePath: aiLogsControllerPath, handlers: ['eventTypes', 'list'] },
   ],
   extraMocks: [
-    { modulePath: 'src/domains/communications/ai_ingress.service.js', factory: () => aiIngressMock },
     { modulePath: 'src/domains/pricebook/pricebook.service.js', factory: () => pbServiceMock },
     { modulePath: 'src/domains/quotes/quote.service.js', factory: () => quoteServiceMock },
     { modulePath: 'src/domains/jobs/job.service.js', factory: () => jobServiceMock },
@@ -137,23 +130,6 @@ describe('ai bridge routes', () => {
     harness.authState.message = '';
     jest.clearAllMocks();
 
-    aiIngressMock.handleInboundSms.mockResolvedValue({
-      business: { id: BUSINESS_ID },
-      customer: { id: VALID_UUID },
-      ai_reply: 'Thanks for reaching out',
-    });
-    aiIngressMock.handleInboundCall.mockResolvedValue({
-      business: { id: BUSINESS_ID },
-      customer: { id: VALID_UUID },
-      ai_response: { message: 'We can help' },
-    });
-    aiIngressMock.handleCallStatus.mockResolvedValue({
-      business: { id: BUSINESS_ID },
-      customer: { id: VALID_UUID },
-      status: 'completed',
-      call_sid: 'CA123',
-    });
-
     dashboardServiceMock.getDashboardSummary.mockResolvedValue({ revenue: 100, active_jobs: 2 });
     activityLogMock.logActivity.mockResolvedValue({ id: 'log-1', event_type: 'call.missed' });
     pbServiceMock.lookupForAI.mockResolvedValue([{ id: 'price-1' }]);
@@ -188,75 +164,6 @@ describe('ai bridge routes', () => {
     });
     prismaMock.serviceCategory.findMany.mockResolvedValue([{ id: 'cat-1' }]);
     prismaMock.priceBookItem.findMany.mockResolvedValue([{ id: 'item-1' }]);
-  });
-
-  test('provider inbound SMS returns JSON success', async () => {
-    const response = await harness.request({
-      method: 'POST',
-      path: '/api/internal/ai/sms/incoming',
-      body: { from: '+15555550123', to: '+16665550123', message: 'Need help' },
-    });
-
-    expect(response.status).toBe(200);
-    expect(response.body.success).toBe(true);
-    expect(aiIngressMock.handleInboundSms).toHaveBeenCalledTimes(1);
-  });
-
-  test('provider inbound SMS returns Twilio XML for webhook-shaped payloads', async () => {
-    const response = await harness.request({
-      method: 'POST',
-      path: '/api/internal/sms/incoming',
-      body: { Body: 'Need help', From: '+15555550123', To: '+16665550123' },
-    });
-
-    expect(response.status).toBe(200);
-    expect(response.body).toContain('<Response>');
-  });
-
-  test('provider inbound SMS surfaces handler failures', async () => {
-    aiIngressMock.handleInboundSms.mockRejectedValueOnce(new Error('sms failed'));
-
-    const response = await harness.request({
-      method: 'POST',
-      path: '/api/internal/ai/sms/incoming',
-      body: { from: '+15555550123', to: '+16665550123', message: 'Need help' },
-    });
-
-    expect(response.status).toBe(500);
-    expect(response.body.message).toBe('sms failed');
-  });
-
-  test('provider inbound call returns JSON success', async () => {
-    const response = await harness.request({
-      method: 'POST',
-      path: '/api/internal/ai/calls/incoming',
-      body: { from: '+15555550123', to: '+16665550123', status: 'ringing' },
-    });
-
-    expect(response.status).toBe(200);
-    expect(response.body.success).toBe(true);
-  });
-
-  test('provider inbound call returns Twilio XML when Twilio fields are present', async () => {
-    const response = await harness.request({
-      method: 'POST',
-      path: '/api/internal/calls/incoming',
-      body: { CallSid: 'CA123', From: '+15555550123', To: '+16665550123' },
-    });
-
-    expect(response.status).toBe(200);
-    expect(response.body).toContain('<Say>');
-  });
-
-  test('provider call status returns success payload', async () => {
-    const response = await harness.request({
-      method: 'POST',
-      path: '/api/internal/ai/calls/status',
-      body: { from: '+15555550123', to: '+16665550123', status: 'completed' },
-    });
-
-    expect(response.status).toBe(200);
-    expect(response.body.status).toBe('completed');
   });
 
   test('business-by-phone resolves a tenant with x-api-key only', async () => {

@@ -14,6 +14,9 @@ jest.mock('../../src/utils/logger', () => ({
   warn: jest.fn(),
   error: jest.fn(),
 }));
+jest.mock('../../src/domains/communications/email.service', () => ({
+  sendPasswordResetOtpEmail: jest.fn(),
+}));
 
 process.env.JWT_SECRET = 'test-secret';
 process.env.DATABASE_URL = 'postgres://localhost:5432/test';
@@ -64,6 +67,8 @@ describe('auth.service signup validation', () => {
     expect(prisma.user.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         email: 'user@example.com',
+        trial_started_at: expect.any(Date),
+        trial_ends_at: expect.any(Date),
       }),
     }));
   });

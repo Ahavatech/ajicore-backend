@@ -21,21 +21,45 @@ function getStripeClient() {
 }
 
 async function getBusinessOrThrow(businessId) {
-  const business = await prisma.business.findUnique({ where: { id: businessId } });
+  const business = await prisma.business.findUnique({
+    where: { id: businessId },
+    include: {
+      owner: true,
+    },
+  });
   if (!business) throw new NotFoundError('Business');
   return business;
 }
 
-function mapSubscriptionRecord(record) {
+function mapPaymentMethodSummary(paymentMethod) {
+  if (!paymentMethod?.card) {
+    return null;
+  }
+
+  return {
+    id: paymentMethod.id,
+    brand: paymentMethod.card.brand,
+    last4: paymentMethod.card.last4,
+    exp_month: paymentMethod.card.exp_month,
+    exp_year: paymentMethod.card.exp_year,
+  };
+}
+
+function mapSubscriptionRecord(record, extras = {}) {
   if (!record) {
     return {
       has_subscription: false,
       subscription: null,
+      payment_method_ready: false,
+      default_payment_method: null,
+      ...extras,
     };
   }
 
   return {
     has_subscription: true,
+    payment_method_ready: Boolean(extras.default_payment_method),
+    default_payment_method: extras.default_payment_method || null,
     subscription: {
       id: record.id,
       business_id: record.business_id,
@@ -52,6 +76,7 @@ function mapSubscriptionRecord(record) {
       created_at: record.createdAt,
       updated_at: record.updatedAt,
     },
+    ...extras,
   };
 }
 
@@ -94,6 +119,55 @@ async function ensureStripeCustomer(business, input = {}) {
   });
 
   return customer.id;
+}
+
+async function fetchDefaultPaymentMethodSummary(stripeCustomerId) {
+  if (!stripeCustomerId) return null;
+
+  const stripe = getStripeClient();
+  const customer = await stripe.customers.retrieve(stripeCustomerId, {
+    expand: ['invoice_settings.default_payment_method'],
+  });
+
+  if (typeof customer === 'string' || customer.deleted) {
+    return null;
+  }
+
+  const defaultPaymentMethod = customer.invoice_settings?.default_payment_method;
+  if (!defaultPaymentMethod || typeof defaultPaymentMethod === 'string') {
+    return null;
+  }
+
+  return mapPaymentMethodSummary(defaultPaymentMethod);
+}
+
+async function attachPaymentMethodIfNeeded(stripeCustomerId, paymentMethodId) {
+  if (!paymentMethodId) return null;
+
+  const stripe = getStripeClient();
+
+  const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+  if (paymentMethod.customer && paymentMethod.customer !== stripeCustomerId) {
+    throw new ConflictError('Payment method already belongs to another customer.');
+  }
+
+  if (!paymentMethod.customer) {
+    await stripe.paymentMethods.attach(paymentMethodId, {
+      customer: stripeCustomerId,
+    });
+  }
+
+  await stripe.customers.update(stripeCustomerId, {
+    invoice_settings: {
+      default_payment_method: paymentMethodId,
+    },
+  });
+
+  const refreshedPaymentMethod = paymentMethod.customer
+    ? paymentMethod
+    : await stripe.paymentMethods.retrieve(paymentMethodId);
+
+  return mapPaymentMethodSummary(refreshedPaymentMethod);
 }
 
 async function ensureSubscriptionPrice() {
@@ -183,13 +257,90 @@ async function upsertLocalSubscription(businessId, stripeSubscription, stripeCus
   return prisma.businessSubscription.create({ data });
 }
 
+function normalizeTrialEnd(trialEnd) {
+  if (!trialEnd) return null;
+
+  const asDate = trialEnd instanceof Date ? trialEnd : new Date(trialEnd);
+  if (Number.isNaN(asDate.getTime())) {
+    throw new ValidationError('Invalid trial end date.');
+  }
+
+  if (asDate.getTime() <= Date.now()) {
+    return null;
+  }
+
+  return Math.floor(asDate.getTime() / 1000);
+}
+
+async function createStripeSubscription({
+  business,
+  stripeCustomerId,
+  stripePriceId,
+  paymentMethodId = null,
+  trialEnd = null,
+  useDefaultTrial = true,
+}) {
+  const stripe = getStripeClient();
+  const stripePayload = {
+    customer: stripeCustomerId,
+    items: [{ price: stripePriceId }],
+    payment_behavior: paymentMethodId ? 'default_incomplete' : undefined,
+    expand: ['latest_invoice.payment_intent'],
+    metadata: {
+      business_id: business.id,
+      business_name: business.name,
+    },
+  };
+
+  const normalizedTrialEnd = normalizeTrialEnd(trialEnd);
+  if (normalizedTrialEnd) {
+    stripePayload.trial_end = normalizedTrialEnd;
+  } else if (useDefaultTrial) {
+    stripePayload.trial_period_days = env.STRIPE_SUBSCRIPTION_TRIAL_DAYS;
+  }
+
+  return stripe.subscriptions.create(stripePayload);
+}
+
+async function resolveTrialWindowForUser(userId) {
+  if (!userId) return null;
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      trial_started_at: true,
+      trial_ends_at: true,
+    },
+  });
+
+  if (!user?.trial_ends_at) {
+    return null;
+  }
+
+  const trialEnd = new Date(user.trial_ends_at);
+  if (trialEnd.getTime() <= Date.now()) {
+    return null;
+  }
+
+  return {
+    trial_started_at: user.trial_started_at ? new Date(user.trial_started_at) : null,
+    trial_ends_at: trialEnd,
+  };
+}
+
 async function getStatus(businessId) {
   if (!businessId) throw new ValidationError('business_id is required.');
   const subscription = await prisma.businessSubscription.findFirst({
     where: { business_id: businessId },
     orderBy: { updatedAt: 'desc' },
   });
-  return mapSubscriptionRecord(subscription);
+  const defaultPaymentMethod = subscription?.stripe_customer_id
+    ? await fetchDefaultPaymentMethodSummary(subscription.stripe_customer_id)
+    : null;
+
+  return mapSubscriptionRecord(subscription, {
+    default_payment_method: defaultPaymentMethod,
+  });
 }
 
 async function startSubscription(businessId, input = {}) {
@@ -199,9 +350,15 @@ async function startSubscription(businessId, input = {}) {
   const existing = await findExistingSubscription(businessId);
 
   if (existing) {
+    const defaultPaymentMethod = existing.stripe_customer_id
+      ? await fetchDefaultPaymentMethodSummary(existing.stripe_customer_id)
+      : null;
+
     return {
       already_active: true,
-      ...mapSubscriptionRecord(existing),
+      ...mapSubscriptionRecord(existing, {
+        default_payment_method: defaultPaymentMethod,
+      }),
     };
   }
 
@@ -210,29 +367,16 @@ async function startSubscription(businessId, input = {}) {
   const stripePriceId = await ensureSubscriptionPrice();
 
   if (input.payment_method_id) {
-    await stripe.paymentMethods.attach(input.payment_method_id, {
-      customer: stripeCustomerId,
-    }).catch(async (err) => {
-      if (err.code !== 'resource_already_exists') throw err;
-    });
-
-    await stripe.customers.update(stripeCustomerId, {
-      invoice_settings: {
-        default_payment_method: input.payment_method_id,
-      },
-    });
+    await attachPaymentMethodIfNeeded(stripeCustomerId, input.payment_method_id);
   }
 
-  const stripeSubscription = await stripe.subscriptions.create({
-    customer: stripeCustomerId,
-    items: [{ price: stripePriceId }],
-    trial_period_days: env.STRIPE_SUBSCRIPTION_TRIAL_DAYS,
-    payment_behavior: input.payment_method_id ? 'default_incomplete' : undefined,
-    expand: ['latest_invoice.payment_intent'],
-    metadata: {
-      business_id: businessId,
-      business_name: business.name,
-    },
+  const stripeSubscription = await createStripeSubscription({
+    business,
+    stripeCustomerId,
+    stripePriceId,
+    paymentMethodId: input.payment_method_id || null,
+    trialEnd: input.trial_end || null,
+    useDefaultTrial: true,
   });
 
   const localSubscription = await upsertLocalSubscription(
@@ -243,11 +387,112 @@ async function startSubscription(businessId, input = {}) {
   );
 
   const clientSecret = stripeSubscription.latest_invoice?.payment_intent?.client_secret || null;
+  const defaultPaymentMethod = await fetchDefaultPaymentMethodSummary(stripeCustomerId);
 
   return {
     already_active: false,
     client_secret: clientSecret,
-    ...mapSubscriptionRecord(localSubscription),
+    ...mapSubscriptionRecord(localSubscription, {
+      default_payment_method: defaultPaymentMethod,
+    }),
+  };
+}
+
+async function ensureTrialSubscriptionForBusiness({ userId, businessId }) {
+  if (!businessId) {
+    throw new ValidationError('business_id is required.');
+  }
+
+  const business = await getBusinessOrThrow(businessId);
+  const existing = await findExistingSubscription(businessId);
+  if (existing) {
+    const defaultPaymentMethod = existing.stripe_customer_id
+      ? await fetchDefaultPaymentMethodSummary(existing.stripe_customer_id)
+      : null;
+
+    return {
+      already_active: true,
+      ...mapSubscriptionRecord(existing, {
+        default_payment_method: defaultPaymentMethod,
+      }),
+    };
+  }
+
+  const trialWindow = await resolveTrialWindowForUser(userId || business.owner_id || business.owner?.id);
+  const stripeCustomerId = await ensureStripeCustomer(business, {
+    customer_email: business.company_email || business.owner?.email || undefined,
+    customer_phone: business.company_phone || business.owner?.phone_number || undefined,
+  });
+  const stripePriceId = await ensureSubscriptionPrice();
+
+  const stripeSubscription = await createStripeSubscription({
+    business,
+    stripeCustomerId,
+    stripePriceId,
+    trialEnd: trialWindow?.trial_ends_at || null,
+    useDefaultTrial: false,
+  });
+
+  const localSubscription = await upsertLocalSubscription(
+    businessId,
+    stripeSubscription,
+    stripeCustomerId,
+    stripePriceId
+  );
+
+  const defaultPaymentMethod = await fetchDefaultPaymentMethodSummary(stripeCustomerId);
+
+  return {
+    already_active: false,
+    ...mapSubscriptionRecord(localSubscription, {
+      default_payment_method: defaultPaymentMethod,
+    }),
+  };
+}
+
+async function createSetupIntent(businessId) {
+  if (!businessId) throw new ValidationError('business_id is required.');
+
+  const business = await getBusinessOrThrow(businessId);
+  const stripe = getStripeClient();
+  const stripeCustomerId = await ensureStripeCustomer(business, {
+    customer_email: business.company_email || business.owner?.email || undefined,
+    customer_phone: business.company_phone || business.owner?.phone_number || undefined,
+  });
+
+  const setupIntent = await stripe.setupIntents.create({
+    customer: stripeCustomerId,
+    payment_method_types: ['card'],
+    usage: 'off_session',
+    metadata: {
+      business_id: business.id,
+      business_name: business.name,
+    },
+  });
+
+  return {
+    client_secret: setupIntent.client_secret,
+    setup_intent_id: setupIntent.id,
+    stripe_customer_id: stripeCustomerId,
+  };
+}
+
+async function savePaymentMethod(businessId, paymentMethodId) {
+  if (!businessId) throw new ValidationError('business_id is required.');
+  if (!paymentMethodId) throw new ValidationError('payment_method_id is required.');
+
+  const business = await getBusinessOrThrow(businessId);
+  const stripeCustomerId = await ensureStripeCustomer(business, {
+    customer_email: business.company_email || business.owner?.email || undefined,
+    customer_phone: business.company_phone || business.owner?.phone_number || undefined,
+  });
+
+  const paymentMethod = await attachPaymentMethodIfNeeded(stripeCustomerId, paymentMethodId);
+
+  return {
+    success: true,
+    stripe_customer_id: stripeCustomerId,
+    payment_method: paymentMethod,
   };
 }
 
@@ -271,7 +516,13 @@ async function cancelSubscription(businessId) {
     subscription.stripe_price_id
   );
 
-  return mapSubscriptionRecord(updated);
+  const defaultPaymentMethod = updated.stripe_customer_id
+    ? await fetchDefaultPaymentMethodSummary(updated.stripe_customer_id)
+    : null;
+
+  return mapSubscriptionRecord(updated, {
+    default_payment_method: defaultPaymentMethod,
+  });
 }
 
 async function resumeSubscription(businessId) {
@@ -298,7 +549,13 @@ async function resumeSubscription(businessId) {
     subscription.stripe_price_id
   );
 
-  return mapSubscriptionRecord(updated);
+  const defaultPaymentMethod = updated.stripe_customer_id
+    ? await fetchDefaultPaymentMethodSummary(updated.stripe_customer_id)
+    : null;
+
+  return mapSubscriptionRecord(updated, {
+    default_payment_method: defaultPaymentMethod,
+  });
 }
 
 async function recordStripeEvent(event) {
@@ -405,6 +662,9 @@ async function handleWebhookEvent(event) {
 module.exports = {
   getStatus,
   startSubscription,
+  ensureTrialSubscriptionForBusiness,
+  createSetupIntent,
+  savePaymentMethod,
   cancelSubscription,
   resumeSubscription,
   handleWebhookEvent,

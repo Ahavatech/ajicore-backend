@@ -40,6 +40,59 @@ router.get('/status', requireFields(['business_id'], 'query'), requireBusinessAc
 
 /**
  * @swagger
+ * /api/subscriptions/setup-intent:
+ *   post:
+ *     summary: Create a Stripe SetupIntent for storing a card for future billing
+ *     tags: [Subscriptions]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [business_id]
+ *             properties:
+ *               business_id:
+ *                 type: string
+ *                 format: uuid
+ *     responses:
+ *       200:
+ *         description: SetupIntent created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SubscriptionSetupIntentResponse'
+ */
+router.post('/setup-intent', requireFields(['business_id']), requireBusinessAccess('body'), subscriptionController.createSetupIntent);
+
+/**
+ * @swagger
+ * /api/subscriptions/payment-method:
+ *   post:
+ *     summary: Attach and store a payment method for subscription billing
+ *     tags: [Subscriptions]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/SubscriptionPaymentMethodRequest'
+ *     responses:
+ *       200:
+ *         description: Payment method stored successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SubscriptionPaymentMethodResponse'
+ */
+router.post('/payment-method', requireFields(['business_id', 'payment_method_id']), requireBusinessAccess('body'), subscriptionController.savePaymentMethod);
+
+/**
+ * @swagger
  * /api/subscriptions/start:
  *   post:
  *     summary: Start a business subscription with free trial

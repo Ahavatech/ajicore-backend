@@ -36,6 +36,24 @@ if (process.env.NODE_ENV === 'production') {
   if (missingProd.length > 0) {
     throw new Error(`Production environment missing: ${missingProd.join(', ')}`);
   }
+
+  const smtpRequired = [
+    'MAIL_PROVIDER',
+    'SMTP_HOST',
+    'SMTP_PORT',
+    'SMTP_USER',
+    'SMTP_PASS',
+    'MAIL_FROM_EMAIL',
+  ];
+
+  const missingSmtp = smtpRequired.filter(v => !process.env[v]);
+  if (missingSmtp.length > 0) {
+    throw new Error(`Production SMTP configuration missing: ${missingSmtp.join(', ')}`);
+  }
+
+  if (String(process.env.MAIL_PROVIDER || '').trim().toLowerCase() !== 'smtp') {
+    throw new Error('Production mail provider must be set to smtp.');
+  }
 }
 
 function parseBoolean(value, defaultValue = false) {

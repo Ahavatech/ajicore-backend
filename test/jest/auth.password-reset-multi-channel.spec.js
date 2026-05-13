@@ -64,7 +64,7 @@ describe('auth password reset multi-channel flow', () => {
     const result = await authService.forgotPassword({ email: 'owner@example.com' });
 
     expect(result.message).toBe('If an account exists, a reset code has been sent.');
-    expect(result.dev_reset_code).toMatch(/^\d{5}$/);
+    expect(result.dev_reset_code).toBeUndefined();
     expect(mockPrisma.user.update).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: 'user-1' },
       data: expect.objectContaining({
@@ -76,6 +76,33 @@ describe('auth password reset multi-channel flow', () => {
     expect(emailService.sendPasswordResetOtpEmail).toHaveBeenCalledWith(expect.objectContaining({
       to: 'owner@example.com',
       userName: 'Aji Core',
+    }));
+  });
+
+  test('forgotPassword routes phone identifier requests to email delivery when email exists', async () => {
+    const authService = require('../../src/domains/auth/auth.service');
+    const emailService = require('../../src/domains/communications/email.service');
+
+    mockPrisma.user.findFirst.mockResolvedValue({
+      id: 'user-1',
+      email: 'owner@example.com',
+      first_name: 'Aji',
+      last_name: 'Core',
+      phone_number: '+15555550123',
+      auth_provider: 'Email',
+    });
+    mockPrisma.user.update.mockResolvedValue({});
+
+    const result = await authService.forgotPassword({ identifier: '+15555550123' });
+
+    expect(result).toEqual({ message: 'If an account exists, a reset code has been sent.' });
+    expect(mockPrisma.user.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        password_reset_channel: 'email',
+      }),
+    }));
+    expect(emailService.sendPasswordResetOtpEmail).toHaveBeenCalledWith(expect.objectContaining({
+      to: 'owner@example.com',
     }));
   });
 
