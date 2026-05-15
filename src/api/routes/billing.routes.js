@@ -221,6 +221,7 @@ router.patch('/invoices/:id', validateUUID('id'), requireResourceAccess('invoice
  *     tags: [Billing]
  *     security:
  *       - bearerAuth: []
+ *     description: Marks the invoice as sent and attempts customer email delivery when a customer email exists.
  */
 router.post('/invoices/:id/send', validateUUID('id'), requireResourceAccess('invoice'), billingController.sendInvoice);
 

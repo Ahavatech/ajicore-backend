@@ -7,6 +7,7 @@ const { randomBytes } = require('crypto');
 const prisma = require('../../lib/prisma');
 const env = require('../../config/env');
 const logger = require('../../utils/logger');
+const emailService = require('../communications/email.service');
 const payrollService = require('./payroll.service');
 const scheduleService = require('../jobs/schedule.service');
 const {
@@ -126,17 +127,28 @@ function buildDispatchItem(item, type) {
 
 async function sendStaffInviteEmail({ email, name, temporaryPassword }) {
   const appUrl = process.env.FRONTEND_URL || env.BACKEND_URL || 'http://localhost:3000';
-  logger.warn('Staff invite email provider is not configured. Logging invite payload instead.', {
-    email,
-    name,
-    temporaryPassword,
-    appUrl,
-  });
+  try {
+    await emailService.sendStaffInviteEmail({
+      to: email,
+      name,
+      temporaryPassword,
+    });
 
-  return {
-    status: env.isProduction ? 'logged' : 'preview',
-    app_url: appUrl,
-  };
+    return {
+      status: 'sent',
+      app_url: appUrl,
+    };
+  } catch (err) {
+    logger.warn('Staff invite email send failed.', {
+      email,
+      error: err.message,
+    });
+
+    return {
+      status: env.isProduction ? 'failed' : 'preview',
+      app_url: appUrl,
+    };
+  }
 }
 
 function getRequestBusinessId(req) {

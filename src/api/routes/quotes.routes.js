@@ -150,6 +150,7 @@ router.patch('/:id', requireRole(['admin']), validateUUID('id'), requireResource
  *     tags: [Quotes]
  *     security:
  *       - bearerAuth: []
+ *     description: Marks the quote as sent and attempts customer email delivery when a customer email exists. Estimate appointments are sent as appointment notifications.
  *     parameters:
  *       - in: path
  *         name: id

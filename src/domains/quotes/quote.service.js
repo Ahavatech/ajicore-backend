@@ -5,6 +5,7 @@
 const prisma = require('../../lib/prisma');
 const logger = require('../../utils/logger');
 const { logActivitySafe } = require('../ai_logs/activity_log.service');
+const emailService = require('../communications/email.service');
 const { calculateFinancials, normalizeLineItems } = require('../../utils/financial_calculator');
 const { NotFoundError, ValidationError } = require('../../utils/errors');
 
@@ -450,6 +451,29 @@ async function sendQuote(id) {
       : `Quote sent to ${buildCustomerName(updatedQuote.customer)}`,
     details: { quote_id: updatedQuote.id, status: updatedQuote.status, expires_at: updatedQuote.expires_at },
   });
+
+  const recipientEmail = updatedQuote.customer?.email || null;
+  if (recipientEmail) {
+    try {
+      await emailService.sendQuoteNotificationEmail({
+        to: recipientEmail,
+        customerName: buildCustomerName(updatedQuote.customer),
+        businessName: quote.business?.name,
+        serviceName: updatedQuote.service_name || updatedQuote.title,
+        totalAmount: updatedQuote.total_amount,
+        notes: updatedQuote.notes,
+        isEstimateAppointment: updatedQuote.is_estimate_appointment,
+        assignedStaffName: updatedQuote.assigned_staff?.name || null,
+        scheduledStartTime: updatedQuote.scheduled_start_time,
+        scheduledEstimateDate: updatedQuote.scheduled_estimate_date,
+        scheduledEstimateTime: updatedQuote.scheduled_estimate_time,
+      });
+    } catch (err) {
+      logger.warn(`Quote email send failed for quote ${updatedQuote.id}: ${err.message}`);
+    }
+  } else {
+    logger.warn(`Quote ${updatedQuote.id} has no customer email; send action updated status only.`);
+  }
 
   return quoteListRow(updatedQuote);
 }

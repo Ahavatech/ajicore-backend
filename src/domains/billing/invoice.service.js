@@ -7,6 +7,7 @@ const prisma = require('../../lib/prisma');
 const logger = require('../../utils/logger');
 const { logActivitySafe } = require('../ai_logs/activity_log.service');
 const { recordLedgerTransaction } = require('../bookkeeping/ledger.service');
+const emailService = require('../communications/email.service');
 const { calculateFinancials } = require('../../utils/financial_calculator');
 const { NotFoundError, ValidationError } = require('../../utils/errors');
 
@@ -340,6 +341,26 @@ async function send(id) {
     title: `Invoice sent to ${buildCustomerName(getInvoiceCustomer(sentInvoice))}`,
     details: { invoice_id: sentInvoice.id, status: sentInvoice.status },
   });
+
+  const recipientEmail = getInvoiceCustomer(sentInvoice)?.email || null;
+  if (recipientEmail) {
+    try {
+      await emailService.sendInvoiceNotificationEmail({
+        to: recipientEmail,
+        customerName: buildCustomerName(getInvoiceCustomer(sentInvoice)),
+        businessName: sentInvoice.business?.name,
+        invoiceNumber: sentInvoice.invoice_number || sentInvoice.id,
+        totalAmount: sentInvoice.total_amount,
+        dueDate: sentInvoice.due_date,
+        status: sentInvoice.status,
+        notes: sentInvoice.notes,
+      });
+    } catch (err) {
+      logger.warn(`Invoice email send failed for invoice ${sentInvoice.id}: ${err.message}`);
+    }
+  } else {
+    logger.warn(`Invoice ${sentInvoice.id} has no customer email; send action updated status only.`);
+  }
 
   return sentInvoice;
 }

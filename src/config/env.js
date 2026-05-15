@@ -51,8 +51,9 @@ if (process.env.NODE_ENV === 'production') {
     throw new Error(`Production SMTP configuration missing: ${missingSmtp.join(', ')}`);
   }
 
-  if (String(process.env.MAIL_PROVIDER || '').trim().toLowerCase() !== 'smtp') {
-    throw new Error('Production mail provider must be set to smtp.');
+  const productionMailProvider = String(process.env.MAIL_PROVIDER || '').trim().toLowerCase();
+  if (!['smtp', 'gmail', 'google'].includes(productionMailProvider)) {
+    throw new Error('Production mail provider must be set to smtp, gmail, or google.');
   }
 }
 
