@@ -146,13 +146,24 @@ if (process.env.NODE_ENV === 'production') {
       return next();
     }
 
+    const hostHeader = String(req.header('host') || '').trim().toLowerCase();
+    const isLocalHealthProbe = req.path === '/api/health'
+      && (/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(hostHeader)
+        || req.ip === '127.0.0.1'
+        || req.ip === '::1'
+        || req.ip === '::ffff:127.0.0.1');
+    if (isLocalHealthProbe) {
+      return next();
+    }
+
     const forwardedProto = String(req.header('x-forwarded-proto') || '')
       .split(',')[0]
       .trim()
       .toLowerCase();
     const isSecure = req.secure || forwardedProto === 'https';
+    const cameThroughProxy = forwardedProto.length > 0;
 
-    if (!isSecure) {
+    if (cameThroughProxy && !isSecure) {
       res.redirect(`https://${req.header('host')}${req.url}`);
     } else {
       next();

@@ -523,3 +523,70 @@ describe('app-level endpoints', () => {
     expect(payload.error).toBe('Not Found');
   });
 });
+
+describe('production proxy behavior', () => {
+  const originalEnv = { ...process.env };
+  let server;
+  let baseUrl;
+
+  beforeAll(async () => {
+    jest.resetModules();
+    Object.assign(process.env, {
+      ...originalEnv,
+      NODE_ENV: 'production',
+      PORT: '3000',
+      JWT_SECRET: originalEnv.JWT_SECRET || 'test-jwt-secret',
+      DATABASE_URL: originalEnv.DATABASE_URL || 'postgresql://user:pass@localhost:5432/ajicore',
+      STRIPE_SECRET_KEY: originalEnv.STRIPE_SECRET_KEY || 'sk_test_123',
+      INTERNAL_API_KEY: originalEnv.INTERNAL_API_KEY || 'internal-test-key',
+      TWILIO_ACCOUNT_SID: originalEnv.TWILIO_ACCOUNT_SID || 'test-twilio-account-sid',
+      TWILIO_AUTH_TOKEN: originalEnv.TWILIO_AUTH_TOKEN || 'twilio-auth-token',
+      TWILIO_PHONE_NUMBER: originalEnv.TWILIO_PHONE_NUMBER || '+15555550123',
+      MAIL_PROVIDER: originalEnv.MAIL_PROVIDER || 'smtp',
+      SMTP_HOST: originalEnv.SMTP_HOST || 'smtp.example.com',
+      SMTP_PORT: originalEnv.SMTP_PORT || '587',
+      SMTP_USER: originalEnv.SMTP_USER || 'smtp-user',
+      SMTP_PASS: originalEnv.SMTP_PASS || 'smtp-pass',
+      MAIL_FROM_EMAIL: originalEnv.MAIL_FROM_EMAIL || 'support@example.com',
+      ALLOWED_ORIGINS: 'https://myajicore.com',
+    });
+
+    const app = require(abs('src/app.js'));
+    server = app.listen(0, '127.0.0.1');
+    await new Promise((resolve) => server.once('listening', resolve));
+    const { port } = server.address();
+    baseUrl = `http://127.0.0.1:${port}`;
+  });
+
+  afterAll(async () => {
+    if (server) {
+      await new Promise((resolve) => server.close(resolve));
+    }
+    process.env = originalEnv;
+    jest.resetModules();
+  });
+
+  test('GET /api/health is not redirected for localhost probes in production', async () => {
+    const response = await fetch(`${baseUrl}/api/health`, { redirect: 'manual' });
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('location')).toBeNull();
+    expect(payload.status).toBe('ok');
+  });
+
+  test('OPTIONS /api/auth/google returns CORS headers for allowed origin in production', async () => {
+    const response = await fetch(`${baseUrl}/api/auth/google`, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'https://myajicore.com',
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'content-type',
+      },
+    });
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get('access-control-allow-origin')).toBe('https://myajicore.com');
+    expect(response.headers.get('access-control-allow-methods')).toContain('OPTIONS');
+  });
+});
