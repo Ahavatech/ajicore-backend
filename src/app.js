@@ -47,6 +47,10 @@ const { errorHandler, notFoundHandler } = require('./api/middlewares/error.middl
 const { rateLimiters } = require('./api/middlewares/rate_limit.middleware');
 
 const app = express();
+
+// Trust the first proxy hop (Traefik on Dokploy) so X-Forwarded-Proto/For are read correctly
+app.set('trust proxy', 1);
+
 const openApiSpec = getOpenApiSpec();
 const openApiDocumentUrl = getOpenApiDocumentUrl();
 
@@ -132,13 +136,24 @@ app.use(cors({
   maxAge: 3600,  // Cache preflight for 1 hour
 }));
 
+// Health check must come before HTTPS enforcement so Docker/Traefik probes always reach it
+app.get('/api/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'ajicore',
+    version: '2.0.0',
+    timestamp: new Date().toISOString(),
+    docs: '/api/docs',
+  });
+});
+
 // HTTPS enforcement in production
 if (process.env.NODE_ENV === 'production') {
   app.use((req, res, next) => {
-    if (req.header('x-forwarded-proto') !== 'https') {
-      res.redirect(`https://${req.header('host')}${req.url}`);
-    } else {
+    if (req.secure || req.header('x-forwarded-proto') === 'https') {
       next();
+    } else {
+      res.redirect(`https://${req.header('host')}${req.url}`);
     }
   });
 }
@@ -168,17 +183,6 @@ app.use((req, res, next) => {
 // Rate Limiting
 // ============================================
 
-// Health check - no rate limiting
-app.get('/api/health', (_req, res) => {
-  res.json({
-    status: 'ok',
-    service: 'ajicore',
-    version: '2.0.0',
-    timestamp: new Date().toISOString(),
-    docs: '/api/docs',
-  });
-});
-
 // API docs - lenient rate limiting
 app.use('/api/docs', rateLimiters.docs);
 app.use('/api/docs.json', rateLimiters.docs);
@@ -205,11 +209,6 @@ app.get('/api/docs.json', (_req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.send(openApiSpec);
 });
-
-// ============================================
-// Health Check
-// ============================================
-// Moved above rate limiting
 
 // ============================================
 // Static Assets
