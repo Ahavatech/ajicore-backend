@@ -1039,10 +1039,43 @@ function getSubscriptionService() {
   return require('../subscriptions/subscription.service');
 }
 
+function shouldDeferTrialSubscriptionProvisioning(err) {
+  if (!err) return false;
+
+  const message = String(err.message || '').toLowerCase();
+  const errorName = String(err.name || '');
+  const errorType = String(err.type || err.rawType || '');
+  const isStripeNamedError = errorName.startsWith('Stripe') || errorType.startsWith('Stripe');
+  const isStripePriceConfigError = message.includes('no such price')
+    || message.includes('stripe subscription pricing')
+    || message.includes('stripe secret key')
+    || message.includes('stripe sdk load failed')
+    || (message.includes('stripe') && message.includes('not configured'));
+  const isStripeApiCode = ['resource_missing', 'api_connection_error', 'rate_limit', 'authentication_error'].includes(err.code);
+
+  return Boolean(isStripeNamedError || isStripePriceConfigError || isStripeApiCode);
+}
+
 async function ensureBusinessTrialSubscription({ userId, businessId }) {
   try {
     await getSubscriptionService().ensureTrialSubscriptionForBusiness({ userId, businessId });
+    return { deferred: false };
   } catch (err) {
+    if (shouldDeferTrialSubscriptionProvisioning(err)) {
+      logger.warn(`Trial subscription provisioning deferred for business ${businessId}: ${err.message}`, {
+        businessId,
+        userId,
+        errorName: err.name,
+        errorType: err.type || err.rawType || null,
+        errorCode: err.code || null,
+        statusCode: err.statusCode || null,
+      });
+      return {
+        deferred: true,
+        reason: err.message,
+      };
+    }
+
     logger.error(`Failed to provision trial subscription for business ${businessId}: ${err.message}`);
     throw err;
   }

@@ -85,4 +85,60 @@ describe('auth onboarding trial subscription sync', () => {
       businessId: 'biz-1',
     });
   });
+
+  test('onboardingStep2 succeeds when Stripe trial subscription provisioning is deferred', async () => {
+    const logger = require('../../src/utils/logger');
+    const authService = require('../../src/domains/auth/auth.service');
+
+    mockSubscriptionService.ensureTrialSubscriptionForBusiness.mockRejectedValueOnce({
+      name: 'StripeAPIError',
+      message: "No such price: 'prod_UV3qWGRkCnLW6f'",
+      code: 'resource_missing',
+      statusCode: 404,
+      type: 'StripeInvalidRequestError',
+    });
+
+    const result = await authService.onboardingStep2('user-1', {
+      first_name: 'Aji',
+      last_name: 'Core',
+      company_name: 'Ajicore Services',
+      company_email: 'owner@example.com',
+      company_type: 'Plumbing',
+      business_structure: 'LLC',
+    });
+
+    expect(result.message).toBe('Organization contact info saved.');
+    expect(result.business.id).toBe('biz-1');
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Trial subscription provisioning deferred for business biz-1'),
+      expect.objectContaining({
+        businessId: 'biz-1',
+        userId: 'user-1',
+        errorCode: 'resource_missing',
+        statusCode: 404,
+      })
+    );
+  });
+
+  test('onboardingStep2 still throws for non-Stripe trial subscription failures', async () => {
+    const logger = require('../../src/utils/logger');
+    const authService = require('../../src/domains/auth/auth.service');
+
+    mockSubscriptionService.ensureTrialSubscriptionForBusiness.mockRejectedValueOnce(
+      new Error('unexpected database failure')
+    );
+
+    await expect(authService.onboardingStep2('user-1', {
+      first_name: 'Aji',
+      last_name: 'Core',
+      company_name: 'Ajicore Services',
+      company_email: 'owner@example.com',
+      company_type: 'Plumbing',
+      business_structure: 'LLC',
+    })).rejects.toThrow('unexpected database failure');
+
+    expect(logger.error).toHaveBeenCalledWith(
+      'Failed to provision trial subscription for business biz-1: unexpected database failure'
+    );
+  });
 });
