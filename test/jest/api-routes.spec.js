@@ -386,7 +386,7 @@ const standardModules = [
     name: 'conversations.routes',
     routeModulePath: 'src/api/routes/conversations.routes.js',
     basePath: '/api/conversations',
-    controllerModules: [{ modulePath: 'src/domains/conversations/conversation.controller.js', handlers: ['list', 'show'] }],
+    controllerModules: [{ modulePath: 'src/domains/conversations/conversation.controller.js', handlers: ['list', 'show', 'startInternal', 'finalizeInternal', 'appendInternal'] }],
     routes: [
       { method: 'get', path: '/', handler: 'list', query: { business_id: BUSINESS_ID }, invalidQuery: {}, failureAuth: 'requireAuth' },
       { method: 'get', path: `/${VALID_UUID}`, handler: 'show', query: { business_id: BUSINESS_ID }, invalidQuery: {}, invalidPath: '/bad-uuid', failureAuth: 'requireAuth' },

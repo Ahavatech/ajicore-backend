@@ -22,6 +22,7 @@ const quoteController = require('../../domains/quotes/quote.controller');
 const materialController = require('../../domains/inventory/material.controller');
 const customerController = require('../../domains/customers/customer.controller');
 const smsController = require('../../domains/communications/sms.controller');
+const callController = require('../../domains/communications/call.controller');
 const staffController = require('../../domains/team/staff.controller');
 const billingController = require('../../domains/billing/invoice.controller');
 const followUpController = require('../../domains/follow_ups/follow_up.controller');
@@ -850,5 +851,44 @@ router.get(withAiAlias('/ai/business/communication', '/business/communication'),
 // Outbound SMS
 // ============================================
 router.post(withAiAlias('/ai/sms/send', '/sms/send'), requireFields(['business_id', 'to', 'message'], 'body'), requireInternalBusinessAccess('body'), smsController.sendSms);
+
+/**
+ * @swagger
+ * /api/internal/ai/calls/outbound:
+ *   post:
+ *     summary: Place an outbound voice call through the AI bridge
+ *     tags: [AI Bridge]
+ *     security:
+ *       - apiKeyAuth: []
+ *       - businessTokenAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [business_id, to]
+ *             properties:
+ *               business_id: { type: string, format: uuid }
+ *               to:
+ *                 type: string
+ *                 description: Destination number in E.164 format.
+ *                 example: +2349011774616
+ *               message:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Plain-text message to speak if custom TwiML is not supplied.
+ *               twiml:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Optional raw TwiML to execute for the call.
+ *               customer_id: { type: string, format: uuid, nullable: true }
+ *               customer_name: { type: string, nullable: true }
+ *               job_id: { type: string, format: uuid, nullable: true }
+ *     responses:
+ *       200:
+ *         description: Outbound call started
+ */
+router.post(withAiAlias('/ai/calls/outbound', '/calls/outbound'), requireFields(['business_id', 'to'], 'body'), requireInternalBusinessAccess('body'), callController.makeCall);
 
 module.exports = router;

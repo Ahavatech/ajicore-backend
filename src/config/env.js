@@ -27,14 +27,35 @@ if (missingVars.length > 0) {
 if (process.env.NODE_ENV === 'production') {
   const productionRequired = [
     'STRIPE_SECRET_KEY',
-    'TWILIO_ACCOUNT_SID',
-    'TWILIO_AUTH_TOKEN',
     'INTERNAL_API_KEY',
   ];
 
   const missingProd = productionRequired.filter(v => !process.env[v]);
   if (missingProd.length > 0) {
     throw new Error(`Production environment missing: ${missingProd.join(', ')}`);
+  }
+
+  const hasTwilioAccountPair = Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN);
+  const hasTwilioApiKeyTriple = Boolean(
+    process.env.TWILIO_ACCOUNT_SID
+    && process.env.TWILIO_API_KEY_SID
+    && process.env.TWILIO_API_KEY_SECRET
+  );
+  if (!hasTwilioAccountPair && !hasTwilioApiKeyTriple) {
+    throw new Error(
+      'Production Twilio configuration missing: set either '
+      + 'TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN or '
+      + 'TWILIO_ACCOUNT_SID + TWILIO_API_KEY_SID + TWILIO_API_KEY_SECRET.'
+    );
+  }
+
+  if (!process.env.TWILIO_MESSAGING_SERVICE_SID && !process.env.TWILIO_PHONE_NUMBER) {
+    throw new Error('Production Twilio outbound sender missing: set TWILIO_MESSAGING_SERVICE_SID or TWILIO_PHONE_NUMBER.');
+  }
+
+  const productionTwilioPhoneNumber = String(process.env.TWILIO_PHONE_NUMBER || '').trim();
+  if (productionTwilioPhoneNumber && ['+1234567890', '+10000000000'].includes(productionTwilioPhoneNumber)) {
+    throw new Error('Production TWILIO_PHONE_NUMBER must be a real Twilio-owned number, not a placeholder.');
   }
 
   const smtpRequired = [

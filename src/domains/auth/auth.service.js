@@ -19,6 +19,12 @@ const env = require('../../config/env');
 const logger = require('../../utils/logger');
 const emailService = require('../communications/email.service');
 const {
+  getTwilioClient,
+  hasTwilioCredentials,
+  hasTwilioSmsSender,
+  normalizeE164PhoneNumber,
+} = require('../../integrations/twilio/twilio_client');
+const {
   ValidationError,
   ConflictError,
   AuthenticationError,
@@ -322,7 +328,7 @@ async function onboardingStep3(userId, data) {
   }
 
   const client = getTwilioClient();
-  const normalizedPhoneNumber = normalizeE164Number(phone_number);
+  const normalizedPhoneNumber = normalizeE164PhoneNumber(phone_number);
   const friendlyName = buildBusinessPhoneFriendlyName(business.name, normalizedPhoneNumber);
 
   let provisionedNumber;
@@ -751,9 +757,7 @@ async function sendOtp(userId, { phone_number }) {
   ]);
 
   // Send SMS via Twilio if credentials are available, otherwise log
-  const hasTwilio = env.TWILIO_ACCOUNT_SID
-    && env.TWILIO_AUTH_TOKEN
-    && (env.TWILIO_MESSAGING_SERVICE_SID || env.TWILIO_PHONE_NUMBER);
+  const hasTwilio = hasTwilioCredentials() && hasTwilioSmsSender();
 
   if (hasTwilio) {
     try {
@@ -950,59 +954,8 @@ function sanitizeBusiness(business) {
   return safe;
 }
 
-function getTwilioClient() {
-  const accountSidRaw = String(env.TWILIO_ACCOUNT_SID || '').trim();
-  const authToken = env.TWILIO_AUTH_TOKEN;
-  const apiKeySid = String(env.TWILIO_API_KEY_SID || '').trim();
-  const apiKeySecret = env.TWILIO_API_KEY_SECRET;
-
-  // Auto-detect: someone may have stored an API Key SID (SK...) under TWILIO_ACCOUNT_SID
-  // and the master Account SID under TWILIO_AUTH_TOKEN-equivalent envs. Normalize.
-  const looksLikeApiKey = (sid) => /^SK[a-zA-Z0-9]+$/.test(sid);
-  const looksLikeAccountSid = (sid) => /^AC[a-zA-Z0-9]+$/.test(sid);
-
-  let credentials;
-
-  if (apiKeySid && apiKeySecret && looksLikeAccountSid(accountSidRaw)) {
-    credentials = { sid: apiKeySid, secret: apiKeySecret, accountSid: accountSidRaw };
-  } else if (looksLikeApiKey(accountSidRaw) && authToken && looksLikeAccountSid(apiKeySid)) {
-    credentials = { sid: accountSidRaw, secret: authToken, accountSid: apiKeySid };
-  } else if (looksLikeAccountSid(accountSidRaw) && authToken) {
-    credentials = { sid: accountSidRaw, secret: authToken };
-  } else if (!accountSidRaw && !apiKeySid) {
-    throw new ValidationError('Twilio credentials are not configured.');
-  } else {
-    throw new ValidationError(
-      'Twilio credentials are misconfigured. Set either '
-      + '(TWILIO_ACCOUNT_SID=AC... + TWILIO_AUTH_TOKEN) or '
-      + '(TWILIO_API_KEY_SID=SK... + TWILIO_API_KEY_SECRET + TWILIO_ACCOUNT_SID=AC...).'
-    );
-  }
-
-  try {
-    const twilio = require('twilio');
-    if (credentials.accountSid) {
-      return twilio(credentials.sid, credentials.secret, { accountSid: credentials.accountSid });
-    }
-    return twilio(credentials.sid, credentials.secret);
-  } catch (err) {
-    logger.error(`Twilio SDK load failed: ${err.code || 'UNKNOWN'} ${err.message}`, {
-      stack: err.stack,
-    });
-    throw new ValidationError(`Twilio SDK load failed: ${err.code || err.message}`);
-  }
-}
-
 function normalizeTwilioCountryCode(countryCode) {
   return String(countryCode || 'US').trim().toUpperCase();
-}
-
-function normalizeE164Number(phoneNumber) {
-  const normalized = String(phoneNumber || '').trim();
-  if (!/^\+\d{8,15}$/.test(normalized)) {
-    throw new ValidationError('phone_number must be a valid E.164 phone number.');
-  }
-  return normalized;
 }
 
 function isValidEmail(email) {
@@ -1126,9 +1079,7 @@ function normalizeResetPasswordInput(input, codeArg, newPasswordArg) {
 }
 
 async function sendResetCodeSms(phoneNumber, code) {
-  const hasTwilio = env.TWILIO_ACCOUNT_SID
-    && env.TWILIO_AUTH_TOKEN
-    && (env.TWILIO_MESSAGING_SERVICE_SID || env.TWILIO_PHONE_NUMBER);
+  const hasTwilio = hasTwilioCredentials() && hasTwilioSmsSender();
 
   if (!hasTwilio) {
     throw new ValidationError('SMS delivery is not configured on this server.');
@@ -1197,7 +1148,7 @@ async function deprovisionAiPhoneNumber(businessId) {
 
   let releasedTwilioNumber = false;
 
-  if (business.twilio_phone_sid && env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN) {
+  if (business.twilio_phone_sid && hasTwilioCredentials()) {
     try {
       const client = getTwilioClient();
       releasedTwilioNumber = await releaseIncomingPhoneNumber(client, business.twilio_phone_sid);

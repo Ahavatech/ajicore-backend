@@ -5,6 +5,7 @@ const quoteControllerPath = 'src/domains/quotes/quote.controller.js';
 const materialControllerPath = 'src/domains/inventory/material.controller.js';
 const customerControllerPath = 'src/domains/customers/customer.controller.js';
 const smsControllerPath = 'src/domains/communications/sms.controller.js';
+const callControllerPath = 'src/domains/communications/call.controller.js';
 const staffControllerPath = 'src/domains/team/staff.controller.js';
 const billingControllerPath = 'src/domains/billing/invoice.controller.js';
 const followUpControllerPath = 'src/domains/follow_ups/follow_up.controller.js';
@@ -38,13 +39,14 @@ const harness = createRouteHarness({
     { modulePath: materialControllerPath, handlers: ['getAllMaterials'] },
     { modulePath: customerControllerPath, handlers: ['getAll', 'findByPhone', 'getById', 'getHistory', 'create'] },
     { modulePath: smsControllerPath, handlers: ['sendSms'] },
+    { modulePath: callControllerPath, handlers: ['makeCall'] },
     { modulePath: staffControllerPath, handlers: ['getAllStaff', 'getStaffById'] },
     { modulePath: billingControllerPath, handlers: ['getAll', 'getTotal', 'getById', 'createInvoice', 'updateInvoice', 'sendInvoice', 'voidInvoice', 'refundInvoice', 'processPayment'] },
     { modulePath: followUpControllerPath, handlers: ['list', 'create', 'update', 'markSent', 'cancel'] },
     { modulePath: teamCheckinControllerPath, handlers: ['list', 'create', 'update', 'receive', 'escalate'] },
     { modulePath: pricebookControllerPath, handlers: ['getItems', 'getItemById'] },
     { modulePath: businessControllerPath, handlers: ['getProfile', 'getAlerts', 'getAutomation', 'getCommunication'] },
-    { modulePath: conversationsControllerPath, handlers: ['list', 'show'] },
+    { modulePath: conversationsControllerPath, handlers: ['list', 'show', 'startInternal', 'finalizeInternal', 'appendInternal'] },
     { modulePath: aiLogsControllerPath, handlers: ['eventTypes', 'list'] },
   ],
   extraMocks: [
@@ -107,12 +109,13 @@ const protectedRoutes = [
   { paths: ['/api/internal/ai/events/event-types', '/api/internal/events/event-types'], query: { business_id: BUSINESS_ID }, handler: 'eventTypes', modulePath: aiLogsControllerPath, invalidQuery: {} },
   { paths: ['/api/internal/ai/events', '/api/internal/events'], query: { business_id: BUSINESS_ID }, handler: 'list', modulePath: aiLogsControllerPath, invalidQuery: {} },
   { paths: ['/api/internal/ai/conversations', '/api/internal/conversations'], query: { business_id: BUSINESS_ID }, handler: 'list', modulePath: conversationsControllerPath, invalidQuery: {} },
-  { paths: [`/api/internal/ai/conversations/${VALID_UUID}`, `/api/internal/conversations/${VALID_UUID}`], handler: 'show', modulePath: conversationsControllerPath, failureAuth: 'requireInternalResourceAccess' },
+  { paths: [`/api/internal/ai/conversations/${VALID_UUID}`, `/api/internal/conversations/${VALID_UUID}`], handler: 'show', modulePath: conversationsControllerPath, failureAuth: 'requireInternalApiKey' },
   { paths: ['/api/internal/ai/business/profile', '/api/internal/business/profile'], query: { business_id: BUSINESS_ID }, handler: 'getProfile', modulePath: businessControllerPath, invalidQuery: {} },
   { paths: ['/api/internal/ai/business/alerts', '/api/internal/business/alerts'], query: { business_id: BUSINESS_ID }, handler: 'getAlerts', modulePath: businessControllerPath, invalidQuery: {} },
   { paths: ['/api/internal/ai/business/automation', '/api/internal/business/automation'], query: { business_id: BUSINESS_ID }, handler: 'getAutomation', modulePath: businessControllerPath, invalidQuery: {} },
   { paths: ['/api/internal/ai/business/communication', '/api/internal/business/communication'], query: { business_id: BUSINESS_ID }, handler: 'getCommunication', modulePath: businessControllerPath, invalidQuery: {} },
   { paths: ['/api/internal/ai/sms/send', '/api/internal/sms/send'], method: 'post', body: { business_id: BUSINESS_ID, to: '+15555550123', message: 'Hello' }, handler: 'sendSms', modulePath: smsControllerPath, invalidBody: { business_id: BUSINESS_ID, to: '+15555550123' } },
+  { paths: ['/api/internal/ai/calls/outbound', '/api/internal/calls/outbound'], method: 'post', body: { business_id: BUSINESS_ID, to: '+15555550123', message: 'Hello from Ajicore' }, handler: 'makeCall', modulePath: callControllerPath, invalidBody: { business_id: BUSINESS_ID } },
 ];
 
 describe('ai bridge routes', () => {
