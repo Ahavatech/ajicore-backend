@@ -16,7 +16,7 @@ const DEFAULT_LIMITS = {
   // General API limits
   standard: { windowMs: 15 * 60 * 1000, maxRequests: 100 }, // 100 requests per 15 minutes
   strict: { windowMs: 5 * 60 * 1000, maxRequests: 20 },     // 20 requests per 5 minutes
-  auth: { windowMs: 15 * 60 * 1000, maxRequests: 30 },      // 30 auth attempts per 15 minutes
+  auth: { windowMs: 15 * 60 * 1000, maxRequests: 75 },      // 75 auth attempts per 15 minutes
 
   // Custom limits can be added as needed
 };
