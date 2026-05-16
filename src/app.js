@@ -53,6 +53,9 @@ const app = express();
 const openApiSpec = getOpenApiSpec();
 const openApiDocumentUrl = getOpenApiDocumentUrl();
 
+// Respect reverse-proxy headers from Dokploy / ingress / load balancers.
+app.set('trust proxy', 1);
+
 // ============================================
 // Global Middleware
 // ============================================
@@ -138,7 +141,18 @@ app.use(cors({
 // HTTPS enforcement in production
 if (process.env.NODE_ENV === 'production') {
   app.use((req, res, next) => {
-    if (req.header('x-forwarded-proto') !== 'https') {
+    // Never redirect preflight requests; browsers treat redirect-on-OPTIONS as CORS failure.
+    if (req.method === 'OPTIONS') {
+      return next();
+    }
+
+    const forwardedProto = String(req.header('x-forwarded-proto') || '')
+      .split(',')[0]
+      .trim()
+      .toLowerCase();
+    const isSecure = req.secure || forwardedProto === 'https';
+
+    if (!isSecure) {
       res.redirect(`https://${req.header('host')}${req.url}`);
     } else {
       next();
