@@ -4,8 +4,20 @@
  */
 const dotenv = require('dotenv');
 const path = require('path');
+const fs = require('fs');
 
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+const localEnvPath = path.resolve(__dirname, '../../.env');
+if (fs.existsSync(localEnvPath)) {
+  dotenv.config({ path: localEnvPath });
+}
+
+function maskPhoneForEnvError(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '[empty]';
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length < 4) return raw;
+  return `${raw.startsWith('+') ? '+' : ''}***${digits.slice(-4)}`;
+}
 
 // Validate required environment variables
 const requiredEnvVars = [
@@ -55,7 +67,11 @@ if (process.env.NODE_ENV === 'production') {
 
   const productionTwilioPhoneNumber = String(process.env.TWILIO_PHONE_NUMBER || '').trim();
   if (productionTwilioPhoneNumber && ['+1234567890', '+10000000000'].includes(productionTwilioPhoneNumber)) {
-    throw new Error('Production TWILIO_PHONE_NUMBER must be a real Twilio-owned number, not a placeholder.');
+    throw new Error(
+      `Production TWILIO_PHONE_NUMBER is still a placeholder (${maskPhoneForEnvError(productionTwilioPhoneNumber)}). `
+      + 'This value is coming from the deployment runtime environment, not the repo .env file. '
+      + 'Update the hosting provider runtime env for TWILIO_PHONE_NUMBER and redeploy.'
+    );
   }
 
   const smtpRequired = [
