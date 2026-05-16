@@ -1,4 +1,3 @@
-const Stripe = require('stripe');
 const prisma = require('../../lib/prisma');
 const env = require('../../config/env');
 const logger = require('../../utils/logger');
@@ -14,7 +13,16 @@ function getStripeClient() {
   }
 
   if (!stripeClient) {
-    stripeClient = new Stripe(env.STRIPE_SECRET_KEY);
+    try {
+      // Lazy-load Stripe so a bad dependency install does not take down the whole API at boot.
+      const Stripe = require('stripe');
+      stripeClient = new Stripe(env.STRIPE_SECRET_KEY);
+    } catch (err) {
+      logger.error(`Stripe SDK load failed: ${err.code || 'UNKNOWN'} ${err.message}`, {
+        stack: err.stack,
+      });
+      throw new ValidationError(`Stripe SDK load failed: ${err.code || err.message}`);
+    }
   }
 
   return stripeClient;
