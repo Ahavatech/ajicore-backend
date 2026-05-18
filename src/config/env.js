@@ -116,7 +116,28 @@ function validateStripeKeyPair(secretKey, publishableKey) {
   }
 }
 
+function validateStripeBillingConfig() {
+  const stripePriceId = String(process.env.STRIPE_SUBSCRIPTION_PRICE_ID || '').trim();
+  const stripeProductId = String(process.env.STRIPE_SUBSCRIPTION_PRODUCT_ID || '').trim();
+
+  if (stripePriceId) {
+    if (stripePriceId.startsWith('prod_')) {
+      throw new Error(
+        'STRIPE_SUBSCRIPTION_PRICE_ID must be a Stripe Price ID (price_...), not a Product ID (prod_...).'
+      );
+    }
+    if (!stripePriceId.startsWith('price_')) {
+      throw new Error('STRIPE_SUBSCRIPTION_PRICE_ID must start with price_.');
+    }
+  }
+
+  if (stripeProductId && !stripeProductId.startsWith('prod_')) {
+    throw new Error('STRIPE_SUBSCRIPTION_PRODUCT_ID must start with prod_.');
+  }
+}
+
 validateStripeKeyPair(process.env.STRIPE_SECRET_KEY, process.env.STRIPE_PUBLISHABLE_KEY);
+validateStripeBillingConfig();
 
 const env = {
   // Server
@@ -139,6 +160,7 @@ const env = {
   STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY,
   STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
   STRIPE_CURRENCY: (process.env.STRIPE_CURRENCY || 'usd').toLowerCase(),
+  STRIPE_SUBSCRIPTION_PRODUCT_ID: process.env.STRIPE_SUBSCRIPTION_PRODUCT_ID,
   STRIPE_SUBSCRIPTION_PRICE_ID: process.env.STRIPE_SUBSCRIPTION_PRICE_ID,
   STRIPE_SUBSCRIPTION_PRICE_AMOUNT: parseInteger(process.env.STRIPE_SUBSCRIPTION_PRICE_AMOUNT, null),
   STRIPE_SUBSCRIPTION_TRIAL_DAYS: parseInteger(process.env.STRIPE_SUBSCRIPTION_TRIAL_DAYS, 21),

@@ -244,4 +244,75 @@ describe('subscription service', () => {
     expect(result.has_subscription).toBe(true);
     expect(result.subscription.status).toBe('trialing');
   });
+
+  test('ensureTrialSubscriptionForBusiness uses configured Stripe price id directly', async () => {
+    process.env.STRIPE_SUBSCRIPTION_PRICE_ID = 'price_1TW3j94p3u6l6XNc25i5Zoxr';
+    mockStripeInstance.customers.create.mockResolvedValue({ id: 'cus_123' });
+    mockStripeInstance.subscriptions.create.mockResolvedValue({
+      id: 'sub_123',
+      status: 'trialing',
+      customer: 'cus_123',
+      trial_start: Math.floor(Date.now() / 1000),
+      trial_end: Math.floor((Date.now() + 10 * 24 * 60 * 60 * 1000) / 1000),
+      current_period_start: Math.floor(Date.now() / 1000),
+      current_period_end: Math.floor((Date.now() + 10 * 24 * 60 * 60 * 1000) / 1000),
+      cancel_at_period_end: false,
+      canceled_at: null,
+      items: { data: [{ price: { id: 'price_1TW3j94p3u6l6XNc25i5Zoxr' } }] },
+      latest_invoice: null,
+      metadata: { business_id: 'biz-1', business_name: 'Ajicore' },
+    });
+    mockStripeInstance.customers.retrieve.mockResolvedValue({
+      id: 'cus_123',
+      invoice_settings: {
+        default_payment_method: null,
+      },
+    });
+
+    mockPrisma.business.findUnique.mockResolvedValue({
+      id: 'biz-1',
+      name: 'Ajicore',
+      owner_id: 'user-1',
+      company_email: 'owner@example.com',
+      owner: { id: 'user-1', email: 'owner@example.com', phone_number: '+15555550123' },
+    });
+    mockPrisma.user.findUnique.mockResolvedValue({
+      trial_started_at: new Date(),
+      trial_ends_at: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
+    });
+    mockPrisma.businessSubscription.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    mockPrisma.businessSubscription.create.mockResolvedValue({
+      id: 'local-sub-1',
+      business_id: 'biz-1',
+      stripe_customer_id: 'cus_123',
+      stripe_subscription_id: 'sub_123',
+      stripe_price_id: 'price_1TW3j94p3u6l6XNc25i5Zoxr',
+      status: 'trialing',
+      trial_start: new Date(),
+      trial_end: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
+      current_period_start: new Date(),
+      current_period_end: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
+      cancel_at_period_end: false,
+      canceled_at: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const subscriptionService = require('../../src/domains/subscriptions/subscription.service');
+    const result = await subscriptionService.ensureTrialSubscriptionForBusiness({
+      userId: 'user-1',
+      businessId: 'biz-1',
+    });
+
+    expect(mockStripeInstance.prices.list).not.toHaveBeenCalled();
+    expect(mockStripeInstance.products.create).not.toHaveBeenCalled();
+    expect(mockStripeInstance.prices.create).not.toHaveBeenCalled();
+    expect(mockStripeInstance.subscriptions.create).toHaveBeenCalledWith(expect.objectContaining({
+      items: [{ price: 'price_1TW3j94p3u6l6XNc25i5Zoxr' }],
+    }));
+    expect(result.subscription.stripe_price_id).toBe('price_1TW3j94p3u6l6XNc25i5Zoxr');
+  });
 });
