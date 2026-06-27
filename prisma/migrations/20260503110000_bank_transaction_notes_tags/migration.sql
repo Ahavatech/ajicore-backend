@@ -1,3 +1,0 @@
-ALTER TABLE "bank_transactions"
-  ADD COLUMN IF NOT EXISTS "notes" TEXT,
-  ADD COLUMN IF NOT EXISTS "tags" JSONB;
