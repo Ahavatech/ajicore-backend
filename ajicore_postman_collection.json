@@ -1,0 +1,2806 @@
+{
+  "info": {
+    "name": "Ajicore API",
+    "description": "\n# Ajicore — AI-Powered Back Office for Blue-Collar Service Businesses\n\nComplete REST API for managing schedules, quotes, jobs, invoicing, inventory, fleet, staff, and AI call flow.\n\n## Authentication\n- **Frontend routes**: Use `Authorization: Bearer <jwt_token>` header\n- **AI / Internal routes**: Use `x-api-key: <internal_api_key>` header\n\n## Key Flows\n\n### Quote → Job Conversion\n1. AI books estimate → `POST /api/quotes` (status: EstimateScheduled)\n2. Contractor goes on-site → `PATCH /api/quotes/:id` (add pricing, status: Draft)\n3. Send to customer → `POST /api/quotes/:id/send` (status: Sent, expiry set)\n4. Customer approves → `POST /api/quotes/:id/approve` (creates Job)\n\n### Direct Job Booking (price known)\n1. AI/manual books job → `POST /api/jobs`\n2. Start work → `POST /api/jobs/:id/start`\n3. Complete → `POST /api/jobs/:id/complete`\n4. Invoice → `POST /api/billing/invoices`\n5. Payment → `POST /api/billing/payments/:invoiceId`\n\n### Invoice Edit Rules\n- **Draft/Sent**: Full edit allowed\n- **Paid**: Only internal notes\n- **Refunded/Voided**: Locked\n      ",
+    "version": "2.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{JWT_TOKEN}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "JWT_TOKEN",
+      "value": "",
+      "type": "string",
+      "description": "JWT from POST /api/auth/signin"
+    },
+    {
+      "key": "AI_API_KEY",
+      "value": "",
+      "type": "string",
+      "description": "x-api-key for AI bridge endpoints"
+    },
+    {
+      "key": "BUSINESS_ID",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "CUSTOMER_ID",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "JOB_ID",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "QUOTE_ID",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "INVOICE_ID",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Sign Up",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/auth/signup",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "signup"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_name\": \"Acme Plumbing\",\n  \"industry\": \"Plumbing\",\n  \"email\": \"owner@example.com\",\n  \"password\": \"SecurePass123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Sign In (get JWT)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/auth/signin",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "signin"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@example.com\",\n  \"password\": \"SecurePass123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get current user",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/auth/me",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "me"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "Update onboarding step",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/auth/onboarding",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "onboarding"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"step\": 2,\n  \"home_base_zip\": \"30301\",\n  \"service_radius_miles\": 50\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Customers",
+      "item": [
+        {
+          "name": "List Customers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/customers?business_id={{BUSINESS_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "customers"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Lookup by Phone (AI)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/customers/lookup?business_id={{BUSINESS_ID}}&phone=+14045551234",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "customers",
+                "lookup"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                },
+                {
+                  "key": "phone",
+                  "value": "+14045551234"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Customer",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/customers/{{CUSTOMER_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "customers",
+                "{{CUSTOMER_ID}}"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "Customer Job History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/customers/{{CUSTOMER_ID}}/history",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "customers",
+                "{{CUSTOMER_ID}}",
+                "history"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "Create Customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/customers",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "customers"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_id\": \"{{BUSINESS_ID}}\",\n  \"first_name\": \"John\",\n  \"last_name\": \"Smith\",\n  \"phone_number\": \"+14045551234\",\n  \"address\": \"123 Main St, Atlanta, GA\",\n  \"zip_code\": \"30301\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Update Customer",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/customers/{{CUSTOMER_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "customers",
+                "{{CUSTOMER_ID}}"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"Prefers morning appointments\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete Customer",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/customers/{{CUSTOMER_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "customers",
+                "{{CUSTOMER_ID}}"
+              ],
+              "query": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Quotes",
+      "item": [
+        {
+          "name": "List Quotes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/quotes?business_id={{BUSINESS_ID}}&status=EstimateScheduled",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "quotes"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                },
+                {
+                  "key": "status",
+                  "value": "EstimateScheduled"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Quote",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/quotes/{{QUOTE_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{QUOTE_ID}}"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "Create Quote (Estimate)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/quotes",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "quotes"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_id\": \"{{BUSINESS_ID}}\",\n  \"customer_id\": \"{{CUSTOMER_ID}}\",\n  \"title\": \"Water Heater Replacement Estimate\",\n  \"description\": \"Customer reports no hot water\",\n  \"scheduled_estimate_date\": \"2026-03-20T09:00:00Z\",\n  \"is_emergency\": false,\n  \"source\": \"AI\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Update Quote (add pricing)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/quotes/{{QUOTE_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{QUOTE_ID}}"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"total_amount\": 850,\n  \"notes\": \"Includes parts and labor\",\n  \"status\": \"Draft\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Send Quote to Customer",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/quotes/{{QUOTE_ID}}/send",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{QUOTE_ID}}",
+                "send"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "Approve Quote → Create Job",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/quotes/{{QUOTE_ID}}/approve",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{QUOTE_ID}}",
+                "approve"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scheduled_start_time\": \"2026-03-22T08:00:00Z\",\n  \"scheduled_end_time\": \"2026-03-22T12:00:00Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Decline Quote",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/quotes/{{QUOTE_ID}}/decline",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{QUOTE_ID}}",
+                "decline"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Customer went with another provider\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete Quote",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/quotes/{{QUOTE_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{QUOTE_ID}}"
+              ],
+              "query": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Jobs",
+      "item": [
+        {
+          "name": "List Jobs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/jobs?business_id={{BUSINESS_ID}}&status=Scheduled",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "jobs"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                },
+                {
+                  "key": "status",
+                  "value": "Scheduled"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Schedule View",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/jobs/schedule?business_id={{BUSINESS_ID}}&start_date=2026-03-16&end_date=2026-03-23",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "schedule"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                },
+                {
+                  "key": "start_date",
+                  "value": "2026-03-16"
+                },
+                {
+                  "key": "end_date",
+                  "value": "2026-03-23"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Check Staff Availability",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/jobs/availability?staff_id=&start_time=2026-03-20T09:00:00Z&end_time=2026-03-20T12:00:00Z",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "availability"
+              ],
+              "query": [
+                {
+                  "key": "staff_id",
+                  "value": ""
+                },
+                {
+                  "key": "start_time",
+                  "value": "2026-03-20T09:00:00Z"
+                },
+                {
+                  "key": "end_time",
+                  "value": "2026-03-20T12:00:00Z"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Job",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/jobs/{{JOB_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{JOB_ID}}"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "Create Job (price known)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/jobs",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "jobs"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_id\": \"{{BUSINESS_ID}}\",\n  \"customer_id\": \"{{CUSTOMER_ID}}\",\n  \"type\": \"Job\",\n  \"title\": \"AC Tune-Up\",\n  \"job_details\": \"Annual maintenance\",\n  \"service_call_fee\": 89,\n  \"scheduled_start_time\": \"2026-03-20T10:00:00Z\",\n  \"is_emergency\": false,\n  \"source\": \"Manual\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Update Job",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/jobs/{{JOB_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{JOB_ID}}"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assigned_staff_id\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Start Job",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/jobs/{{JOB_ID}}/start",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{JOB_ID}}",
+                "start"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "Complete Job",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/jobs/{{JOB_ID}}/complete",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{JOB_ID}}",
+                "complete"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "Add Materials Used",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/jobs/{{JOB_ID}}/materials",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{JOB_ID}}",
+                "materials"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"materials\": [\n    {\n      \"material_id\": \"\",\n      \"quantity_used\": 2,\n      \"unit_cost\": 45\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Add Job Photos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/jobs/{{JOB_ID}}/photos",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{JOB_ID}}",
+                "photos"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"photo_urls\": [\n    \"https://cdn.example.com/job-photo-1.jpg\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete Job",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/jobs/{{JOB_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "jobs",
+                "{{JOB_ID}}"
+              ],
+              "query": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Billing",
+      "item": [
+        {
+          "name": "List Invoices",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/billing/invoices?business_id={{BUSINESS_ID}}&status=Draft",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "billing",
+                "invoices"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                },
+                {
+                  "key": "status",
+                  "value": "Draft"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Invoice",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/billing/invoices/{{INVOICE_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "billing",
+                "invoices",
+                "{{INVOICE_ID}}"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "Get Invoice Total (subtotal, paid, balance)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/billing/invoices/{{INVOICE_ID}}/total",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "billing",
+                "invoices",
+                "{{INVOICE_ID}}",
+                "total"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "Get Invoices for Job",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/billing/invoices/job/{{JOB_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "billing",
+                "invoices",
+                "job",
+                "{{JOB_ID}}"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "Create Invoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/billing/invoices",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "billing",
+                "invoices"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"job_id\": \"{{JOB_ID}}\",\n  \"business_id\": \"{{BUSINESS_ID}}\",\n  \"status\": \"Draft\",\n  \"notes\": \"Thank you for your business!\",\n  \"due_date\": \"2026-04-15T00:00:00Z\",\n  \"line_items\": [\n    {\n      \"description\": \"AC Tune-Up Labor\",\n      \"quantity\": 1,\n      \"unit_price\": 150\n    },\n    {\n      \"description\": \"Refrigerant Top-off\",\n      \"quantity\": 1,\n      \"unit_price\": 45\n    },\n    {\n      \"description\": \"Service Call Credit\",\n      \"quantity\": 1,\n      \"unit_price\": 89,\n      \"is_credit\": true\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Edit Invoice (respects status rules)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/billing/invoices/{{INVOICE_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "billing",
+                "invoices",
+                "{{INVOICE_ID}}"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"Updated notes\",\n  \"line_items\": [\n    {\n      \"description\": \"AC Tune-Up\",\n      \"quantity\": 1,\n      \"unit_price\": 200\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Send Invoice",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/billing/invoices/{{INVOICE_ID}}/send",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "billing",
+                "invoices",
+                "{{INVOICE_ID}}",
+                "send"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "Void Invoice",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/billing/invoices/{{INVOICE_ID}}/void",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "billing",
+                "invoices",
+                "{{INVOICE_ID}}",
+                "void"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "Refund Invoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/billing/invoices/{{INVOICE_ID}}/refund",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "billing",
+                "invoices",
+                "{{INVOICE_ID}}",
+                "refund"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 100,\n  \"reason\": \"Service issue\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Record Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/billing/payments/{{INVOICE_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "billing",
+                "payments",
+                "{{INVOICE_ID}}"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 106,\n  \"payment_method\": \"credit_card\",\n  \"payment_method_id\": \"pm_...\",\n  \"notes\": \"Visa ending 4242\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "List Expenses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/billing/expenses?business_id={{BUSINESS_ID}}&category=Materials",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "billing",
+                "expenses"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                },
+                {
+                  "key": "category",
+                  "value": "Materials"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Expense",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/billing/expenses",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "billing",
+                "expenses"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_id\": \"{{BUSINESS_ID}}\",\n  \"job_id\": \"{{JOB_ID}}\",\n  \"category\": \"Materials\",\n  \"amount\": 45,\n  \"description\": \"Refrigerant R-410A\",\n  \"date\": \"2026-03-16\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Update Expense",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/billing/expenses/:id",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "billing",
+                "expenses",
+                ":id"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 50\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete Expense",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/billing/expenses/:id",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "billing",
+                "expenses",
+                ":id"
+              ],
+              "query": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "PriceBook",
+      "item": [
+        {
+          "name": "List Service Categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/price-book/categories?business_id={{BUSINESS_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "price-book",
+                "categories"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Category",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/price-book/categories",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "price-book",
+                "categories"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_id\": \"{{BUSINESS_ID}}\",\n  \"name\": \"HVAC Services\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Update Category",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/price-book/categories/:id",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "price-book",
+                "categories",
+                ":id"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"HVAC & Refrigeration\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Deactivate Category",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/price-book/categories/:id",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "price-book",
+                "categories",
+                ":id"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "List Price Book Items",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/price-book?business_id={{BUSINESS_ID}}&can_quote_phone=true",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "price-book"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                },
+                {
+                  "key": "can_quote_phone",
+                  "value": "true"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Suggested Items (auto-detect from job patterns)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/price-book/suggestions?business_id={{BUSINESS_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "price-book",
+                "suggestions"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Price Book Item",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/price-book/:id",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "price-book",
+                ":id"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "Create Price Book Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/price-book",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "price-book"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_id\": \"{{BUSINESS_ID}}\",\n  \"name\": \"AC Tune-Up\",\n  \"can_quote_phone\": true,\n  \"price_type\": \"Fixed\",\n  \"price\": 89,\n  \"visit_type\": \"PaidServiceCall\",\n  \"service_call_fee\": 89\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Update Price Book Item",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/price-book/:id",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "price-book",
+                ":id"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 99\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Deactivate Price Book Item",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/price-book/:id",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "price-book",
+                ":id"
+              ],
+              "query": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Inventory",
+      "item": [
+        {
+          "name": "List Materials",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/inventory?business_id={{BUSINESS_ID}}&low_stock=false",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "inventory"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                },
+                {
+                  "key": "low_stock",
+                  "value": "false"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Low Stock Alert",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/inventory?business_id={{BUSINESS_ID}}&low_stock=true",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "inventory"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                },
+                {
+                  "key": "low_stock",
+                  "value": "true"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Material",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/inventory/:id",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "inventory",
+                ":id"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "Create Material",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/inventory",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "inventory"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_id\": \"{{BUSINESS_ID}}\",\n  \"name\": \"Refrigerant R-410A\",\n  \"unit\": \"lbs\",\n  \"quantity_on_hand\": 20,\n  \"restock_threshold\": 5,\n  \"unit_cost\": 15\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Update Material",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/inventory/:id",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "inventory",
+                ":id"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unit_cost\": 16.5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Restock Material",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/inventory/:id/restock",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "inventory",
+                ":id",
+                "restock"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 10\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Remove Material",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/inventory/:id",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "inventory",
+                ":id"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "Deduct Materials for Job",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/inventory/deduct/:jobId",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "inventory",
+                "deduct",
+                ":jobId"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"materials\": [\n    {\n      \"material_id\": \"\",\n      \"quantity\": 2\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Fleet",
+      "item": [
+        {
+          "name": "List Vehicles",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/fleet?business_id={{BUSINESS_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "fleet"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Maintenance Alerts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/fleet/maintenance-alerts?business_id={{BUSINESS_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "fleet",
+                "maintenance-alerts"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Vehicle",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/fleet/:id",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "fleet",
+                ":id"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "Add Vehicle",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/fleet",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "fleet"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_id\": \"{{BUSINESS_ID}}\",\n  \"make_model\": \"2021 Ford Transit\",\n  \"year\": 2021,\n  \"license_plate\": \"ABC-1234\",\n  \"mileage\": 45000,\n  \"maintenance_cycle_miles\": 5000,\n  \"insurance_expiry\": \"2027-01-01\",\n  \"registration_renewal\": \"2026-12-31\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Update Vehicle",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/fleet/:id",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "fleet",
+                ":id"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"last_maintenance_mileage\": 45000,\n  \"notes\": \"Oil changed 3/15/2026\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Update Mileage (triggers maintenance check)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/fleet/:id/mileage",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "fleet",
+                ":id",
+                "mileage"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mileage\": 46500\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Remove Vehicle",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/fleet/:id",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "fleet",
+                ":id"
+              ],
+              "query": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Staff",
+      "item": [
+        {
+          "name": "List Staff",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/staff?business_id={{BUSINESS_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "staff"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Calculate Payroll",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/staff/payroll?business_id={{BUSINESS_ID}}&start_date=2026-03-01&end_date=2026-03-16",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "staff",
+                "payroll"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                },
+                {
+                  "key": "start_date",
+                  "value": "2026-03-01"
+                },
+                {
+                  "key": "end_date",
+                  "value": "2026-03-16"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Timesheets",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/staff/timesheets?business_id={{BUSINESS_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "staff",
+                "timesheets"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Staff Member",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/staff/:id",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "staff",
+                ":id"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "Add Staff Member",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/staff",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "staff"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_id\": \"{{BUSINESS_ID}}\",\n  \"name\": \"Mike Johnson\",\n  \"role\": \"Technician\",\n  \"hourly_rate\": 28,\n  \"phone\": \"+14045551234\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Update Staff Member",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/staff/:id",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "staff",
+                ":id"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hourly_rate\": 30\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Remove Staff Member",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/staff/:id",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "staff",
+                ":id"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "Clock In",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/staff/:id/clock-in",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "staff",
+                ":id",
+                "clock-in"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"job_id\": \"{{JOB_ID}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Clock Out",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/staff/:id/clock-out",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "staff",
+                ":id",
+                "clock-out"
+              ],
+              "query": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Dashboard Summary (KPIs)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/dashboard/summary?business_id={{BUSINESS_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "dashboard",
+                "summary"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Weekly Report",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/dashboard/weekly-report?business_id={{BUSINESS_ID}}&start_date=2026-03-09&end_date=2026-03-16",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "dashboard",
+                "weekly-report"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                },
+                {
+                  "key": "start_date",
+                  "value": "2026-03-09"
+                },
+                {
+                  "key": "end_date",
+                  "value": "2026-03-16"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Revenue Chart",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/dashboard/revenue?business_id={{BUSINESS_ID}}&period=30d",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "dashboard",
+                "revenue"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                },
+                {
+                  "key": "period",
+                  "value": "30d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Jobs Analytics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/dashboard/jobs-analytics?business_id={{BUSINESS_ID}}&period=30d",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "dashboard",
+                "jobs-analytics"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                },
+                {
+                  "key": "period",
+                  "value": "30d"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "AI Bridge",
+      "item": [
+        {
+          "name": "AI: Get Business Config",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/internal/ai/business-config?business_id={{BUSINESS_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "business-config"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                }
+              ]
+            },
+            "auth": {
+              "type": "apikey",
+              "apikey": [
+                {
+                  "key": "key",
+                  "value": "x-api-key",
+                  "in": "header"
+                },
+                {
+                  "key": "value",
+                  "value": "{{AI_API_KEY}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "AI: Price Lookup",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/internal/ai/price-lookup?business_id={{BUSINESS_ID}}&service=ac tune",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "price-lookup"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                },
+                {
+                  "key": "service",
+                  "value": "ac tune"
+                }
+              ]
+            },
+            "auth": {
+              "type": "apikey",
+              "apikey": [
+                {
+                  "key": "key",
+                  "value": "x-api-key",
+                  "in": "header"
+                },
+                {
+                  "key": "value",
+                  "value": "{{AI_API_KEY}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "AI: Service Radius Check",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/internal/ai/radius-check",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "radius-check"
+              ],
+              "query": []
+            },
+            "auth": {
+              "type": "apikey",
+              "apikey": [
+                {
+                  "key": "key",
+                  "value": "x-api-key",
+                  "in": "header"
+                },
+                {
+                  "key": "value",
+                  "value": "{{AI_API_KEY}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_id\": \"{{BUSINESS_ID}}\",\n  \"customer_zip\": \"30309\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "AI: Book Job or Quote",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/internal/ai/book",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "ai",
+                "book"
+              ],
+              "query": []
+            },
+            "auth": {
+              "type": "apikey",
+              "apikey": [
+                {
+                  "key": "key",
+                  "value": "x-api-key",
+                  "in": "header"
+                },
+                {
+                  "key": "value",
+                  "value": "{{AI_API_KEY}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_id\": \"{{BUSINESS_ID}}\",\n  \"booking_type\": \"Job\",\n  \"customer\": {\n    \"first_name\": \"Jane\",\n    \"last_name\": \"Doe\",\n    \"phone_number\": \"+14045559999\"\n  },\n  \"service_name\": \"AC Tune-Up\",\n  \"service_call_fee\": 89,\n  \"scheduled_start_time\": \"2026-03-20T10:00:00Z\",\n  \"is_emergency\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "AI: Get Schedule",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/internal/schedule?business_id={{BUSINESS_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "schedule"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                }
+              ]
+            },
+            "auth": {
+              "type": "apikey",
+              "apikey": [
+                {
+                  "key": "key",
+                  "value": "x-api-key",
+                  "in": "header"
+                },
+                {
+                  "key": "value",
+                  "value": "{{AI_API_KEY}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "AI: List Customers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/internal/customers?business_id={{BUSINESS_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "customers"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                }
+              ]
+            },
+            "auth": {
+              "type": "apikey",
+              "apikey": [
+                {
+                  "key": "key",
+                  "value": "x-api-key",
+                  "in": "header"
+                },
+                {
+                  "key": "value",
+                  "value": "{{AI_API_KEY}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "AI: Lookup Customer by Phone",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/internal/customers/lookup?business_id={{BUSINESS_ID}}&phone=+14045551234",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "customers",
+                "lookup"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                },
+                {
+                  "key": "phone",
+                  "value": "+14045551234"
+                }
+              ]
+            },
+            "auth": {
+              "type": "apikey",
+              "apikey": [
+                {
+                  "key": "key",
+                  "value": "x-api-key",
+                  "in": "header"
+                },
+                {
+                  "key": "value",
+                  "value": "{{AI_API_KEY}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "AI: List Quotes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/internal/quotes?business_id={{BUSINESS_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "quotes"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                }
+              ]
+            },
+            "auth": {
+              "type": "apikey",
+              "apikey": [
+                {
+                  "key": "key",
+                  "value": "x-api-key",
+                  "in": "header"
+                },
+                {
+                  "key": "value",
+                  "value": "{{AI_API_KEY}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "AI: Incoming SMS Webhook (Twilio)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/internal/sms/incoming",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "sms",
+                "incoming"
+              ],
+              "query": []
+            },
+            "auth": {
+              "type": "apikey",
+              "apikey": [
+                {
+                  "key": "key",
+                  "value": "x-api-key",
+                  "in": "header"
+                },
+                {
+                  "key": "value",
+                  "value": "{{AI_API_KEY}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"From\": \"+14045551234\",\n  \"Body\": \"I need to schedule a repair\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "AI: Send Outbound SMS",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/internal/sms/send",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "sms",
+                "send"
+              ],
+              "query": []
+            },
+            "auth": {
+              "type": "apikey",
+              "apikey": [
+                {
+                  "key": "key",
+                  "value": "x-api-key",
+                  "in": "header"
+                },
+                {
+                  "key": "value",
+                  "value": "{{AI_API_KEY}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"to\": \"+14045551234\",\n  \"message\": \"Your appointment is confirmed for tomorrow at 10 AM.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "AI: Dashboard Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/internal/dashboard/summary?business_id={{BUSINESS_ID}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "internal",
+                "dashboard",
+                "summary"
+              ],
+              "query": [
+                {
+                  "key": "business_id",
+                  "value": "{{BUSINESS_ID}}"
+                }
+              ]
+            },
+            "auth": {
+              "type": "apikey",
+              "apikey": [
+                {
+                  "key": "key",
+                  "value": "x-api-key",
+                  "in": "header"
+                },
+                {
+                  "key": "value",
+                  "value": "{{AI_API_KEY}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

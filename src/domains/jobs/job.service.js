@@ -1,0 +1,461 @@
+/**
+ * Job Service
+ * Business logic for job CRUD, status transitions, and time tracking.
+ * Jobs: Scheduled → InProgress → Completed → Invoiced
+ */
+const prisma = require('../../lib/prisma');
+const logger = require('../../utils/logger');
+const { logActivitySafe } = require('../ai_logs/activity_log.service');
+const { NotFoundError, ValidationError } = require('../../utils/errors');
+
+function buildCustomerName(customer) {
+  if (!customer) return 'Unknown Customer';
+  const fullName = [customer.first_name, customer.last_name].filter(Boolean).join(' ').trim();
+  return fullName || 'Unknown Customer';
+}
+
+function buildJobLabel(job) {
+  return job.service_type || job.title || job.type || 'Service Job';
+}
+
+function buildCustomerAddress(job) {
+  return job.address || job.customer?.location_main || job.customer?.address || null;
+}
+
+function normalizeCostItems(items) {
+  if (!Array.isArray(items)) return [];
+  return items.map((item) => ({
+    ...item,
+    qty: Number(item.qty ?? item.quantity ?? 0) || 0,
+    rate: Number(item.rate ?? 0) || 0,
+    price: Number(item.price ?? ((Number(item.qty ?? item.quantity ?? 0) || 0) * (Number(item.rate ?? 0) || 0))) || 0,
+  }));
+}
+
+// Transform job to include hydrated relational data
+function hydrateJob(job) {
+  if (!job) return null;
+
+  const photo_urls = Array.isArray(job.photos_urls)
+    ? job.photos_urls
+    : (Array.isArray(job.photo_urls) ? job.photo_urls : []);
+
+  const line_items = Array.isArray(job.line_items)
+    ? job.line_items
+    : (job.line_items ? job.line_items : []);
+
+  // Parse materials and tools from JSON fields
+  const materials = Array.isArray(job.materials)
+    ? normalizeCostItems(job.materials)
+    : normalizeCostItems(job.job_materials?.map((entry) => ({
+      name: entry.material?.name || null,
+      qty: entry.quantity_used,
+      rate: entry.unit_cost ?? entry.material?.unit_cost ?? 0,
+      price: (Number(entry.quantity_used) || 0) * (Number(entry.unit_cost ?? entry.material?.unit_cost ?? 0) || 0),
+    })));
+
+  const tools = Array.isArray(job.tools)
+    ? normalizeCostItems(job.tools)
+    : [];
+
+  return {
+    ...job,
+    // Frontend expects these hydrated display fields (no raw UUID-only rendering)
+    id: job.id,
+    title: job.title,
+    status: job.status,
+    customer_name: buildCustomerName(job.customer),
+    customer_id: job.customer_id,
+    customer_address: buildCustomerAddress(job),
+    staff_name: job.assigned_staff ? job.assigned_staff.name : null,
+    address: buildCustomerAddress(job),
+    service_type: job.service_type,
+    scheduled_start_time: job.scheduled_start_time,
+    scheduled_end_time: job.scheduled_end_time,
+    estimated_time: job.estimated_time || null,
+
+    // Job details
+    job_details: job.job_details,
+    photo_urls,
+
+    // Materials and tools breakdown
+    materials,
+    tools,
+    labor_time: job.labor_time,
+    labor_cost: job.labor_cost || 0,
+    service_call_fee: job.service_call_fee || 0,
+
+    // Financial breakdown
+    subtotal: job.subtotal || 0,
+    discount_percent: job.discount_percent || 0,
+    discount_amount: job.discount_amount || 0,
+    tax_percent: job.tax_percent || 0,
+    tax_amount: job.tax_amount || 0,
+    total_amount: job.total_amount || 0,
+
+    // Legacy fields
+    line_items,
+    notes: job.notes ?? job.job_details ?? null,
+  };
+}
+
+
+// Transform array of jobs
+function hydrateJobs(jobs) {
+  return Array.isArray(jobs) ? jobs.map(hydrateJob) : jobs;
+}
+
+async function getJobs({
+  business_id,
+  status,
+  type,
+  customer_id,
+  assigned_staff_id,
+  start_date,
+  end_date,
+  search,
+  page = 1,
+  limit = 20,
+}) {
+  const where = {};
+  if (business_id) where.business_id = business_id;
+  if (status) where.status = status;
+  if (type) where.type = type;
+  if (customer_id) where.customer_id = customer_id;
+  if (assigned_staff_id) where.assigned_staff_id = assigned_staff_id;
+
+  const andClauses = [];
+
+  if (start_date || end_date) {
+    const scheduledRange = {};
+    const fallbackCreatedRange = {};
+
+    if (start_date) {
+      const start = new Date(start_date);
+      scheduledRange.gte = start;
+      fallbackCreatedRange.gte = start;
+    }
+
+    if (end_date) {
+      const end = new Date(end_date);
+      scheduledRange.lte = end;
+      fallbackCreatedRange.lte = end;
+    }
+
+    andClauses.push({
+      OR: [
+        { scheduled_start_time: scheduledRange },
+        {
+          AND: [
+            { scheduled_start_time: null },
+            { createdAt: fallbackCreatedRange },
+          ],
+        },
+      ],
+    });
+  }
+
+  if (search) {
+    andClauses.push({
+      OR: [
+        { title: { contains: search, mode: 'insensitive' } },
+        { service_type: { contains: search, mode: 'insensitive' } },
+        { address: { contains: search, mode: 'insensitive' } },
+        {
+          customer: {
+            OR: [
+              { first_name: { contains: search, mode: 'insensitive' } },
+              { last_name: { contains: search, mode: 'insensitive' } },
+            ],
+          },
+        },
+      ],
+    });
+  }
+
+  if (andClauses.length > 0) {
+    where.AND = andClauses;
+  }
+
+  const skip = (page - 1) * limit;
+  const [data, total] = await Promise.all([
+    prisma.job.findMany({
+      where, skip, take: limit,
+      include: {
+        customer: true,
+        assigned_staff: true,
+        invoices: { include: { line_items: true, payments: true }, orderBy: { createdAt: 'desc' }, take: 1 },
+      },
+      orderBy: { scheduled_start_time: 'asc' },
+    }),
+    prisma.job.count({ where }),
+  ]);
+  return { data: hydrateJobs(data), total, page, limit, totalPages: Math.ceil(total / limit) };
+}
+
+async function getJobById(id) {
+  const job = await prisma.job.findUnique({
+    where: { id },
+    include: {
+      customer: true,
+      assigned_staff: true,
+      invoices: { include: { line_items: true, payments: true, edit_logs: true } },
+      job_materials: { include: { material: true } },
+      expenses: true,
+      timesheets: { include: { staff: true } },
+    },
+  });
+  return hydrateJob(job);
+}
+
+async function createJob(data) {
+  const photoUrls = data.photo_urls ?? data.photos_urls;
+  const materials = data.materials !== undefined ? normalizeCostItems(data.materials) : undefined;
+  const tools = data.tools !== undefined ? normalizeCostItems(data.tools) : undefined;
+
+  const job = await prisma.job.create({
+    data: {
+      business_id: data.business_id,
+      customer_id: data.customer_id,
+      assigned_staff_id: data.assigned_staff_id || null,
+      type: data.type || 'Job',
+      status: data.status || 'Scheduled',
+      title: data.title || null,
+      job_details: data.job_details || null,
+      price_book_item_id: data.price_book_item_id || null,
+      service_call_fee: data.service_call_fee ?? null,
+      address: data.address || null,
+      service_type: data.service_type || null,
+      scheduled_start_time: data.scheduled_start_time ? new Date(data.scheduled_start_time) : null,
+      scheduled_end_time: data.scheduled_end_time ? new Date(data.scheduled_end_time) : null,
+      estimated_time: data.estimated_time || null,
+      photos_urls: Array.isArray(photoUrls) ? photoUrls : (photoUrls ? photoUrls : null),
+      materials: materials ?? null,
+      tools: tools ?? null,
+      labor_time: data.labor_time || null,
+      labor_cost: data.labor_cost ?? null,
+      subtotal: data.subtotal ?? null,
+      discount_percent: data.discount_percent ?? null,
+      discount_amount: data.discount_amount ?? null,
+      tax_percent: data.tax_percent ?? null,
+      tax_amount: data.tax_amount ?? null,
+      total_amount: data.total_amount ?? null,
+      notes: data.notes || null,
+      line_items: Array.isArray(data.line_items) ? data.line_items : (data.line_items ? data.line_items : null),
+      is_emergency: data.is_emergency ?? false,
+      source: data.source || 'Manual',
+      from_quote_id: data.from_quote_id || null,
+    },
+    include: { customer: true, assigned_staff: true },
+  });
+
+
+  if (data.price_book_item_id) {
+    await prisma.priceBookItem.update({
+      where: { id: data.price_book_item_id },
+      data: { usage_count: { increment: 1 } },
+    }).catch(() => {});
+  }
+
+  if (job.assigned_staff_id && job.status === 'InProgress') {
+    await prisma.staff.update({
+      where: { id: job.assigned_staff_id },
+      data: { active_job_id: job.id },
+    }).catch(() => {});
+  }
+
+  await logActivitySafe({
+    business_id: job.business_id,
+    customer_id: job.customer_id,
+    job_id: job.id,
+    event_type: job.scheduled_start_time ? 'schedule.job_created' : 'job.created',
+    title: `${buildJobLabel(job)} created for ${buildCustomerName(job.customer)}`,
+    details: {
+      job_id: job.id,
+      status: job.status,
+      source: job.source,
+    },
+  });
+
+  return hydrateJob(job);
+}
+
+async function updateJob(id, data) {
+  const updateData = {};
+  const scalarFields = [
+    'assigned_staff_id',
+    'status',
+    'title',
+    'job_details',
+    'price_book_item_id',
+    'service_call_fee',
+    'is_emergency',
+    'address',
+    'service_type',
+    'type',
+    'estimated_time',
+    'labor_time',
+    'labor_cost',
+    'subtotal',
+    'discount_percent',
+    'discount_amount',
+    'tax_percent',
+    'tax_amount',
+    'total_amount',
+    'notes',
+  ];
+
+  scalarFields.forEach((f) => {
+    if (data[f] !== undefined) updateData[f] = data[f];
+  });
+
+  // Accept frontend naming (photo_urls) + legacy/internal naming (photos_urls)
+  if (data.photo_urls !== undefined) updateData.photos_urls = data.photo_urls;
+  if (data.photos_urls !== undefined) updateData.photos_urls = data.photos_urls;
+  if (data.materials !== undefined) updateData.materials = normalizeCostItems(data.materials);
+  if (data.tools !== undefined) updateData.tools = normalizeCostItems(data.tools);
+
+  // Pricebook line items array
+  if (data.line_items !== undefined) updateData.line_items = data.line_items;
+
+  if (data.scheduled_start_time) updateData.scheduled_start_time = new Date(data.scheduled_start_time);
+  if (data.scheduled_end_time) updateData.scheduled_end_time = new Date(data.scheduled_end_time);
+  if (data.actual_start_time) updateData.actual_start_time = new Date(data.actual_start_time);
+  if (data.actual_end_time) updateData.actual_end_time = new Date(data.actual_end_time);
+
+  const job = await prisma.job.update({ where: { id }, data: updateData, include: { customer: true, assigned_staff: true } });
+
+
+  if (job.assigned_staff_id) {
+    if (job.status === 'InProgress') {
+      await prisma.staff.update({
+        where: { id: job.assigned_staff_id },
+        data: { active_job_id: job.id },
+      }).catch(() => {});
+    } else if (['Completed', 'Cancelled', 'Invoiced'].includes(job.status)) {
+      await prisma.staff.updateMany({
+        where: { id: job.assigned_staff_id, active_job_id: job.id },
+        data: { active_job_id: null },
+      }).catch(() => {});
+    }
+  }
+
+  await logActivitySafe({
+    business_id: job.business_id,
+    customer_id: job.customer_id,
+    job_id: job.id,
+    event_type: 'job.updated',
+    title: `${buildJobLabel(job)} updated for ${buildCustomerName(job.customer)}`,
+    details: {
+      job_id: job.id,
+      status: job.status,
+    },
+  });
+
+    return hydrateJob(job);
+}
+
+
+async function startJob(id) {
+  const job = await prisma.job.findUnique({ where: { id } });
+  if (!job) throw new NotFoundError('Job not found.');
+  if (job.status !== 'Scheduled') throw new ValidationError('Job must be Scheduled to start.');
+
+  const startedJob = await prisma.$transaction(async (tx) => {
+    const updatedJob = await tx.job.update({
+      where: { id },
+      data: { status: 'InProgress', actual_start_time: new Date() },
+      include: { customer: true, assigned_staff: true },
+    });
+
+    if (updatedJob.assigned_staff_id) {
+      await tx.staff.update({
+        where: { id: updatedJob.assigned_staff_id },
+        data: { active_job_id: updatedJob.id },
+      }).catch(() => {});
+    }
+
+    return updatedJob;
+  });
+
+  await logActivitySafe({
+    business_id: startedJob.business_id,
+    customer_id: startedJob.customer_id,
+    job_id: startedJob.id,
+    event_type: 'job.started',
+    title: `${buildJobLabel(startedJob)} started for ${buildCustomerName(startedJob.customer)}`,
+    details: {
+      job_id: startedJob.id,
+      status: startedJob.status,
+    },
+  });
+
+    return hydrateJob(startedJob);
+}
+
+
+async function completeJob(id) {
+  const job = await prisma.job.findUnique({ where: { id } });
+  if (!job) throw new NotFoundError('Job not found.');
+  if (job.status !== 'InProgress') throw new ValidationError('Job must be InProgress to complete.');
+
+  const completedJob = await prisma.$transaction(async (tx) => {
+    const updatedJob = await tx.job.update({
+      where: { id },
+      data: { status: 'Completed', actual_end_time: new Date() },
+      include: { customer: true, assigned_staff: true },
+    });
+
+    if (updatedJob.assigned_staff_id) {
+      await tx.staff.updateMany({
+        where: { id: updatedJob.assigned_staff_id, active_job_id: updatedJob.id },
+        data: { active_job_id: null },
+      });
+    }
+
+    return updatedJob;
+  });
+
+  await logActivitySafe({
+    business_id: completedJob.business_id,
+    customer_id: completedJob.customer_id,
+    job_id: completedJob.id,
+    event_type: 'job.completed',
+    title: `${buildJobLabel(completedJob)} completed for ${buildCustomerName(completedJob.customer)}`,
+    details: {
+      job_id: completedJob.id,
+      status: completedJob.status,
+    },
+  });
+
+    return hydrateJob(completedJob);
+}
+
+
+async function addMaterials(jobId, materials) {
+  const results = [];
+  for (const m of materials) {
+    const material = await prisma.material.findUnique({ where: { id: m.material_id } });
+    if (!material) continue;
+    const jobMat = await prisma.jobMaterial.create({
+      data: { job_id: jobId, material_id: m.material_id, quantity_used: m.quantity_used, unit_cost: m.unit_cost ?? material.unit_cost },
+      include: { material: true },
+    });
+    await prisma.material.update({ where: { id: m.material_id }, data: { quantity_on_hand: { decrement: m.quantity_used } } });
+    results.push(jobMat);
+  }
+  return results;
+}
+
+async function addPhotos(jobId, photoUrls) {
+  const job = await prisma.job.findUnique({ where: { id: jobId } });
+  if (!job) throw new NotFoundError('Job not found.');
+  const existing = Array.isArray(job.photos_urls) ? job.photos_urls : [];
+  return prisma.job.update({ where: { id: jobId }, data: { photos_urls: [...existing, ...photoUrls] } });
+}
+
+async function deleteJob(id) {
+  return prisma.job.delete({ where: { id } });
+}
+
+module.exports = { getJobs, getJobById, createJob, updateJob, startJob, completeJob, addMaterials, addPhotos, deleteJob };

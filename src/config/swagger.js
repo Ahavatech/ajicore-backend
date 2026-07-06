@@ -1,0 +1,2116 @@
+/**
+ * Swagger / OpenAPI 3.0 Configuration
+ * Access docs at: GET /api/docs
+ * Download JSON for Postman at: GET /api/docs.json
+ */
+const swaggerJsdoc = require('swagger-jsdoc');
+
+const options = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'Ajicore API',
+      version: '2.0.0',
+      description: `
+# Ajicore — AI-Powered Back Office for Blue-Collar Service Businesses
+
+Complete REST API for managing schedules, quotes, jobs, invoicing, inventory, fleet, staff, and AI call flow.
+
+## Authentication
+- **Frontend routes**: Use \`Authorization: Bearer <jwt_token>\` header
+
+- **AI / Internal routes**: Use \`x-api-key: <INTERNAL_API_KEY>\`. Business-scoped internal routes also require \`x-business-token: <business_internal_api_token>\`.
+
+## Page Guide
+
+- **Auth**: sign in, sign up, password reset, current user, internal token
+- **Onboarding**: business info, OTP verification, AI number setup, service area, finish setup
+- **Dashboard**: summary, revenue, jobs analytics, weekly report
+- **Jobs**: jobs list, job detail, lifecycle actions, materials, photos
+- **Schedule**: schedule/calendar reads and availability checks
+- **Quotes**: estimates, approvals, declines, and sending
+- **Customers**: customer list, lookup, detail, and history
+- **Conversations**: recent calls and SMS history
+- **Team**: staff list, detail, payroll, timesheets, and clock-in/out
+- **Team Check-Ins**: field check-ins and escalations
+- **Follow-Ups**: reminder and follow-up records
+- **Business Profile / Alerts / Automation / Communication**: settings pages
+- **Billing / Payments / Expenses**: invoices, payments, and expense tracking
+- **PriceBook**: service categories and quoteable items
+- **Inventory**: materials, restocks, and deductions
+- **Fleet**: vehicles and maintenance alerts
+- **Bookkeeping**: transactions and categorization rules
+- **AI Logs**: event log inspection
+- **AI Bridge**: internal AI/receptionist integration surface
+
+## Key Flows
+
+### Quote → Job Conversion
+1. AI books estimate → \`POST /api/quotes\` (status: EstimateScheduled)
+
+2. Contractor goes on-site → \`PATCH /api/quotes/:id\` (add pricing, status: Draft)
+
+3. Send to customer → \`POST /api/quotes/:id/send\` (status: Sent, expiry set)
+
+4. Customer approves → \`POST /api/quotes/:id/approve\` (status becomes Approved)
+
+5. Office converts approved quote → \`POST /api/quotes/:id/convert\` (creates Job)
+
+### Direct Job Booking (price known)
+1. AI/manual books job → \`POST /api/jobs\`
+
+2. Start work → \`POST /api/jobs/:id/start\`
+
+3. Complete → \`POST /api/jobs/:id/complete\`
+
+4. Invoice → \`POST /api/billing/invoices\`
+
+5. Payment → \`POST /api/billing/payments/:invoiceId\`
+
+### Invoice Edit Rules
+
+- **Draft/Sent**: Full edit allowed
+
+- **Paid**: Only internal notes
+
+- **Refunded/Voided**: Locked
+      `,
+      contact: { name: 'Ajicore Team' },
+    },
+    servers: [
+      { url: 'http://localhost:3000', description: 'Development' },
+    ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          description: 'JWT token from /api/auth/signin or /api/auth/signup',
+        },
+        apiKeyAuth: {
+          type: 'apiKey',
+          in: 'header',
+          name: 'x-api-key',
+          description: 'Shared internal API key. Must match INTERNAL_API_KEY.',
+        },
+        businessTokenAuth: {
+          type: 'apiKey',
+          in: 'header',
+          name: 'x-business-token',
+          description: 'Per-business internal bridge token, retrievable by the business owner from /api/auth/internal-api-token',
+        },
+      },
+      schemas: {
+        Business: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+            industry: { type: 'string' },
+            owner_id: { type: 'string', format: 'uuid', nullable: true },
+            business_structure: { type: 'string', nullable: true },
+            company_email: { type: 'string', format: 'email', nullable: true },
+            company_type: { type: 'string', nullable: true },
+            company_phone: { type: 'string', nullable: true },
+            ai_phone_number: { type: 'string', nullable: true },
+            home_base_zip: { type: 'string', nullable: true },
+            service_radius_miles: { type: 'number', nullable: true },
+            cost_per_mile_over_radius: { type: 'number', nullable: true },
+            quote_expiry_days: { type: 'integer' },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        InternalApiTokenResponse: {
+          type: 'object',
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            internal_api_token: { type: 'string' },
+          },
+        },
+        AuthSignupInput: {
+          type: 'object',
+          required: ['email', 'password'],
+          additionalProperties: false,
+          properties: {
+            email: {
+              type: 'string',
+              format: 'email',
+              minLength: 3,
+              example: 'user@example.com',
+              description: 'Required. Must be a valid email address and cannot be blank. The backend trims spaces and stores it lowercase.',
+            },
+            password: {
+              type: 'string',
+              minLength: 8,
+              nullable: false,
+              writeOnly: true,
+              example: 'password123',
+              description: 'Required JSON string. Must not be empty or whitespace-only. Must be at least 8 characters long. No uppercase, lowercase, number, or special-character requirement is currently enforced. No maximum length is currently enforced.',
+            },
+          },
+        },
+        AuthSigninInput: {
+          type: 'object',
+          required: ['email', 'password'],
+          additionalProperties: false,
+          properties: {
+            email: {
+              type: 'string',
+              format: 'email',
+              minLength: 3,
+              example: 'user@example.com',
+              description: 'Required. Must be the email address used during signup and cannot be blank.',
+            },
+            password: {
+              type: 'string',
+              minLength: 1,
+              nullable: false,
+              writeOnly: true,
+              example: 'password123',
+              description: 'Required JSON string. Must not be empty. Use the exact password created during signup. New passwords created through signup/reset/change-password must be at least 8 characters, with no uppercase, lowercase, number, or special-character requirement currently enforced.',
+            },
+          },
+        },
+        AuthForgotPasswordInput: {
+          type: 'object',
+          description: 'Accepts email, phone_number, or identifier. When identifier contains "@", it is treated as an email; otherwise it is treated as a phone number.',
+          properties: {
+            email: { type: 'string', format: 'email', nullable: true, example: 'owner@example.com' },
+            phone_number: { type: 'string', nullable: true, example: '+15555550123' },
+            identifier: { type: 'string', nullable: true, example: 'owner@example.com' },
+          },
+          anyOf: [
+            { required: ['email'] },
+            { required: ['phone_number'] },
+            { required: ['identifier'] },
+          ],
+        },
+        AuthForgotPasswordResponse: {
+          type: 'object',
+          properties: {
+            message: { type: 'string', example: 'If an account exists, a reset code has been sent.' },
+          },
+        },
+        AuthVerifyResetCodeInput: {
+          type: 'object',
+          required: ['code'],
+          properties: {
+            email: { type: 'string', format: 'email', nullable: true, example: 'owner@example.com' },
+            phone_number: { type: 'string', nullable: true, example: '+15555550123' },
+            identifier: { type: 'string', nullable: true, example: '+15555550123' },
+            code: { type: 'string', example: '12345' },
+          },
+          anyOf: [
+            { required: ['email', 'code'] },
+            { required: ['phone_number', 'code'] },
+            { required: ['identifier', 'code'] },
+          ],
+        },
+        AuthVerifyResetCodeResponse: {
+          type: 'object',
+          properties: {
+            message: { type: 'string', example: 'Valid' },
+            valid: { type: 'boolean' },
+          },
+        },
+        AuthResetPasswordInput: {
+          type: 'object',
+          required: ['code', 'new_password'],
+          properties: {
+            email: { type: 'string', format: 'email', nullable: true, example: 'owner@example.com' },
+            phone_number: { type: 'string', nullable: true, example: '+15555550123' },
+            identifier: { type: 'string', nullable: true, example: 'owner@example.com' },
+            code: { type: 'string', example: '12345' },
+            new_password: {
+              type: 'string',
+              minLength: 8,
+              nullable: false,
+              writeOnly: true,
+              description: 'Required JSON string. Must be at least 8 characters long. No uppercase, lowercase, number, or special-character requirement is currently enforced.',
+            },
+          },
+          anyOf: [
+            { required: ['email', 'code', 'new_password'] },
+            { required: ['phone_number', 'code', 'new_password'] },
+            { required: ['identifier', 'code', 'new_password'] },
+          ],
+        },
+        AuthResetPasswordResponse: {
+          type: 'object',
+          properties: {
+            message: { type: 'string', example: 'Password reset successfully.' },
+          },
+        },
+        PhoneNumberCapabilities: {
+          type: 'object',
+          description: 'Capabilities available on the phone number (voice, SMS, MMS)',
+          properties: {
+            voice: { type: 'boolean', example: true },
+            sms: { type: 'boolean', example: true },
+            mms: { type: 'boolean', example: false },
+          },
+        },
+        AvailablePhoneNumber: {
+          type: 'object',
+          description: 'A single available Twilio phone number from search results',
+          properties: {
+            phone_number: {
+              type: 'string',
+              format: 'e164',
+              example: '+12025551234',
+              description: 'E.164 formatted phone number (international format)',
+            },
+            friendly_name: { type: 'string', example: 'US/United States' },
+            locality: { type: 'string', example: 'Washington', nullable: true },
+            region: { type: 'string', example: 'DC', nullable: true },
+            capabilities: { $ref: '#/components/schemas/PhoneNumberCapabilities' },
+          },
+        },
+        GetAvailableNumbersQuery: {
+          type: 'object',
+          required: ['type'],
+          properties: {
+            type: {
+              type: 'string',
+              enum: ['city', 'area_code', 'toll_free'],
+              description: 'Search type: "city" requires city parameter, "area_code" requires area_code parameter, "toll_free" needs no additional parameters',
+            },
+            city: {
+              type: 'string',
+              example: 'Washington',
+              description: 'City name (required if type=city)',
+            },
+            area_code: {
+              type: 'string',
+              example: '202',
+              description: '3-digit area code (required if type=area_code, auto-sanitized)',
+            },
+          },
+        },
+        GetAvailableNumbersResponse: {
+          type: 'object',
+          description: 'Available phone numbers from Twilio based on search criteria',
+          properties: {
+            type: { type: 'string', enum: ['city', 'area_code', 'toll_free'] },
+            country: { type: 'string', example: 'US' },
+            numbers: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/AvailablePhoneNumber' },
+              maxItems: 5,
+              description: 'Up to 5 available numbers matching search criteria',
+            },
+            count: { type: 'integer', example: 2, minimum: 0, maximum: 5 },
+          },
+        },
+        OnboardingStep3Input: {
+          type: 'object',
+          required: ['phone_number', 'search_type'],
+          additionalProperties: false,
+          properties: {
+            phone_number: {
+              type: 'string',
+              format: 'e164',
+              example: '+12025551234',
+              description: 'E.164 formatted phone number selected from available-numbers search',
+            },
+            search_type: {
+              type: 'string',
+              enum: ['city', 'area_code', 'toll_free'],
+              description: 'The search type used to find this number',
+            },
+          },
+        },
+        OnboardingStep3Response: {
+          type: 'object',
+          description: 'Successful Twilio phone number provisioning for AI business',
+          properties: {
+            message: {
+              type: 'string',
+              example: 'AI business number provisioned.',
+            },
+            user: {
+              type: 'object',
+              description: 'Updated user (onboarding_step advanced to 4)',
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                email: { type: 'string', format: 'email' },
+                onboarding_step: { type: 'integer', example: 4 },
+              },
+            },
+            business: {
+              type: 'object',
+              description: 'Updated business with provisioned phone number details',
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                name: { type: 'string' },
+                ai_phone_number: {
+                  type: 'string',
+                  format: 'e164',
+                  example: '+12025551234',
+                },
+                dedicated_phone_number: {
+                  type: 'string',
+                  format: 'e164',
+                  example: '+12025551234',
+                },
+                ai_phone_country: { type: 'string', example: 'US' },
+                ai_phone_area_code: { type: 'string', example: '202' },
+                twilio_phone_sid: {
+                  type: 'string',
+                  example: 'PNxxxxxxxxxxxx',
+                  description: 'Twilio SID for this provisioned number',
+                },
+                twilio_phone_friendly_name: {
+                  type: 'string',
+                  example: 'Acme Corp - +12025551234',
+                  description: 'Friendly name configured in Twilio',
+                },
+              },
+            },
+            ai_phone_number: {
+              type: 'string',
+              format: 'e164',
+              example: '+12025551234',
+            },
+            twilio_phone_sid: { type: 'string', example: 'PNxxxxxxxxxxxx' },
+            onboarding_step: { type: 'integer', example: 4 },
+          },
+        },
+        OnboardingSkip3Response: {
+          type: 'object',
+          description: 'User skipped step 3 (AI number provisioning)',
+          properties: {
+            message: {
+              type: 'string',
+              example: 'AI number setup skipped.',
+            },
+            user: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                email: { type: 'string', format: 'email' },
+                onboarding_step: { type: 'integer', example: 4 },
+              },
+            },
+            onboarding_step: { type: 'integer', example: 4 },
+          },
+        },
+        Customer: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            business_id: { type: 'string', format: 'uuid' },
+            customer_type: { type: 'string', enum: ['Individual', 'Company'], default: 'Individual' },
+            type: { type: 'string', enum: ['Individual', 'Company'], description: 'Frontend-friendly type alias for customer_type.' },
+            company_name: { type: 'string', nullable: true },
+            poc_name: { type: 'string', nullable: true },
+            first_name: { type: 'string', nullable: true },
+            last_name: { type: 'string', nullable: true },
+            name: { type: 'string', description: 'Computed name field preserved for backward compatibility.' },
+            display_name: { type: 'string', description: 'Recommended primary label for search and list display.' },
+            contact: { type: 'string', nullable: true, description: 'Recommended secondary display field, usually email or phone number.' },
+            phone_number: { type: 'string', nullable: true },
+            email: { type: 'string', nullable: true },
+            address: { type: 'string', nullable: true },
+            zip_code: { type: 'string', nullable: true },
+            location_main: { type: 'string', nullable: true },
+            location_other: { type: 'string', nullable: true },
+            warranty_enabled: { type: 'boolean' },
+            warranty_due: { type: 'string', format: 'date-time', nullable: true },
+            profile_image_url: { type: 'string', nullable: true },
+            total_spent: { type: 'number', nullable: true },
+            total_jobs: { type: 'integer', nullable: true },
+            last_job_date: { type: 'string', format: 'date-time', nullable: true },
+            notes: { type: 'string', nullable: true },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+          examples: {
+            individual: {
+              value: {
+                id: '550e8400-e29b-41d4-a716-446655440000',
+                customer_type: 'Individual',
+                type: 'Individual',
+                first_name: 'John',
+                last_name: 'Doe',
+                name: 'John Doe',
+                display_name: 'John Doe',
+                contact: 'john@example.com',
+                email: 'john@example.com',
+                phone_number: '+15555550123',
+              },
+            },
+            company: {
+              value: {
+                id: '550e8400-e29b-41d4-a716-446655440001',
+                customer_type: 'Company',
+                type: 'Company',
+                company_name: null,
+                name: '',
+                display_name: 'company@example.com',
+                contact: 'company@example.com',
+                email: 'company@example.com',
+                phone_number: '+15555550124',
+              },
+            },
+          },
+        },
+        CustomerSearchResult: {
+          allOf: [{ $ref: '#/components/schemas/Customer' }],
+        },
+        StripeConfigResponse: {
+          type: 'object',
+          properties: {
+            publishable_key: { type: 'string', example: 'pk_test_xxxxxxxxxxxxxxxxx' },
+            currency: { type: 'string', example: 'usd' },
+          },
+        },
+        SubscriptionStatusRecord: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            business_id: { type: 'string', format: 'uuid' },
+            stripe_customer_id: { type: 'string', nullable: true },
+            stripe_subscription_id: { type: 'string', nullable: true },
+            stripe_price_id: { type: 'string', nullable: true },
+            status: { type: 'string', enum: ['incomplete', 'incomplete_expired', 'trialing', 'active', 'past_due', 'canceled', 'unpaid', 'paused'] },
+            trial_start: { type: 'string', format: 'date-time', nullable: true },
+            trial_end: { type: 'string', format: 'date-time', nullable: true },
+            current_period_start: { type: 'string', format: 'date-time', nullable: true },
+            current_period_end: { type: 'string', format: 'date-time', nullable: true },
+            cancel_at_period_end: { type: 'boolean' },
+            canceled_at: { type: 'string', format: 'date-time', nullable: true },
+            created_at: { type: 'string', format: 'date-time' },
+            updated_at: { type: 'string', format: 'date-time' },
+          },
+        },
+        SubscriptionStatusResponse: {
+          type: 'object',
+          properties: {
+            has_subscription: { type: 'boolean' },
+            payment_method_ready: { type: 'boolean' },
+            default_payment_method: {
+              allOf: [{ $ref: '#/components/schemas/SubscriptionPaymentMethodSummary' }],
+              nullable: true,
+            },
+            subscription: {
+              allOf: [{ $ref: '#/components/schemas/SubscriptionStatusRecord' }],
+              nullable: true,
+            },
+          },
+        },
+        SubscriptionPaymentMethodSummary: {
+          type: 'object',
+          nullable: true,
+          properties: {
+            id: { type: 'string', example: 'pm_123' },
+            brand: { type: 'string', example: 'visa' },
+            last4: { type: 'string', example: '4242' },
+            exp_month: { type: 'integer', example: 12 },
+            exp_year: { type: 'integer', example: 2030 },
+          },
+        },
+        StartSubscriptionRequest: {
+          type: 'object',
+          required: ['business_id'],
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            payment_method_id: { type: 'string', nullable: true, description: 'Stripe PaymentMethod ID created by Stripe.js if the frontend collects a card.' },
+            customer_email: { type: 'string', format: 'email', nullable: true },
+            customer_name: { type: 'string', nullable: true },
+            customer_phone: { type: 'string', nullable: true },
+          },
+        },
+        StartSubscriptionResponse: {
+          type: 'object',
+          properties: {
+            already_active: { type: 'boolean' },
+            client_secret: { type: 'string', nullable: true, description: 'Returned when Stripe creates a payment intent requiring client-side confirmation.' },
+            has_subscription: { type: 'boolean' },
+            payment_method_ready: { type: 'boolean' },
+            default_payment_method: {
+              allOf: [{ $ref: '#/components/schemas/SubscriptionPaymentMethodSummary' }],
+              nullable: true,
+            },
+            subscription: {
+              $ref: '#/components/schemas/SubscriptionStatusRecord',
+            },
+          },
+        },
+        SubscriptionSetupIntentResponse: {
+          type: 'object',
+          properties: {
+            client_secret: { type: 'string' },
+            setup_intent_id: { type: 'string' },
+            stripe_customer_id: { type: 'string' },
+          },
+        },
+        SubscriptionPaymentMethodRequest: {
+          type: 'object',
+          required: ['business_id', 'payment_method_id'],
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            payment_method_id: { type: 'string', example: 'pm_123' },
+          },
+        },
+        SubscriptionPaymentMethodResponse: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            stripe_customer_id: { type: 'string' },
+            payment_method: {
+              allOf: [{ $ref: '#/components/schemas/SubscriptionPaymentMethodSummary' }],
+              nullable: true,
+            },
+          },
+        },
+        CancelSubscriptionResponse: {
+          type: 'object',
+          properties: {
+            has_subscription: { type: 'boolean' },
+            payment_method_ready: { type: 'boolean' },
+            default_payment_method: {
+              allOf: [{ $ref: '#/components/schemas/SubscriptionPaymentMethodSummary' }],
+              nullable: true,
+            },
+            subscription: {
+              $ref: '#/components/schemas/SubscriptionStatusRecord',
+            },
+          },
+        },
+        ResumeSubscriptionResponse: {
+          type: 'object',
+          properties: {
+            has_subscription: { type: 'boolean' },
+            payment_method_ready: { type: 'boolean' },
+            default_payment_method: {
+              allOf: [{ $ref: '#/components/schemas/SubscriptionPaymentMethodSummary' }],
+              nullable: true,
+            },
+            subscription: {
+              $ref: '#/components/schemas/SubscriptionStatusRecord',
+            },
+          },
+        },
+        StripeWebhookResponse: {
+          type: 'object',
+          properties: {
+            received: { type: 'boolean' },
+            event_type: { type: 'string' },
+          },
+        },
+                CustomerInput: {
+                  type: 'object',
+                  required: ['business_id', 'customer_type'],
+                  properties: {
+                    business_id: { type: 'string', format: 'uuid' },
+                    customer_type: { type: 'string', enum: ['Individual', 'Company'] },
+                    first_name: { type: 'string', nullable: true },
+                    last_name: { type: 'string', nullable: true },
+                    company_name: { type: 'string', nullable: true },
+                    poc_name: { type: 'string', nullable: true },
+                    email: { type: 'string', format: 'email', nullable: true },
+                    phone_number: { type: 'string', nullable: true },
+                    location_main: { type: 'string', nullable: true },
+                    location_other: { type: 'string', nullable: true },
+                    warranty_enabled: { type: 'boolean', nullable: true },
+                    warranty_due: { type: 'string', format: 'date-time', nullable: true },
+                    notes: { type: 'string', nullable: true },
+                    profile_image_url: { type: 'string', nullable: true },
+                  },
+                },
+                CustomerUpdateInput: {
+                  type: 'object',
+                  properties: {
+                    customer_type: { type: 'string', enum: ['Individual', 'Company'] },
+                    first_name: { type: 'string', nullable: true },
+                    last_name: { type: 'string', nullable: true },
+                    company_name: { type: 'string', nullable: true },
+                    poc_name: { type: 'string', nullable: true },
+                    email: { type: 'string', format: 'email', nullable: true },
+                    phone_number: { type: 'string', nullable: true },
+                    location_main: { type: 'string', nullable: true },
+                    location_other: { type: 'string', nullable: true },
+                    warranty_enabled: { type: 'boolean', nullable: true },
+                    warranty_due: { type: 'string', format: 'date-time', nullable: true },
+                    notes: { type: 'string', nullable: true },
+                    profile_image_url: { type: 'string', nullable: true },
+                  },
+                },
+                CustomerMetrics: {
+                  type: 'object',
+                  properties: {
+                    total_customers: { type: 'number' },
+                    total_jobs_across_all: { type: 'number' },
+                    avg_customer_lifetime_value: { type: 'number' },
+                    repeat_customer_percentage: { type: 'number' },
+                  },
+                },
+                Job: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            business_id: { type: 'string', format: 'uuid' },
+            customer_id: { type: 'string', format: 'uuid' },
+            assigned_staff_id: { type: 'string', format: 'uuid', nullable: true },
+
+            // Hydrated display fields (added to avoid raw UUID rendering in UI)
+            customer_name: { type: 'string', nullable: true },
+            customer_address: { type: 'string', nullable: true },
+            staff_name: { type: 'string', nullable: true },
+
+            type: { type: 'string', enum: ['Job', 'ServiceCall'] },
+            status: { type: 'string', enum: ['Scheduled', 'InProgress', 'Completed', 'Invoiced', 'Cancelled'] },
+            title: { type: 'string', nullable: true },
+            job_details: { type: 'string', nullable: true },
+            service_type: { type: 'string', nullable: true },
+            address: { type: 'string', nullable: true },
+
+            scheduled_start_time: { type: 'string', format: 'date-time', nullable: true },
+            scheduled_end_time: { type: 'string', format: 'date-time', nullable: true },
+            estimated_time: { type: 'string', nullable: true },
+            actual_start_time: { type: 'string', format: 'date-time', nullable: true },
+            actual_end_time: { type: 'string', format: 'date-time', nullable: true },
+
+            service_call_fee: { type: 'number', nullable: true },
+            is_emergency: { type: 'boolean' },
+            source: { type: 'string', enum: ['AI', 'Manual', 'SMS'] },
+
+            photo_urls: {
+              type: 'array',
+              description: 'Array of uploaded photo URLs attached to this job',
+              items: { type: 'string', format: 'uri' },
+            },
+            materials: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string', nullable: true },
+                  qty: { type: 'number' },
+                  rate: { type: 'number' },
+                  price: { type: 'number' },
+                },
+              },
+            },
+            tools: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string', nullable: true },
+                  qty: { type: 'number' },
+                  rate: { type: 'number' },
+                  price: { type: 'number' },
+                },
+              },
+            },
+            labor_time: { type: 'string', nullable: true },
+            labor_cost: { type: 'number', nullable: true },
+            subtotal: { type: 'number', nullable: true },
+            discount_percent: { type: 'number', nullable: true },
+            discount_amount: { type: 'number', nullable: true },
+            tax_percent: { type: 'number', nullable: true },
+            tax_amount: { type: 'number', nullable: true },
+            total_amount: { type: 'number', nullable: true },
+            notes: { type: 'string', nullable: true },
+            line_items: {
+              type: 'array',
+              description: 'Array of pricebook line items attached at creation/update time',
+              items: {
+                type: 'object',
+                properties: {
+                  price_book_id: { type: 'string', format: 'uuid' },
+                  name: { type: 'string', nullable: true },
+                  description: { type: 'string', nullable: true },
+                  price: { type: 'number' },
+                  labor_cost: { type: 'number', nullable: true },
+                  labor_time: { type: 'string', nullable: true },
+                  materials: {
+                    type: 'array',
+                    items: { type: 'object', additionalProperties: true },
+                  },
+                  tools: {
+                    type: 'array',
+                    items: { type: 'object', additionalProperties: true },
+                  },
+                },
+              },
+            },
+
+            createdAt: { type: 'string', format: 'date-time', nullable: true },
+            updatedAt: { type: 'string', format: 'date-time', nullable: true },
+          },
+        },
+        JobAvailabilityConflict: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            title: { type: 'string', nullable: true },
+            service_type: { type: 'string', nullable: true },
+            status: { type: 'string', example: 'Scheduled' },
+            address: { type: 'string', nullable: true },
+            scheduled_start_time: { type: 'string', format: 'date-time', nullable: true },
+            scheduled_end_time: { type: 'string', format: 'date-time', nullable: true },
+            customer: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                first_name: { type: 'string', nullable: true },
+                last_name: { type: 'string', nullable: true },
+              },
+            },
+            assigned_staff: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                name: { type: 'string', nullable: true },
+                role: { type: 'string', nullable: true },
+              },
+            },
+          },
+        },
+        JobAvailabilityResponse: {
+          type: 'object',
+          properties: {
+            available: { type: 'boolean', example: false },
+            staff_id: { type: 'string', format: 'uuid' },
+            requested_window: {
+              type: 'object',
+              properties: {
+                start_time: { type: 'string', format: 'date-time' },
+                end_time: { type: 'string', format: 'date-time' },
+              },
+            },
+            conflicts: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/JobAvailabilityConflict' },
+            },
+          },
+        },
+        Quote: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            business_id: { type: 'string' },
+            customer_id: { type: 'string' },
+            assigned_staff_id: { type: 'string', format: 'uuid', nullable: true },
+            status: { type: 'string', enum: ['EstimateScheduled', 'Draft', 'Pending', 'Appointment', 'Sent', 'Approved', 'Declined', 'Expired'] },
+            quote_number: { type: 'string', nullable: true },
+            title: { type: 'string' },
+            service_name: { type: 'string', nullable: true },
+            service_category: { type: 'string', nullable: true },
+            custom_category_name: { type: 'string', nullable: true },
+            customer_name: { type: 'string', nullable: true },
+            customer_address: { type: 'string', nullable: true },
+            technician_name: { type: 'string', nullable: true },
+            scheduled_estimate_date: { type: 'string', format: 'date-time', nullable: true },
+            scheduled_estimate_time: { type: 'string', nullable: true, description: 'Either HH:MM (24-hour) or a display range.' },
+            scheduled_start_time: { type: 'string', format: 'date-time', nullable: true },
+            scheduled_end_time: { type: 'string', format: 'date-time', nullable: true },
+            photos: { type: 'array', items: { type: 'string', format: 'uri' } },
+            notes: { type: 'string', nullable: true },
+            site_notes: { type: 'string', nullable: true },
+            is_estimate_appointment: { type: 'boolean' },
+            total_amount: { type: 'number', nullable: true, description: 'null = TBD until approved' },
+            subtotal: { type: 'number', nullable: true },
+            discount_percent: { type: 'number', nullable: true },
+            discount_amount: { type: 'number', nullable: true },
+            tax_percent: { type: 'number', nullable: true },
+            tax_amount: { type: 'number', nullable: true },
+            deposit_percent: { type: 'number', nullable: true },
+            deposit_amount: { type: 'number', nullable: true },
+            due_amount: { type: 'number', nullable: true },
+            payment_due_terms: { type: 'string', enum: ['Upon receipt', 'Net 15', 'Net 30', 'Net 45'], nullable: true },
+            decline_reason: { type: 'string', nullable: true },
+            line_items: {
+              type: 'array',
+              nullable: true,
+              description: 'Optional line items (mirrors Job.line_items JSON) used during Quote → Job conversion',
+              items: {
+                type: 'object',
+                properties: {
+                  price_book_id: { type: 'string', format: 'uuid', nullable: true },
+                  quantity: { type: 'number', nullable: true, default: 1 },
+                  price: { type: 'number', nullable: true },
+                  name: { type: 'string', nullable: true },
+                  description: { type: 'string', nullable: true },
+                  unit_price: { type: 'number', nullable: true },
+                  total: { type: 'number', nullable: true },
+                },
+              },
+            },
+            expires_at: { type: 'string', format: 'date-time', nullable: true },
+            converted_to_job_id: { type: 'string', nullable: true },
+          },
+        },
+        Invoice: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            business_id: { type: 'string', format: 'uuid' },
+            job_id: { type: 'string', nullable: true },
+            customer_id: { type: 'string', nullable: true },
+            invoice_number: { type: 'string', nullable: true },
+            customer_name: { type: 'string', nullable: true },
+            service_name: { type: 'string', nullable: true },
+            service_category: { type: 'string', nullable: true },
+            custom_category_name: { type: 'string', nullable: true },
+            contract_type: { type: 'object', additionalProperties: true, nullable: true },
+            warranty_due: { type: 'string', format: 'date-time', nullable: true },
+            photos: { type: 'array', items: { type: 'string', format: 'uri' } },
+            manual_subtotal: { type: 'number', nullable: true },
+            subtotal: { type: 'number', nullable: true },
+            discount_percent: { type: 'number', nullable: true },
+            tax_percent: { type: 'number', nullable: true },
+            deposit_percent: { type: 'number', nullable: true },
+            total_amount: { type: 'number', nullable: true },
+            due_amount: { type: 'number', nullable: true },
+            status: { type: 'string', enum: ['Draft', 'Sent', 'Pending', 'PartiallyPaid', 'Paid', 'Overdue', 'Refunded', 'Voided', 'Cancelled'] },
+            notes: { type: 'string' },
+            internal_notes: { type: 'string' },
+            payment_due_terms: { type: 'string', nullable: true },
+            due_date: { type: 'string', format: 'date-time', nullable: true },
+            line_items: { type: 'array', items: { $ref: '#/components/schemas/InvoiceLine' } },
+          },
+        },
+        InvoiceLine: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            name: { type: 'string', nullable: true },
+            description: { type: 'string' },
+            quantity: { type: 'number' },
+            unit_price: { type: 'number' },
+            total: { type: 'number' },
+            is_credit: { type: 'boolean', description: 'true = deduction (e.g., service call credit)' },
+          },
+        },
+              Payment: {
+        type: 'object',
+        properties: {
+          invoice_id: { type: 'string' },
+          amount: { type: 'number' },
+          method: { type: 'string' },
+          status: { type: 'string' }
+        }
+      },
+
+        Expense: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            business_id: { type: 'string' },
+            amount: { type: 'number' },
+            category: { type: 'string' },
+            description: { type: 'string' },
+            job_id: { type: 'string', nullable: true },
+            createdAt: { type: 'string', format: 'date-time' }
+          }
+        },
+        Material: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            business_id: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+            unit: { type: 'string', nullable: true },
+            quantity_on_hand: { type: 'integer' },
+            restock_threshold: { type: 'integer' },
+            unit_cost: { type: 'number', nullable: true },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        MaterialInput: {
+          type: 'object',
+          required: ['business_id', 'name'],
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+            unit: { type: 'string' },
+            quantity_on_hand: { type: 'integer' },
+            restock_threshold: { type: 'integer' },
+            unit_cost: { type: 'number' },
+          },
+        },
+        MaterialUpdateInput: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            unit: { type: 'string' },
+            quantity_on_hand: { type: 'integer' },
+            restock_threshold: { type: 'integer' },
+            unit_cost: { type: 'number' },
+          },
+        },
+        MaterialRestockInput: {
+          type: 'object',
+          required: ['quantity'],
+          properties: {
+            quantity: { type: 'integer', minimum: 1 },
+          },
+        },
+        JobMaterialUsageInput: {
+          type: 'object',
+          required: ['material_id', 'quantity'],
+          properties: {
+            material_id: { type: 'string', format: 'uuid' },
+            quantity: { type: 'integer', minimum: 1 },
+            unit_cost: { type: 'number', nullable: true },
+          },
+        },
+        InventoryDeductionInput: {
+          type: 'object',
+          required: ['materials'],
+          properties: {
+            materials: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/JobMaterialUsageInput' },
+            },
+          },
+        },
+        Vehicle: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            business_id: { type: 'string', format: 'uuid' },
+            name: { type: 'string', nullable: true },
+            make_model: { type: 'string' },
+            year: { type: 'integer', nullable: true },
+            license_plate: { type: 'string', nullable: true },
+
+            // Expanded vehicle profile
+            type: { type: 'string', nullable: true, description: 'e.g. Truck, Van, SUV' },
+            vin: { type: 'string', nullable: true },
+            color: { type: 'string', nullable: true },
+            purchase_date: { type: 'string', format: 'date-time', nullable: true },
+            purchase_price: { type: 'number', nullable: true },
+            insurance_provider: { type: 'string', nullable: true },
+            policy_number: { type: 'string', nullable: true },
+            insurance_cost: { type: 'number', nullable: true },
+            assigned_staff_id: { type: 'string', format: 'uuid', nullable: true },
+
+            mileage: { type: 'integer' },
+            insurance_expiry: { type: 'string', format: 'date-time', nullable: true },
+            registration_renewal: { type: 'string', format: 'date-time', nullable: true },
+            maintenance_cycle_miles: { type: 'integer' },
+            last_maintenance_mileage: { type: 'integer' },
+            notes: { type: 'string', nullable: true },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        VehicleInput: {
+          type: 'object',
+          required: ['business_id', 'make_model'],
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+            make_model: { type: 'string' },
+            year: { type: 'integer' },
+            license_plate: { type: 'string' },
+
+            type: { type: 'string' },
+            vin: { type: 'string' },
+            color: { type: 'string' },
+            purchase_date: { type: 'string', format: 'date-time' },
+            purchase_price: { type: 'number' },
+            insurance_provider: { type: 'string' },
+            policy_number: { type: 'string' },
+            insurance_cost: { type: 'number' },
+            assigned_staff_id: { type: 'string', format: 'uuid' },
+
+            mileage: { type: 'integer' },
+            insurance_expiry: { type: 'string', format: 'date-time' },
+            registration_renewal: { type: 'string', format: 'date-time' },
+            maintenance_cycle_miles: { type: 'integer' },
+            last_maintenance_mileage: { type: 'integer' },
+            notes: { type: 'string' },
+          },
+        },
+                VehicleUpdateInput: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            make_model: { type: 'string' },
+            year: { type: 'integer' },
+            license_plate: { type: 'string' },
+            renewal_cost: { type: 'number', nullable: true, description: 'When provided (>0), creates a BookkeepingTransaction expense entry (Fleet & Operations).' },
+
+
+            type: { type: 'string' },
+            vin: { type: 'string' },
+            color: { type: 'string' },
+            purchase_date: { type: 'string', format: 'date-time' },
+            purchase_price: { type: 'number' },
+            insurance_provider: { type: 'string' },
+            policy_number: { type: 'string' },
+            insurance_cost: { type: 'number' },
+            assigned_staff_id: { type: 'string', format: 'uuid' },
+
+            mileage: { type: 'integer' },
+            insurance_expiry: { type: 'string', format: 'date-time' },
+            registration_renewal: { type: 'string', format: 'date-time' },
+            maintenance_cycle_miles: { type: 'integer' },
+            last_maintenance_mileage: { type: 'integer' },
+            notes: { type: 'string' },
+          },
+        },
+        VehicleMileageUpdateInput: {
+          type: 'object',
+          required: ['mileage'],
+          properties: {
+            mileage: { type: 'integer', minimum: 0 },
+          },
+        },
+                VehicleMaintenanceAlert: {
+          type: 'object',
+          description: 'Grouped maintenance alerts per vehicle (shape returned by GET /api/fleet/maintenance-alerts)',
+          properties: {
+            vehicle: { $ref: '#/components/schemas/Vehicle' },
+            alerts: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  type: { type: 'string', example: 'registration_expiring' },
+                  message: { type: 'string', example: 'Registration expires in 15 days' },
+                },
+              },
+            },
+          },
+        },
+        FleetRepairInput: {
+          type: 'object',
+          required: ['description'],
+          properties: {
+            business_id: { type: 'string', format: 'uuid', nullable: true },
+            date: { type: 'string', format: 'date-time', nullable: true, description: 'Alias for completion_date' },
+            completion_date: { type: 'string', format: 'date-time', nullable: true },
+            description: { type: 'string' },
+            provider: { type: 'string', nullable: true },
+            cost: { type: 'number', nullable: true },
+            repair_type: { type: 'string', nullable: true, description: 'maintenance | insurance_claim | emergency_repair' },
+            miles_at_service: { type: 'integer', nullable: true },
+            notes: { type: 'string', nullable: true },
+          },
+        },
+        FleetRepair: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            vehicle_id: { type: 'string', format: 'uuid' },
+            business_id: { type: 'string', format: 'uuid' },
+            repair_type: { type: 'string' },
+            description: { type: 'string' },
+            provider: { type: 'string', nullable: true },
+            cost: { type: 'number', nullable: true },
+            completion_date: { type: 'string', format: 'date-time' },
+            date: { type: 'string', format: 'date-time', description: 'Frontend alias for completion_date' },
+            miles_at_service: { type: 'integer', nullable: true },
+            notes: { type: 'string', nullable: true },
+          },
+        },
+        FleetMetrics: {
+          type: 'object',
+          properties: {
+            totalRepairCosts: { type: 'number' },
+            avgRepairCost: { type: 'number' },
+          },
+        },
+        StaffMember: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            business_id: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+            first_name: { type: 'string', nullable: true },
+            last_name: { type: 'string', nullable: true },
+            role: { type: 'string', enum: ['Owner', 'Manager', 'Technician', 'Apprentice', 'Admin'] },
+            hourly_rate: { type: 'number' },
+            employment_type: { type: 'string', nullable: true, description: 'e.g. Full-Time, Contractor' },
+            entry_level: { type: 'string', nullable: true, description: 'e.g. Senior, Junior' },
+            notes: { type: 'string', nullable: true },
+            email: { type: 'string', format: 'email', nullable: true },
+            phone: { type: 'string', nullable: true },
+            check_in_frequency_hours: { type: 'number', nullable: true },
+            active_job_id: { type: 'string', format: 'uuid', nullable: true },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        StaffInput: {
+          type: 'object',
+          required: ['business_id', 'name', 'hourly_rate'],
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+            role: { type: 'string', enum: ['Owner', 'Manager', 'Technician', 'Apprentice', 'Admin'] },
+            hourly_rate: { type: 'number' },
+            employment_type: { type: 'string' },
+            entry_level: { type: 'string' },
+            notes: { type: 'string' },
+            email: { type: 'string', format: 'email' },
+            phone: { type: 'string' },
+            check_in_frequency_hours: { type: 'number' },
+          },
+        },
+        StaffUpdateInput: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            role: { type: 'string', enum: ['Owner', 'Manager', 'Technician', 'Apprentice', 'Admin'] },
+            hourly_rate: { type: 'number' },
+            employment_type: { type: 'string' },
+            entry_level: { type: 'string' },
+            notes: { type: 'string' },
+            email: { type: 'string', format: 'email' },
+            phone: { type: 'string' },
+            check_in_frequency_hours: { type: 'number' },
+            active_job_id: { type: 'string', format: 'uuid', nullable: true },
+          },
+        },
+        Timesheet: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            staff_id: { type: 'string', format: 'uuid' },
+            job_id: { type: 'string', format: 'uuid', nullable: true },
+            clock_in: { type: 'string', format: 'date-time' },
+            clock_out: { type: 'string', format: 'date-time', nullable: true },
+            total_hours: { type: 'number', nullable: true },
+            notes: { type: 'string', nullable: true },
+          },
+        },
+        PayrollSummary: {
+          type: 'object',
+          properties: {
+            staff_id: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+            regular_hours: { type: 'number' },
+            overtime_hours: { type: 'number', nullable: true },
+            total_pay: { type: 'number' },
+          },
+        },
+        QuoteInput: {
+          type: 'object',
+          description: 'Used for both priced quotes and estimate appointments. If is_estimate_appointment is provided, the backend honors it. If it is omitted, the backend infers mode from line_items: empty line_items means estimate appointment, populated line_items means quote.',
+          required: ['business_id', 'customer_id'],
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            customer_id: { type: 'string', format: 'uuid' },
+            assigned_staff_id: { type: 'string', format: 'uuid', nullable: true },
+            title: { type: 'string' },
+            service_name: { type: 'string' },
+            service_category: { type: 'string' },
+            custom_category_name: { type: 'string', nullable: true },
+            description: { type: 'string' },
+            contract_type: { type: 'object', additionalProperties: true },
+            warranty_due: { type: 'string', format: 'date-time', nullable: true },
+            photos: { type: 'array', items: { type: 'string' } },
+            price_book_item_id: { type: 'string', format: 'uuid', nullable: true },
+            scheduled_estimate_date: { type: 'string', format: 'date-time', nullable: true },
+            scheduled_estimate_time: { type: 'string', nullable: true, description: 'Accepts HH:MM in 24-hour format for appointments, or a display range like "10:00 - 11:00 am".' },
+            manual_subtotal: { type: 'number' },
+            discount_percent: { type: 'number' },
+            tax_percent: { type: 'number' },
+            deposit_percent: { type: 'number' },
+            total_amount: { type: 'number', nullable: true },
+            deposit_amount: { type: 'number', nullable: true },
+            payment_due_terms: { type: 'string', enum: ['Upon receipt', 'Net 15', 'Net 30', 'Net 45'] },
+            notes: { type: 'string', nullable: true },
+            line_items: {
+              type: 'array',
+              nullable: true,
+              description: 'Quote mode includes one or more priced line items. Appointment mode can send an empty array.',
+              items: { type: 'object', additionalProperties: true },
+            },
+            is_emergency: { type: 'boolean' },
+            is_estimate_appointment: { type: 'boolean', description: 'Optional explicit mode flag. If provided, backend honors it. If omitted, backend infers mode from line_items.' },
+            status: { type: 'string', enum: ['EstimateScheduled', 'Draft', 'Pending', 'Appointment', 'Sent', 'Approved', 'Declined', 'Expired'] },
+          },
+        },
+        QuoteUpdateInput: {
+          type: 'object',
+          description: 'Partial update shape for both priced quotes and estimate appointments. If is_estimate_appointment is provided, the backend honors it. If omitted, the backend infers mode from line_items: empty line_items means estimate appointment, populated line_items means quote.',
+          properties: {
+            customer_id: { type: 'string', format: 'uuid' },
+            assigned_staff_id: { type: 'string', format: 'uuid', nullable: true },
+            title: { type: 'string' },
+            service_name: { type: 'string' },
+            service_category: { type: 'string' },
+            custom_category_name: { type: 'string', nullable: true },
+            description: { type: 'string' },
+            contract_type: { type: 'object', additionalProperties: true },
+            warranty_due: { type: 'string', format: 'date-time', nullable: true },
+            photos: { type: 'array', items: { type: 'string' } },
+            price_book_item_id: { type: 'string', format: 'uuid', nullable: true },
+            scheduled_estimate_date: { type: 'string', format: 'date-time', nullable: true },
+            scheduled_estimate_time: { type: 'string', nullable: true, description: 'Accepts HH:MM in 24-hour format for appointments, or a display range like "10:00 - 11:00 am".' },
+            manual_subtotal: { type: 'number' },
+            discount_percent: { type: 'number' },
+            tax_percent: { type: 'number' },
+            deposit_percent: { type: 'number' },
+            total_amount: { type: 'number', nullable: true },
+            deposit_amount: { type: 'number', nullable: true },
+            payment_due_terms: { type: 'string', enum: ['Upon receipt', 'Net 15', 'Net 30', 'Net 45'] },
+            notes: { type: 'string', nullable: true },
+            decline_reason: { type: 'string', nullable: true },
+            line_items: {
+              type: 'array',
+              nullable: true,
+              description: 'Can be empty when the record is being used as an estimate appointment.',
+              items: { type: 'object', additionalProperties: true },
+            },
+            is_emergency: { type: 'boolean' },
+            is_estimate_appointment: { type: 'boolean', description: 'Optional explicit mode flag. If provided, backend honors it. If omitted, backend infers mode from line_items.' },
+            status: { type: 'string', enum: ['EstimateScheduled', 'Draft', 'Pending', 'Appointment', 'Sent', 'Approved', 'Declined', 'Expired'] },
+            expires_at: { type: 'string', format: 'date-time', nullable: true },
+          },
+        },
+        PriceBookItem: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            name: { type: 'string' },
+            category_id: { type: 'string', format: 'uuid', nullable: true },
+            can_quote_phone: { type: 'boolean' },
+            price_type: { type: 'string', enum: ['Fixed', 'Range', 'NeedsOnsite'] },
+            price: { type: 'number', nullable: true },
+            price_min: { type: 'number', nullable: true },
+            price_max: { type: 'number', nullable: true },
+            visit_type: { type: 'string', enum: ['Free estimate', 'Paid service call'], nullable: true },
+            service_cost: { type: 'number', nullable: true },
+            service_call_fee: { type: 'number', nullable: true },
+            notes: { type: 'string', nullable: true },
+            category_name: { type: 'string', nullable: true },
+            labor_time: { type: 'string', nullable: true },
+            labor_cost: { type: 'number', nullable: true },
+            total_materials_cost: { type: 'number', nullable: true },
+            total_tools_cost: { type: 'number', nullable: true },
+            base_cost: { type: 'number', nullable: true },
+            flat_rate: { type: 'number', nullable: true },
+            margin_amount: { type: 'number', nullable: true },
+            margin_percent: { type: 'number', nullable: true },
+            materials: {
+              type: 'array',
+              nullable: true,
+              items: { type: 'object', additionalProperties: true },
+            },
+            tools: {
+              type: 'array',
+              nullable: true,
+              items: { type: 'object', additionalProperties: true },
+            },
+          },
+        },
+        DashboardChartPoint: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', example: 'Mon' },
+            value: { type: 'number', example: 1200 },
+          },
+        },
+        DashboardTodayJob: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            jobId: { type: 'string', example: 'JOB-1247' },
+            time: { type: 'string', example: '09:00 AM', nullable: true },
+            timeWindow: { type: 'string', example: '08:00am - 09:00am' },
+            technician: { type: 'string', example: 'Mike Davis' },
+            technicianRole: { type: 'string', example: 'Plumber', nullable: true },
+            technicianStatus: { type: 'string', example: 'on job', nullable: true },
+            jobType: { type: 'string', example: 'Plumbing Repair' },
+            status: { type: 'string', example: 'In Progress' },
+            customerName: { type: 'string', example: 'Tim Wilson' },
+            customerPhone: { type: 'string', nullable: true },
+            customerEmail: { type: 'string', nullable: true },
+            customerAddress: { type: 'string', nullable: true },
+            notes: { type: 'string', nullable: true },
+            photos: { type: 'array', items: { type: 'string', format: 'uri' } },
+            total: { type: 'number', example: 8500 },
+          },
+        },
+        DashboardPendingQuote: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            title: { type: 'string', example: 'Kitchen Remodel' },
+            status: { type: 'string', example: 'Pending Approval' },
+            customerName: { type: 'string', example: 'Sarah Johnson' },
+            locationType: { type: 'string', nullable: true },
+            address: { type: 'string', nullable: true },
+            phone: { type: 'string', nullable: true },
+            email: { type: 'string', nullable: true },
+            jobType: { type: 'string', example: 'HVAC Installation', nullable: true },
+            quoteId: { type: 'string', example: 'EST-1001ABCD' },
+            total: { type: 'number', example: 8500 },
+            notes: { type: 'string', nullable: true },
+          },
+        },
+        DashboardRecentActivity: {
+          type: 'object',
+          properties: {
+            type: { type: 'string', enum: ['call', 'job', 'sms', 'invoice', 'schedule'] },
+            title: { type: 'string', example: 'Missed call from Sarah Johnson' },
+            time: { type: 'string', example: '10 mins ago' },
+          },
+        },
+        DashboardActiveTeamMember: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            name: { type: 'string', example: 'Chris Brown' },
+            role: { type: 'string', example: 'Technician' },
+            status: { type: 'string', enum: ['On Job', 'Traveling', 'On Break'] },
+            location: { type: 'string', example: '123 Main St, Dallas TX' },
+          },
+        },
+        DashboardSummary: {
+          type: 'object',
+          properties: {
+            revenue: { type: 'number', example: 14250.0 },
+            active_jobs: { type: 'integer', example: 12 },
+            jobs_trend: { type: 'number', example: 8.5 },
+            pending_invoices: { type: 'integer', example: 5 },
+            overdue_invoices: { type: 'integer', example: 2 },
+            calls_handled: { type: 'integer', example: 47 },
+            todays_jobs: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/DashboardTodayJob' },
+            },
+            pending_quotes: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/DashboardPendingQuote' },
+            },
+            recent_activity: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/DashboardRecentActivity' },
+            },
+            active_team: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/DashboardActiveTeamMember' },
+            },
+          },
+        },
+        DashboardRevenue: {
+          type: 'object',
+          properties: {
+            total: { type: 'number', example: 14250.0 },
+            trend: { type: 'number', example: 15.2 },
+            chart_data: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/DashboardChartPoint' },
+            },
+          },
+        },
+        DashboardJobsAnalytics: {
+          type: 'object',
+          properties: {
+            period: { type: 'string', enum: ['7d', '30d', '90d'], example: '7d' },
+            total: { type: 'integer', example: 18 },
+            by_status: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  status: { type: 'string', example: 'Completed' },
+                  count: { type: 'integer', example: 8 },
+                },
+              },
+            },
+            by_type: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  type: { type: 'string', example: 'Job' },
+                  count: { type: 'integer', example: 12 },
+                },
+              },
+            },
+            chart_data: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/DashboardChartPoint' },
+            },
+          },
+        },
+        InternalActivityEventInput: {
+          type: 'object',
+          required: ['business_id', 'event_type'],
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            event_type: {
+              type: 'string',
+              example: 'call.missed',
+              description: 'Must start with call., sms., job., invoice., schedule., or quote.',
+            },
+            title: { type: 'string', example: 'Missed call from Sarah Johnson' },
+            message: { type: 'string', example: 'Customer did not answer callback attempt.' },
+            actor: { type: 'string', example: 'ai-receptionist' },
+            timestamp: { type: 'string', format: 'date-time' },
+            job_id: { type: 'string', format: 'uuid', nullable: true },
+            customer_id: { type: 'string', format: 'uuid', nullable: true },
+            error: { type: 'string', nullable: true },
+            details: {
+              type: 'object',
+              additionalProperties: true,
+            },
+          },
+        },
+        InternalActivityEvent: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            business_id: { type: 'string', format: 'uuid' },
+            event_type: { type: 'string', example: 'call.missed' },
+            actor: { type: 'string', nullable: true },
+            timestamp: { type: 'string', format: 'date-time' },
+            details: {
+              type: 'object',
+              additionalProperties: true,
+            },
+            job_id: { type: 'string', format: 'uuid', nullable: true },
+            customer_id: { type: 'string', format: 'uuid', nullable: true },
+            error: { type: 'string', nullable: true },
+            createdAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        InternalEventTypeListResponse: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'array',
+              items: { type: 'string' },
+            },
+          },
+        },
+        AIBridgeWebhookResponse: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: true },
+            business_id: { type: 'string', format: 'uuid' },
+            customer_id: { type: 'string', format: 'uuid', nullable: true },
+            reply: { type: 'string', nullable: true },
+            status: { type: 'string', nullable: true },
+            call_sid: { type: 'string', nullable: true },
+            data: {
+              type: 'object',
+              additionalProperties: true,
+              nullable: true,
+            },
+          },
+        },
+        AIBridgeInboundSmsInput: {
+          type: 'object',
+          properties: {
+            from: { type: 'string', example: '+15550101010' },
+            to: { type: 'string', example: '+15551234567' },
+            message: { type: 'string', example: 'Need help with my AC' },
+            From: { type: 'string', example: '+15550101010' },
+            To: { type: 'string', example: '+15551234567' },
+            Body: { type: 'string', example: 'Need help with my AC' },
+          },
+        },
+        AIBridgeInboundCallInput: {
+          type: 'object',
+          properties: {
+            from: { type: 'string', example: '+15550101010' },
+            to: { type: 'string', example: '+15551234567' },
+            call_sid: { type: 'string', example: 'CA123' },
+            status: { type: 'string', example: 'ringing' },
+            intent: { type: 'string', example: 'schedule_service' },
+            transcript: { type: 'string', nullable: true },
+            recording_url: { type: 'string', nullable: true },
+            duration_seconds: { type: 'integer', nullable: true },
+            outcome: { type: 'string', nullable: true },
+            From: { type: 'string', example: '+15550101010' },
+            To: { type: 'string', example: '+15551234567' },
+            CallSid: { type: 'string', example: 'CA123' },
+            CallStatus: { type: 'string', example: 'ringing' },
+          },
+        },
+        AIBridgeCallStatusInput: {
+          allOf: [
+            { $ref: '#/components/schemas/AIBridgeInboundCallInput' },
+          ],
+        },
+        AIBusinessConfigResponse: {
+          type: 'object',
+          properties: {
+            business: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                name: { type: 'string' },
+                industry: { type: 'string', nullable: true },
+                business_hours: {
+                  type: 'object',
+                  additionalProperties: true,
+                  nullable: true,
+                },
+                timezone: { type: 'string', nullable: true },
+                company_phone: { type: 'string', nullable: true },
+                owner_phone: { type: 'string', nullable: true },
+                dedicated_phone_number: { type: 'string', nullable: true },
+                ai_phone_number: { type: 'string', nullable: true },
+                ai_receptionist_name: { type: 'string', nullable: true },
+                voice_gender: { type: 'string', nullable: true },
+                ai_business_description: { type: 'string', nullable: true },
+                home_base_zip: { type: 'string', nullable: true },
+                service_radius_miles: { type: 'number', nullable: true },
+                cost_per_mile_over_radius: { type: 'number', nullable: true },
+                service_area_description: { type: 'string', nullable: true },
+                unknown_service_handling: { type: 'string', nullable: true },
+                unknown_service_call_fee: { type: 'number', nullable: true },
+                quote_expiry_days: { type: 'integer', nullable: true },
+                payment_follow_up_days: {
+                  type: 'array',
+                  items: { type: 'string' },
+                },
+                payment_interval: { type: 'string', nullable: true },
+                alert_settings: { $ref: '#/components/schemas/BusinessAlertSettings' },
+                automation_settings: { $ref: '#/components/schemas/BusinessAutomationSettings' },
+                communication_settings: { $ref: '#/components/schemas/BusinessCommunicationSettings' },
+              },
+            },
+            service_categories: {
+              type: 'array',
+              items: {
+                type: 'object',
+                additionalProperties: true,
+              },
+            },
+            price_book: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/PriceBookItem' },
+            },
+          },
+        },
+        AIPriceLookupResponse: {
+          type: 'object',
+          properties: {
+            items: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/PriceBookItem' },
+            },
+            unknown_service_handling: { type: 'string', nullable: true },
+            unknown_service_call_fee: { type: 'number', nullable: true },
+          },
+        },
+        AIBookCustomerInput: {
+          type: 'object',
+          properties: {
+            first_name: { type: 'string' },
+            last_name: { type: 'string' },
+            phone_number: { type: 'string' },
+            email: { type: 'string', format: 'email', nullable: true },
+            address: { type: 'string', nullable: true },
+            zip_code: { type: 'string', nullable: true },
+            notes: { type: 'string', nullable: true },
+          },
+        },
+        AIBookingInput: {
+          type: 'object',
+          required: ['business_id', 'booking_type'],
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            booking_type: { type: 'string', enum: ['Quote', 'Job', 'ServiceCall'] },
+            customer_id: { type: 'string', format: 'uuid', nullable: true },
+            customer: { $ref: '#/components/schemas/AIBookCustomerInput' },
+            assigned_staff_id: { type: 'string', format: 'uuid', nullable: true },
+            service_name: { type: 'string', nullable: true },
+            service_type: { type: 'string', nullable: true },
+            address: { type: 'string', nullable: true },
+            price_book_item_id: { type: 'string', format: 'uuid', nullable: true },
+            service_call_fee: { type: 'number', nullable: true },
+            scheduled_start_time: { type: 'string', format: 'date-time', nullable: true },
+            scheduled_end_time: { type: 'string', format: 'date-time', nullable: true },
+            is_emergency: { type: 'boolean', nullable: true },
+            notes: { type: 'string', nullable: true },
+          },
+        },
+        AIBookingResponse: {
+          type: 'object',
+          properties: {
+            booking_type: { type: 'string', enum: ['Quote', 'Job', 'ServiceCall'] },
+            result: {
+              type: 'object',
+              additionalProperties: true,
+            },
+            automation: {
+              type: 'object',
+              properties: {
+                follow_up: {
+                  type: 'object',
+                  additionalProperties: true,
+                  nullable: true,
+                },
+                team_checkin: {
+                  type: 'object',
+                  additionalProperties: true,
+                  nullable: true,
+                },
+              },
+            },
+          },
+        },
+        BusinessProfile: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            industry: { type: 'string' },
+            business_structure: { type: 'string' },
+            company_email: { type: 'string' },
+            company_type: { type: 'string' },
+            company_phone: { type: 'string' },
+            owner_phone: { type: 'string' },
+            street: { type: 'string' },
+            city: { type: 'string' },
+            postal_code: { type: 'string' },
+            country: { type: 'string' },
+            logo_url: { type: 'string' },
+            is_phone_verified: { type: 'boolean' },
+            timezone: { type: 'string' },
+            business_hours: {
+              type: 'object',
+              additionalProperties: true,
+            },
+            service_area_description: { type: 'string' },
+            home_base_zip: { type: 'string' },
+            service_radius_miles: { type: 'number', nullable: true },
+            cost_per_mile_over_radius: { type: 'number', nullable: true },
+            dedicated_phone_number: { type: 'string' },
+            ai_phone_number: { type: 'string' },
+            ai_phone_country: { type: 'string' },
+            ai_phone_area_code: { type: 'string' },
+            ai_receptionist_name: { type: 'string' },
+            voice_gender: { type: 'string', nullable: true },
+            ai_business_description: { type: 'string' },
+            unknown_service_handling: { type: 'string' },
+            unknown_service_call_fee: { type: 'number', nullable: true },
+          },
+        },
+        BusinessProfileResponse: {
+          type: 'object',
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            profile: { $ref: '#/components/schemas/BusinessProfile' },
+          },
+        },
+        BusinessProfileUpdateInput: {
+          type: 'object',
+          required: ['business_id'],
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            profile: {
+              type: 'object',
+              additionalProperties: true,
+              nullable: true,
+            },
+            name: { type: 'string' },
+            industry: { type: 'string' },
+            business_structure: { type: 'string' },
+            company_email: { type: 'string' },
+            company_phone: { type: 'string' },
+            owner_phone: { type: 'string' },
+            street: { type: 'string' },
+            city: { type: 'string' },
+            postal_code: { type: 'string' },
+            country: { type: 'string' },
+            logo_url: { type: 'string' },
+            is_phone_verified: { type: 'boolean' },
+            timezone: { type: 'string' },
+            business_hours: {
+              type: 'object',
+              additionalProperties: true,
+            },
+            service_area_description: { type: 'string' },
+            home_base_zip: { type: 'string' },
+            service_radius_miles: { type: 'number' },
+            cost_per_mile_over_radius: { type: 'number' },
+            dedicated_phone_number: { type: 'string' },
+            ai_phone_number: { type: 'string' },
+            ai_phone_country: { type: 'string' },
+            ai_phone_area_code: { type: 'string' },
+            ai_receptionist_name: { type: 'string' },
+            voice_gender: { type: 'string' },
+            ai_business_description: { type: 'string' },
+            unknown_service_handling: { type: 'string' },
+            unknown_service_call_fee: { type: 'number' },
+          },
+        },
+        BusinessAlertSettings: {
+          type: 'object',
+          properties: {
+            missed_calls: { type: 'boolean' },
+            inbound_sms: { type: 'boolean' },
+            failed_checkins: { type: 'boolean' },
+            overdue_invoices: { type: 'boolean' },
+            expiring_quotes: { type: 'boolean' },
+          },
+        },
+        BusinessAlertSettingsResponse: {
+          type: 'object',
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            settings: { $ref: '#/components/schemas/BusinessAlertSettings' },
+          },
+        },
+        BusinessAlertSettingsUpdateInput: {
+          type: 'object',
+          required: ['business_id'],
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            settings: { $ref: '#/components/schemas/BusinessAlertSettings' },
+          },
+        },
+        BusinessAutomationSettings: {
+          type: 'object',
+          properties: {
+            team_checkins_enabled: { type: 'boolean' },
+            invoice_reminders_enabled: { type: 'boolean' },
+            quote_follow_ups_enabled: { type: 'boolean' },
+            default_check_in_frequency_hours: { type: 'number' },
+            quote_expiry_days: { type: 'integer' },
+            payment_follow_up_days: {
+              type: 'array',
+              items: { type: 'string' },
+            },
+            payment_interval: { type: 'string' },
+          },
+        },
+        BusinessAutomationSettingsResponse: {
+          type: 'object',
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            settings: { $ref: '#/components/schemas/BusinessAutomationSettings' },
+          },
+        },
+        BusinessAutomationSettingsUpdateInput: {
+          type: 'object',
+          required: ['business_id'],
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            settings: { $ref: '#/components/schemas/BusinessAutomationSettings' },
+            quote_expiry_days: { type: 'integer' },
+            payment_follow_up_days: {
+              type: 'array',
+              items: { type: 'string' },
+            },
+            payment_interval: { type: 'string' },
+          },
+        },
+        BusinessCommunicationSettings: {
+          type: 'object',
+          properties: {
+            send_booking_confirmations: { type: 'boolean' },
+            send_job_updates: { type: 'boolean' },
+            send_invoice_reminders: { type: 'boolean' },
+            missed_call_text_back: { type: 'boolean' },
+            ai_receptionist_name: { type: 'string' },
+            voice_gender: { type: 'string', nullable: true },
+            ai_business_description: { type: 'string' },
+            unknown_service_handling: { type: 'string' },
+            unknown_service_call_fee: { type: 'number', nullable: true },
+          },
+        },
+        BusinessCommunicationSettingsResponse: {
+          type: 'object',
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            settings: { $ref: '#/components/schemas/BusinessCommunicationSettings' },
+          },
+        },
+        BusinessCommunicationSettingsUpdateInput: {
+          type: 'object',
+          required: ['business_id'],
+          properties: {
+            business_id: { type: 'string', format: 'uuid' },
+            settings: { $ref: '#/components/schemas/BusinessCommunicationSettings' },
+            ai_receptionist_name: { type: 'string' },
+            voice_gender: { type: 'string' },
+            ai_business_description: { type: 'string' },
+            unknown_service_handling: { type: 'string' },
+            unknown_service_call_fee: { type: 'number' },
+          },
+        },
+        ConversationCustomerSummary: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+            phone_number: { type: 'string' },
+            email: { type: 'string' },
+          },
+        },
+        ConversationListItem: {
+          type: 'object',
+          properties: {
+            customer_id: { type: 'string', format: 'uuid' },
+            customer: { $ref: '#/components/schemas/ConversationCustomerSummary' },
+            latest_activity_title: { type: 'string' },
+            latest_timestamp: { type: 'string', format: 'date-time' },
+            dominant_channel: { type: 'string', enum: ['call', 'sms'] },
+            total_events: { type: 'integer' },
+          },
+        },
+        ConversationListResponse: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/ConversationListItem' },
+            },
+            total: { type: 'integer' },
+            page: { type: 'integer' },
+            limit: { type: 'integer' },
+            totalPages: { type: 'integer' },
+          },
+        },
+        ConversationEntry: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            channel: { type: 'string', enum: ['call', 'sms'] },
+            event_type: { type: 'string' },
+            title: { type: 'string' },
+            actor: { type: 'string' },
+            timestamp: { type: 'string', format: 'date-time' },
+            error: { type: 'string', nullable: true },
+            details: {
+              type: 'object',
+              additionalProperties: true,
+            },
+          },
+        },
+        ConversationDetailResponse: {
+          type: 'object',
+          properties: {
+            customer: { $ref: '#/components/schemas/ConversationCustomerSummary' },
+            entries: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/ConversationEntry' },
+            },
+          },
+        },
+        UserProfile: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            email: { type: 'string', format: 'email' },
+            first_name: { type: 'string', nullable: true },
+            last_name: { type: 'string', nullable: true },
+            auth_provider: { type: 'string', enum: ['Email', 'Google'] },
+            onboarding_step: { type: 'integer' },
+            onboarding_completed: { type: 'boolean' },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        AIChatMessage: {
+          type: 'object',
+          required: ['role', 'content'],
+          properties: {
+            role: {
+              type: 'string',
+              enum: ['system', 'user', 'assistant'],
+            },
+            content: {
+              type: 'string',
+            },
+          },
+        },
+        AIChatRequest: {
+          type: 'object',
+          required: ['business_id', 'message', 'history'],
+          properties: {
+            business_id: {
+              type: 'string',
+              description: 'Business UUID used to scope database context.',
+            },
+            message: {
+              type: 'string',
+              description: 'New user message.',
+            },
+            history: {
+              type: 'array',
+              description: 'Previous chat history sent by the frontend.',
+              items: {
+                $ref: '#/components/schemas/AIChatMessage',
+              },
+            },
+          },
+        },
+        AIChatResponse: {
+          type: 'object',
+          required: ['reply'],
+          properties: {
+            reply: {
+              type: 'string',
+              description: 'Final assistant response.',
+            },
+          },
+        },
+        TwilioAvailableNumber: {
+          type: 'object',
+          properties: {
+            phone_number: { type: 'string' },
+            friendly_name: { type: 'string' },
+            locality: { type: 'string', nullable: true },
+            region: { type: 'string', nullable: true },
+            capabilities: {
+              type: 'object',
+              properties: {
+                voice: { type: 'boolean' },
+                sms: { type: 'boolean' },
+                mms: { type: 'boolean' },
+              },
+            },
+          },
+        },
+        AvailableNumbersResponse: {
+          type: 'object',
+          properties: {
+            type: { type: 'string', enum: ['city', 'area_code', 'toll_free'] },
+            country: { type: 'string' },
+            count: { type: 'integer' },
+            numbers: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/TwilioAvailableNumber' },
+            },
+          },
+        },
+        WeeklyReportResponse: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            summary: { type: 'object', additionalProperties: true },
+            report: { type: 'object', additionalProperties: true },
+          },
+        },
+        SimpleMessageResponse: {
+          type: 'object',
+          properties: {
+            message: { type: 'string' },
+          },
+        },
+        BusinessDashboardSummaryResponse: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                name: { type: 'string' },
+                ai_phone_number: { type: 'string', nullable: true },
+              },
+            },
+          },
+        },
+        AiLogEntry: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            business_id: { type: 'string', format: 'uuid' },
+            event_type: { type: 'string' },
+            actor: { type: 'string', nullable: true },
+            title: { type: 'string', nullable: true },
+            message: { type: 'string', nullable: true },
+            timestamp: { type: 'string', format: 'date-time' },
+            details: {
+              type: 'object',
+              additionalProperties: true,
+              nullable: true,
+            },
+          },
+        },
+        AiLogsListResponse: {
+          type: 'object',
+          properties: {
+            data: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/AiLogEntry' },
+            },
+          },
+        },
+        AiStatusResponse: {
+          type: 'object',
+          properties: {
+            status: { type: 'string', enum: ['active', 'paused'] },
+          },
+        },
+
+        Error: {
+          type: 'object',
+          properties: {
+            error: { type: 'string' },
+            message: { type: 'string' },
+          },
+        },
+        Pagination: {
+          type: 'object',
+          properties: {
+            data: { type: 'array', items: {} },
+            total: { type: 'integer' },
+            page: { type: 'integer' },
+            limit: { type: 'integer' },
+            totalPages: { type: 'integer' },
+          },
+        },
+      },
+    },
+    tags: [
+      { name: 'Auth', description: 'Authentication and onboarding' },
+      { name: 'Onboarding', description: 'Business setup, OTP verification, AI number provisioning, and onboarding completion' },
+      { name: 'Customers', description: 'Customer management' },
+      { name: 'Quotes', description: 'Quote lifecycle (EstimateScheduled → Approved → Job)' },
+      { name: 'Jobs', description: 'Job management (Scheduled → Completed → Invoiced)' },
+      { name: 'Billing', description: 'Invoices, payments, and expenses' },
+      { name: 'Payments', description: 'Payment processing and payment recording' },
+      { name: 'Expenses', description: 'Expense tracking endpoints' },
+      { name: 'PriceBook', description: 'Service categories and price book' },
+      { name: 'Inventory', description: 'Materials and inventory' },
+      { name: 'Fleet', description: 'Vehicle and fleet management' },
+      { name: 'Financial Settings', description: 'Invoice & quote settings and Stripe metadata' },
+      { name: 'Integrations', description: 'Third-party integrations (Stripe, etc.)' },
+      { name: 'Subscriptions', description: 'Subscription billing, trials, and lifecycle actions' },
+      { name: 'Webhooks', description: 'Inbound webhook endpoints such as Stripe' },
+
+      { name: 'Schedule', description: 'Schedule and calendar endpoints, including availability checks' },
+      { name: 'Team', description: 'Staff directory, payroll, timesheets, and clock-in/out actions' },
+      { name: 'Team Check-Ins', description: 'Field staff check-ins and escalation flows' },
+      { name: 'Follow-Ups', description: 'Automated reminders and follow-up management' },
+      { name: 'Dashboard', description: 'Analytics and reporting' },
+      { name: 'Business Profile', description: 'Company profile, service area, and general business settings' },
+      { name: 'Businesses', description: 'Lightweight business summary endpoints' },
+      { name: 'Alerts', description: 'Alert preference settings for missed calls, invoices, and check-ins' },
+      { name: 'Automation', description: 'Automation settings for reminders, expiries, and check-in defaults' },
+      { name: 'Communication', description: 'Messaging defaults, AI receptionist settings, and communication behavior' },
+      { name: 'Conversations', description: 'Customer call and SMS history' },
+      { name: 'Notifications', description: 'Notification center feed + read/unread actions' },
+      { name: 'Search', description: 'Global omnibar search' },
+      { name: 'Reports', description: 'Aggregated analytics endpoints for dashboards and leaderboards' },
+      { name: 'Upload', description: 'Universal file upload endpoint' },
+      { name: 'Bookkeeping', description: 'Transactions, summaries, categorization, and rules' },
+      { name: 'AI', description: 'Frontend AI assistant endpoints' },
+      { name: 'AI Logs', description: 'AI event log inspection and manual event creation' },
+      { name: 'AI Bridge', description: 'Internal AI service API (x-api-key required; business-scoped routes also require x-business-token)' },
+    ],
+  },
+  apis: [
+    './src/api/routes/*.js',
+    './src/api/routes/docs/*swagger.js',
+    './src/domains/**/*.js',
+  ],
+};
+
+const swaggerSpec = swaggerJsdoc(options);
+
+module.exports = swaggerSpec;
